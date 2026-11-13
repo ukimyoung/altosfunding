@@ -1,4 +1,4 @@
-"""Broker Gateway: MT4 서버와 통신하는 내부 전용 서비스 (Render Private Service). Sandbox는 데모 MT4 서버에만 연결합니다."""
+"""Broker Gateway: 브로커 MT4 REST API를 호출하는 내부 전용 서비스 (Render Private Service). Sandbox는 데모 API(mexn-mt4-alto-demo.tfb-api.com), Live는 운영 API(mexn-mt4-alto.tfb-api.com)에 연결합니다."""
 
 from fastapi import FastAPI
 
