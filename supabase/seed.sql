@@ -1,0 +1,1 @@
+-- 로컬 개발(supabase start / db reset)에서만 실행되는 시드 데이터입니다.
