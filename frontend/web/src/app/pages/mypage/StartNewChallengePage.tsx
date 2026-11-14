@@ -24,6 +24,9 @@ import { useMeQuery } from '@/app/queries/profile';
 import { hasRequiredProfileName } from '@/app/utils/profile';
 import { useLocale } from '@/app/i18n/LocaleContext';
 import { BannerPopup } from '@/app/components/shared/BannerPopup';
+import { InfoTooltip } from '@/app/components/shared/InfoTooltip';
+
+type TemplateId = 'starter' | 'pro' | 'elite' | 'prime';
 
 type AccountType = {
   id: string;
@@ -32,7 +35,7 @@ type AccountType = {
   price: number;
   originalFee: string;
   capital: number;
-  templateId?: 'starter' | 'pro' | 'elite';
+  templateId?: TemplateId;
   challengeStage: {
     profitTarget: string;
     maxDrawdown: string;
@@ -56,7 +59,9 @@ type AccountTemplate = Omit<
   AccountType,
   'id' | 'challengeId' | 'price' | 'capital' | 'isRecommended'
 > & {
-  id: 'starter' | 'pro' | 'elite';
+  id: TemplateId;
+  /** Funding capital this template describes; used to match API products. */
+  templateCapital: number;
 };
 
 const accountTemplates: AccountTemplate[] = [
@@ -64,19 +69,20 @@ const accountTemplates: AccountTemplate[] = [
     id: 'starter',
     templateId: 'starter',
     name: 'Starter',
-    originalFee: '$150',
+    originalFee: '$80',
+    templateCapital: 10000,
     challengeStage: {
-      profitTarget: '$1,500',
-      maxDrawdown: '$1,500',
+      profitTarget: '$600',
+      maxDrawdown: '$500',
       dailyLossLimit: null,
-      maxContracts: '2 Mini (20 Micro)',
+      maxContracts: '1 Mini (10 Micro)',
       consistency: '40%',
       tradingPeriod: '5 Days',
     },
     fundedStage: {
       profitTarget: null,
-      maxDrawdown: '$1,500',
-      dailyLossLimit: '$500',
+      maxDrawdown: '$500',
+      dailyLossLimit: '$200',
       maxContracts: '2 Mini (20 Micro)',
       consistency: null,
       profitSplit: '80/20',
@@ -86,7 +92,31 @@ const accountTemplates: AccountTemplate[] = [
     id: 'pro',
     templateId: 'pro',
     name: 'Professional',
-    originalFee: '$200',
+    originalFee: '$131',
+    templateCapital: 25000,
+    challengeStage: {
+      profitTarget: '$1,500',
+      maxDrawdown: '$1,000',
+      dailyLossLimit: null,
+      maxContracts: '2 Mini (20 Micro)',
+      consistency: '40%',
+      tradingPeriod: '5 Days',
+    },
+    fundedStage: {
+      profitTarget: null,
+      maxDrawdown: '$1,000',
+      dailyLossLimit: '$500',
+      maxContracts: '2 Mini (20 Micro)',
+      consistency: null,
+      profitSplit: '80/20',
+    },
+  },
+  {
+    id: 'elite',
+    templateId: 'elite',
+    name: 'Elite',
+    originalFee: '$188',
+    templateCapital: 50000,
     challengeStage: {
       profitTarget: '$3,000',
       maxDrawdown: '$2,000',
@@ -105,10 +135,11 @@ const accountTemplates: AccountTemplate[] = [
     },
   },
   {
-    id: 'elite',
-    templateId: 'elite',
-    name: 'Elite',
-    originalFee: '$270',
+    id: 'prime',
+    templateId: 'prime',
+    name: 'Prime',
+    originalFee: '$320',
+    templateCapital: 100000,
     challengeStage: {
       profitTarget: '$6,000',
       maxDrawdown: '$3,500',
@@ -131,6 +162,14 @@ const accountTemplates: AccountTemplate[] = [
 const formatCapital = (capital: number) => `$${capital.toLocaleString('en-US')}`;
 
 const getAccountTemplateForProduct = (product: Product, index: number) => {
+  const capitalTemplate = accountTemplates.find(
+    (template) => template.templateCapital === product.capital,
+  );
+
+  if (capitalTemplate) {
+    return capitalTemplate;
+  }
+
   const productText = `${product.product_id} ${product.challenge_name}`.toLowerCase();
   const matchedTemplate = accountTemplates.find(
     (template) =>
@@ -144,8 +183,10 @@ const mergeAccountTypesWithProducts = (products: Product[]) => {
   return products.map((product, index) => {
     const template = getAccountTemplateForProduct(product, index);
 
+    const { templateCapital: _templateCapital, ...templateFields } = template;
+
     return {
-      ...template,
+      ...templateFields,
       id: product.product_id,
       challengeId: product.challenge_id,
       name: template.name,
@@ -195,6 +236,7 @@ export function StartNewChallengePage() {
   const navigate = useNavigate();
   const { T } = useLocale();
   const text = T.startNewChallenge;
+  const tooltips = text.tooltips;
   const tierNames: Record<string, string> = text.tierNames;
   const getAccountDisplayName = (account: AccountType) =>
     account.templateId ? tierNames[account.templateId] : account.name;
@@ -799,8 +841,8 @@ export function StartNewChallengePage() {
               {text.chooseChallengeAccountType}
             </h2>
             {isChallengeSummaryLoading ? (
-              <div className="grid gap-6 md:grid-cols-3">
-                {Array.from({ length: 3 }).map((_, index) => (
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, index) => (
                   <div
                     key={index}
                     className="animate-pulse rounded-2xl border border-[#2a2a3a] bg-[#0f0f17] p-6"
@@ -820,7 +862,7 @@ export function StartNewChallengePage() {
                 <p className="font-semibold text-white">{text.noActiveChallenges}</p>
               </div>
             ) : (
-              <div className="grid gap-6 md:grid-cols-3">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
                 {sortedChallenges.map((account, index) => {
                   return (
                     <motion.div
@@ -829,7 +871,7 @@ export function StartNewChallengePage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.1 }}
                       onClick={() => setSelectedAccount(account.id)}
-                      className={`relative cursor-pointer rounded-2xl border-2 bg-[#0f0f17] p-6 transition-all hover:scale-105 ${
+                      className={`relative cursor-pointer rounded-2xl border-2 bg-[#0f0f17] p-5 transition-all hover:scale-105 ${
                         selectedAccount === account.id
                           ? 'border-[#0052FF] shadow-lg shadow-[#0052FF]/20'
                           : 'border-[#2a2a3a] hover:border-[#0052FF]/50'
@@ -842,52 +884,97 @@ export function StartNewChallengePage() {
                           </div>
                         </div>
                       )}
-                      {selectedAccount === account.id && (
-                        <div className="absolute right-5 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-[#0052FF]">
-                          <Check size={18} className="text-white" />
+
+                      {/* Compact header: tier name, then capital and one-time fee side by side */}
+                      <div className="mb-4 border-b border-[#2a2a3a] pb-4">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs uppercase tracking-wider text-gray-500">
+                            {getAccountDisplayName(account)}
+                          </span>
+                          {selectedAccount === account.id && (
+                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0052FF]">
+                              <Check size={12} className="text-white" />
+                            </div>
+                          )}
                         </div>
-                      )}
-                      <div className="relative mb-4 flex flex-col items-center text-center">
-                        <h3 className="mb-2 text-2xl font-bold text-white">
-                          {getAccountDisplayName(account)}
-                        </h3>
-                        <p className="mb-1 text-xs text-gray-500">{text.fundingCapital}</p>
-                        <span className="text-3xl font-bold text-[#00FF94]">
-                          {formatCapital(account.capital)}
-                        </span>
+                        <div className="flex items-end justify-between gap-2">
+                          <div>
+                            <div className="text-2xl font-bold leading-tight text-[#00FF94]">
+                              {formatCapital(account.capital)}
+                            </div>
+                            <div className="mt-0.5 text-xs text-gray-400">{text.fundingCapital}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="flex items-baseline justify-end gap-1.5">
+                              <span className="text-xs text-gray-500 line-through">
+                                {account.originalFee}
+                              </span>
+                              <span className="text-2xl font-bold leading-tight text-white">
+                                ${account.price}
+                              </span>
+                            </div>
+                            <div className="mt-0.5 text-xs text-gray-400">{text.oneTimeFee}</div>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="space-y-6">
+                      <div className="space-y-4">
                         <div>
-                          <h3 className="mb-4 text-base font-bold text-white">
+                          <h3 className="mb-3 text-sm font-bold text-white">
                             {text.challengeStage}
                           </h3>
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.profitTarget}</span>
-                              <span className="text-sm font-bold text-white">{account.challengeStage.profitTarget}</span>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.profitTarget} />
+                                {text.profitTarget}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {account.challengeStage.profitTarget}
+                              </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.maxDrawdownEod}</span>
-                              <span className="text-sm font-bold text-white">{account.challengeStage.maxDrawdown}</span>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.maxDrawdownEod} />
+                                {text.maxDrawdownEod}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {account.challengeStage.maxDrawdown}
+                              </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.dailyLossLimit}</span>
-                              <span className="text-sm font-bold text-white">
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.dailyLossLimit} />
+                                {text.dailyLossLimit}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
                                 {account.challengeStage.dailyLossLimit ?? text.none}
                               </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.maxContracts}</span>
-                              <span className="text-sm font-bold text-white">{account.challengeStage.maxContracts}</span>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.maxContracts} />
+                                {text.maxContracts}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {account.challengeStage.maxContracts}
+                              </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.consistency}</span>
-                              <span className="text-sm font-bold text-white">{account.challengeStage.consistency}</span>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.consistency} />
+                                {text.consistency}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {account.challengeStage.consistency}
+                              </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.tradingPeriod}</span>
-                              <span className="text-sm font-bold text-white">
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.tradingPeriod} />
+                                {text.tradingPeriod}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
                                 {formatAccountTextValue(account.challengeStage.tradingPeriod)}
                               </span>
                             </div>
@@ -895,51 +982,64 @@ export function StartNewChallengePage() {
                         </div>
 
                         <div>
-                          <h3 className="mb-4 text-base font-bold text-white">
+                          <h3 className="mb-3 text-sm font-bold text-white">
                             {text.fundedStage}
                           </h3>
                           <div className="space-y-3">
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.profitTarget}</span>
-                              <span className="text-sm font-bold text-white">
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.profitTarget} />
+                                {text.profitTarget}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
                                 {account.fundedStage.profitTarget ?? text.none}
                               </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.maxDrawdownEod}</span>
-                              <span className="text-sm font-bold text-white">{account.fundedStage.maxDrawdown}</span>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.maxDrawdownEod} />
+                                {text.maxDrawdownEod}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {account.fundedStage.maxDrawdown}
+                              </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.dailyLossLimit}</span>
-                              <span className="text-sm font-bold text-white">{account.fundedStage.dailyLossLimit}</span>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.dailyLossLimit} />
+                                {text.dailyLossLimit}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {account.fundedStage.dailyLossLimit}
+                              </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.maxContracts}</span>
-                              <span className="text-sm font-bold text-white">{account.fundedStage.maxContracts}</span>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.maxContracts} />
+                                {text.maxContracts}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {account.fundedStage.maxContracts}
+                              </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.consistency}</span>
-                              <span className="text-sm font-bold text-white">
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.consistency} />
+                                {text.consistency}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
                                 {account.fundedStage.consistency ?? text.none}
                               </span>
                             </div>
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="shrink-0 text-sm text-gray-400">{text.profitSplit}</span>
-                              <span className="text-sm font-bold text-white">{account.fundedStage.profitSplit}</span>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.profitSplit} />
+                                {text.profitSplit}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {account.fundedStage.profitSplit}
+                              </span>
                             </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-6 border-t border-[#2a2a3a] pt-5">
-                        <div className="flex items-center justify-between gap-4">
-                          <span className="text-sm text-gray-400">{text.oneTimeFee}</span>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-sm text-gray-500 line-through">
-                              {account.originalFee}
-                            </span>
-                            <span className="text-2xl font-bold text-white">${account.price}</span>
-                            <span className="text-sm text-gray-400">USDT</span>
                           </div>
                         </div>
                       </div>

@@ -5,7 +5,7 @@ export const startNewChallengeEn: StartNewChallengeTranslations = {
   accountSizeTitle: 'Select Your Account Size',
   accountSizeSubtitle: 'Choose the funding evaluation tier that fits your trading style.',
 
-  tierNames: { starter: 'Starter', pro: 'Professional', elite: 'Elite' },
+  tierNames: { starter: 'Starter', pro: 'Professional', elite: 'Elite', prime: 'Prime' },
 
   mostPopular: 'MOST POPULAR',
   fundingCapital: 'Funding Capital',
@@ -24,6 +24,15 @@ export const startNewChallengeEn: StartNewChallengeTranslations = {
   maxContracts: 'Max Contracts',
   consistency: 'Consistency',
   profitSplit: 'Profit Split',
+  tooltips: {
+    profitTarget: 'The target profit required to pass the challenge stage.',
+    maxDrawdownEod: 'Maximum allowable drawdown calculated based on the End-of-Day balance.',
+    dailyLossLimit: 'The maximum amount of loss permitted within a single trading day.',
+    maxContracts: 'The maximum position size allowed across Mini and Micro contracts.',
+    consistency: 'The rule ensuring profits are distributed across multiple trading days.',
+    tradingPeriod: 'Minimum required active trading days to complete the evaluation.',
+    profitSplit: 'Traders keep 80% of the profits generated, and the firm takes 20%.',
+  },
   activationFee: 'Activation Fee',
   consistencyRule: 'Consistency Rule',
   none: 'None',
