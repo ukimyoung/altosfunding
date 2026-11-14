@@ -11,6 +11,7 @@ export const challengeEn: ChallengeTranslations = {
     accountTypeStarter: 'Starter',
     accountTypeProfessional: 'Professional',
     accountTypeElite: 'Elite',
+    accountTypePrime: 'Prime',
     activeLabel: 'Active',
     totalActiveChallenges: 'Total Active Challenges',
     currentlyInProgress: 'Currently in progress',

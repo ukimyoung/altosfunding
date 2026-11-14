@@ -11,6 +11,7 @@ export const challengeKo: ChallengeTranslations = {
     accountTypeStarter: '스타터',
     accountTypeProfessional: '프로페셔널',
     accountTypeElite: '엘리트',
+    accountTypePrime: '프라임',
     activeLabel: '진행 중',
     totalActiveChallenges: '진행 중인 챌린지',
     currentlyInProgress: '현재 진행 중',
