@@ -1,0 +1,111 @@
+import type { StartNewChallengeTranslations } from './types';
+
+export const startNewChallengeEn: StartNewChallengeTranslations = {
+  pageTitle: 'Start New Challenge',
+  accountSizeTitle: 'Select Your Account Size',
+  accountSizeSubtitle: 'Choose the funding evaluation tier that fits your trading style.',
+
+  tierNames: { starter: 'Starter', pro: 'Professional', elite: 'Elite' },
+
+  mostPopular: 'MOST POPULAR',
+  fundingCapital: 'Funding Capital',
+  oneTimeFee: 'One-time Fee',
+  evaluationPhase: 'Evaluation Phase',
+  fundedAccount: 'Funded Account',
+
+  challengeStage: 'Challenge Stage',
+  fundedStage: 'Funded Stage',
+
+  phase: 'Phase',
+  tradingPeriod: 'Trading Period',
+  dailyLossLimit: 'Daily Loss Limit',
+  maxDrawdown: 'Max Drawdown',
+  maxDrawdownEod: 'Max Drawdown (EOD)',
+  maxContracts: 'Max Contracts',
+  consistency: 'Consistency',
+  profitSplit: 'Profit Split',
+  activationFee: 'Activation Fee',
+  consistencyRule: 'Consistency Rule',
+  none: 'None',
+
+  tradingObjectives: 'Trading Objectives',
+  profitTarget: 'Profit Target',
+  maxDailyLoss: 'Maximum Daily Loss',
+  maxTotalDrawdown: 'Maximum Total Drawdown (MDD)',
+  minTradingDays: 'Minimum Trading Days',
+  noTimeLimit: 'No Time Limit',
+  leverageText: 'Leverage up to 1:100',
+
+  quantityLabel: 'Quantity',
+  account: 'Account',
+  accounts: 'Accounts',
+
+  orderSummary: 'Order Summary',
+  challengeAccountType: 'Challenge Account Type',
+  quantity: 'Quantity',
+  totalAmount: 'Total Amount',
+  proceedToPayment: 'Proceed to Payment',
+  chooseChallengeAccountType: 'Choose Your Challenge Account Type',
+  selected: 'Selected',
+  fiveDays: '5 Days',
+  requestFailed: 'Request Failed',
+  processing: 'Processing...',
+  checking: 'Checking...',
+  noActiveChallenges: 'No active challenges available.',
+  completePaymentError: 'Unable to complete payment. Please try again.',
+  profileNameRequired: 'Please enter your first and last name in your profile.',
+  challengeUnavailable:
+    'Selected challenge is no longer available. Please choose another challenge.',
+  challengeChanged: 'Selected challenge information has changed. Please review it again.',
+  refreshFailed: 'Unable to refresh challenge information. Please try again.',
+
+  refundableRegFee: 'Refundable Registration Fee',
+  refundableRegFeeDesc:
+    'The registration fee is 100% refundable upon your first successful payout.',
+
+  selectPaymentMethod: 'Select Payment Method',
+  cryptoPayment: 'Crypto Payment (USDT / BTC)',
+  creditDebitCard: 'Credit / Debit Card',
+  enterBillingDetails: 'Enter Billing Details',
+  purchaseChallenge: 'Purchase Challenge',
+
+  completePaymentTitle: 'Complete Payment',
+  completePaymentSub: 'Confirm your purchase using your Total Asset balance',
+  availableTotalAsset: 'Available Total Asset',
+  challengeDetails: 'Challenge Details',
+  paymentSummary: 'Payment Summary',
+  challengeFee: 'Challenge Fee',
+  processingFee: 'Processing Fee',
+  free: 'FREE',
+  discountCode: 'Discount Code',
+  discountCodePlaceholder: 'Enter promo code',
+  verifyCode: 'Verify Code',
+  verifyingCode: 'Verifying…',
+  discountApplied: '{rate}% discount applied',
+  discountInvalid: 'Invalid discount code',
+  discountAmount: 'Discount Amount',
+  remainingBalance: 'Remaining Balance After Payment',
+  paymentInfoTitle: 'Payment Information',
+  paymentInfoItems: [
+    'The payment amount will be deducted from your total asset balance.',
+    "Refunds are not possible after payment is completed, and completing the payment is considered as 'agreeing' to the non-refundable policy.",
+    'Participation is confirmed upon completion of payment.',
+    'After payment is completed, the challenge account information will be sent via email.',
+  ],
+  cancel: 'Cancel',
+  completePaymentBtn: 'Complete Payment',
+
+  insufficientFunds: 'Insufficient Funds',
+  unableToComplete: 'Unable to complete payment',
+  insufficientFundsMsg:
+    'Insufficient funds in your Total Asset. Please top up your balance before proceeding with the payment.',
+  requiredAmount: 'Required Amount',
+  currentBalance: 'Current Balance',
+  amountNeeded: 'Amount Needed',
+  close: 'Close',
+  goToMyAsset: 'Go to My Asset',
+
+  paymentSuccessful: 'Payment Successful!',
+  paymentSuccessMsg:
+    'The challenge purchase has been completed. The amount has been deducted from your total asset balance.',
+};

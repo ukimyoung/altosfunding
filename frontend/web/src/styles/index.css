@@ -1,0 +1,105 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+@layer utilities {
+  /* 스크롤바 숨기기 유틸리티 */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE, Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+}
+
+/* 마우스 사용이 가능한 기기(데스크탑 등)에서만 손가락 모양 적용 */
+@media (hover: hover) {
+  button {
+    cursor: pointer;
+  }
+}
+
+/* 버튼이 비활성화되었을 때의 처리 (공통) */
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* reCAPTCHA v3 배지는 화면에서 숨기고, 인라인 고지 문구를 대신 노출한다. */
+.grecaptcha-badge {
+  visibility: hidden !important;
+}
+
+/* react-phone-number-input dark theme overrides */
+.phone-input-dark.PhoneInput {
+  width: 100%;
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #2a2a3a;
+  border-radius: 0.5rem;
+  background: #1a1a24;
+  color: #ffffff;
+  gap: 0.75rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.phone-input-dark.PhoneInput--focus {
+  border-color: #0052ff;
+  box-shadow: 0 0 0 1px rgba(0, 82, 255, 0.15);
+}
+
+.phone-input-dark .PhoneInputCountry {
+  align-self: center;
+  margin-right: 0.125rem;
+}
+
+.phone-input-dark .PhoneInputCountrySelectArrow {
+  border-color: #9ca3af;
+  opacity: 1;
+}
+
+.phone-input-dark .PhoneInputCountryIcon {
+  border-radius: 4px;
+}
+
+.phone-input-dark .PhoneInputCountryIcon--border {
+  background-color: #11111a;
+  box-shadow: 0 0 0 1px #2a2a3a, inset 0 0 0 1px #2a2a3a;
+}
+
+.phone-input-dark .PhoneInputInput {
+  background: transparent;
+  border: 0;
+  color: #ffffff;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+  outline: none;
+}
+
+.phone-input-dark .PhoneInputInput::placeholder {
+  color: #6b7280;
+}
+
+.phone-input-dark .PhoneInputCountrySelect {
+  cursor: pointer;
+}
+
+/* 날짜 입력의 브라우저 기본 달력 아이콘을 숨기고, 커스텀 레이아웃만 보여준다. */
+.filter-date-input::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  cursor: pointer;
+}
+
+.filter-date-input::-webkit-inner-spin-button {
+  display: none;
+}
+
+.filter-date-input::-webkit-clear-button {
+  display: none;
+}
+
+.filter-date-input {
+  appearance: none;
+  -webkit-appearance: none;
+}
