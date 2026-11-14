@@ -1,5 +1,5 @@
 import api from './axios';
-import { clearAccessToken, setAccessToken } from '@/app/utils/auth/tokenStore';
+import { clearAccessToken, setAccessToken } from '@altosfunding/shared/auth/tokenStore';
 
 export interface LoginRequest {
   email: string;

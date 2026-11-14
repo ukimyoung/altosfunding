@@ -27,7 +27,7 @@ import {
   useUpdatePasswordMutation,
   useUpdateWithdrawEmailMutation,
 } from '@/app/queries/security';
-import { getApiErrorMessage, isUnauthorizedError } from '@/app/queries/errors';
+import { getApiErrorMessage, isUnauthorizedError } from '@altosfunding/shared/api/errors';
 import { useLocale } from '@/app/i18n/LocaleContext';
 
 type PasswordFormData = {

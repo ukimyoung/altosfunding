@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { Send, CheckCircle, AlertCircle } from 'lucide-react';
-import { getApiErrorMessage } from '@/app/queries/errors';
+import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { useLocale } from '@/app/i18n/LocaleContext';
 
 interface ContactFormData {

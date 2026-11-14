@@ -14,7 +14,7 @@ import {
   navigateToGoogleAuth,
 } from '../../utils/auth/googleAuth';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
-import { getApiErrorMessage } from '@/app/queries/errors';
+import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { useLocale } from '@/app/i18n/LocaleContext';
 
 type LoginLocationState = {

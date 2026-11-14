@@ -8,7 +8,7 @@ import { createPayoutRequest } from '@/api/payouts';
 import { formatDateByBrowserTimeZone } from '@/app/utils/date';
 import { useInView } from 'react-intersection-observer';
 import { useSearchParams } from 'react-router';
-import { getApiErrorMessage } from '@/app/queries/errors';
+import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { useLocale } from '@/app/i18n/LocaleContext';
 
 type WithdrawalHistory = {

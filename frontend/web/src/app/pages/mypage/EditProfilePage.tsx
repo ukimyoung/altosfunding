@@ -8,12 +8,12 @@ import {
   useUpdateProfileMutation,
   useWithdrawAccountMutation,
 } from '@/app/queries/profile';
-import { getApiErrorMessage } from '@/app/queries/errors';
+import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { Edit, User, Mail, Phone, MapPin, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { Toast } from '../../components/shared/Toast';
 import { type MeResponse, type UpdateProfileRequest } from '@/api/user';
 import { useLocale } from '@/app/i18n/LocaleContext';
-import { clearAccessToken } from '@/app/utils/auth/tokenStore';
+import { clearAccessToken } from '@altosfunding/shared/auth/tokenStore';
 
 type ProfileFormData = {
   firstName: string;

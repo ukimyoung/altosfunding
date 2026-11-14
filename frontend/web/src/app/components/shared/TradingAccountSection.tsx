@@ -7,7 +7,7 @@ import {
   useUpdateAccountPasswordMutation,
 } from '@/app/queries/accounts';
 import { useMeQuery } from '@/app/queries/profile';
-import { getApiErrorMessage } from '@/app/queries/errors';
+import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { createLiveAccount } from '@/api/live';
 import { hasRequiredProfileName } from '@/app/utils/profile';
 import { useLocale } from '@/app/i18n/LocaleContext';

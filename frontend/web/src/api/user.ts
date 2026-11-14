@@ -1,10 +1,8 @@
 import api from './axios';
-import type { AxiosRequestConfig } from 'axios';
+import type { ApiRequestConfig } from '@altosfunding/shared/api/createApiClient';
 import type { KycStatus } from './kyc';
 
-type AuthRequestConfig = AxiosRequestConfig & {
-  skipAuthRedirect?: boolean;
-};
+type AuthRequestConfig = ApiRequestConfig;
 
 export interface MeResponse {
   id?: string;

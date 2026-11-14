@@ -5,7 +5,7 @@ import axios from 'axios';
 import { useMeQuery } from '@/app/queries/profile';
 import { useCreateDemoAccountMutation, useDemoOptionsQuery } from '@/app/queries/demo';
 import { accountsQueryKeys, useAccountsQuery } from '@/app/queries/accounts';
-import { getApiErrorMessage } from '@/app/queries/errors';
+import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   User,

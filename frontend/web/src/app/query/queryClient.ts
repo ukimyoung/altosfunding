@@ -1,14 +1,3 @@
-import { QueryClient } from '@tanstack/react-query';
+import { createQueryClient } from '@altosfunding/shared/query/createQueryClient';
 
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 0,
-    },
-    mutations: {
-      retry: 0,
-    },
-  },
-});
+export const queryClient = createQueryClient();

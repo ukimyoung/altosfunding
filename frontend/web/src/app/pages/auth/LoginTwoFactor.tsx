@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { motion } from 'motion/react';
 import { Shield, ArrowLeft } from 'lucide-react';
 import { useTwoFactorLoginMutation } from '@/app/queries/auth';
-import { getApiErrorMessage } from '@/app/queries/errors';
+import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { AppBrand } from '../../components/shared/AppBrand';
 import { LanguageSelector } from '../../components/shared/LanguageSelector';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../../components/ui/input-otp';
