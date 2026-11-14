@@ -1,3 +1,6 @@
+from typing import Literal
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +18,22 @@ class Settings(BaseSettings):
     mt4_challenge_api_url: str = ""
     mt4_funded_api_url: str = ""
     mt4_api_key: str = ""
+
+    # mock: 브로커를 호출하지 않고 가짜 응답을 돌려줍니다 (local, sandbox).
+    # live: 실제 브로커 API를 호출합니다. APP_ENV=live 에서만 허용됩니다.
+    mt4_mode: Literal["mock", "live"] = "mock"
+
+    @model_validator(mode="after")
+    def _guard_live_broker(self) -> "Settings":
+        if self.mt4_mode == "live" and self.app_env != "live":
+            raise ValueError(
+                f"MT4_MODE=live 는 APP_ENV=live 에서만 사용할 수 있습니다 (현재 APP_ENV={self.app_env})."
+            )
+        if self.mt4_mode == "live" and not (
+            self.mt4_challenge_api_url and self.mt4_funded_api_url and self.mt4_api_key
+        ):
+            raise ValueError("MT4_MODE=live 에는 MT4_CHALLENGE_API_URL, MT4_FUNDED_API_URL, MT4_API_KEY 가 필요합니다.")
+        return self
 
 
 settings = Settings()
