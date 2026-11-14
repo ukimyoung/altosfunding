@@ -79,7 +79,7 @@ export const landingEn: LandingTranslations = {
   accounts: {
     title: 'Account Size',
     subtitle: 'Choose the funding level that matches your trading expertise',
-    tierNames: ['Starter', 'Professional', 'Elite'],
+    tierNames: ['Starter', 'Professional', 'Elite', 'Prime'],
     labels: {
       profitTarget: 'Profit Target',
       maxDrawdownEod: 'Max Drawdown (EOD)',
@@ -102,6 +102,15 @@ export const landingEn: LandingTranslations = {
       fundedStage: 'Funded Stage',
       topPerformance: 'Top 10% performance',
       topPerformanceSub: 'Eligibility is limited to the top 10% of traders.',
+      tooltips: {
+        profitTarget: 'The target profit required to pass the challenge stage.',
+        maxDrawdownEod: 'Maximum allowable drawdown calculated based on the End-of-Day balance.',
+        dailyLossLimit: 'The maximum amount of loss permitted within a single trading day.',
+        maxContracts: 'The maximum position size allowed across Mini and Micro contracts.',
+        consistency: 'The rule ensuring profits are distributed across multiple trading days.',
+        tradingPeriod: 'Minimum required active trading days to complete the evaluation.',
+        profitSplit: 'Traders keep 80% of the profits generated, and the firm takes 20%.',
+      },
     },
   },
 
