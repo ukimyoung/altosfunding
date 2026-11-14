@@ -1,0 +1,73 @@
+# Render Blueprint
+# Render 대시보드 > New > Blueprint 에서 이 저장소를 선택하면 아래 서비스가 만들어진다.
+#
+# 지금은 Sandbox(develop 브랜치) 프론트엔드 정적 사이트 2개만 정의한다.
+# API는 기존 서버(121.254.254.52:8200)를 그대로 쓰고, 각 사이트의 /api/* 요청을
+# Render rewrite로 그 서버에 넘긴다. 새 백엔드로 옮길 때 destination만 바꾸면 된다.
+
+services:
+  # ── 사용자 웹 ───────────────────────────────────────────────
+  - type: web
+    runtime: static
+    name: altosfunding-web-sandbox
+    branch: develop
+    rootDir: frontend
+    buildCommand: npm ci && npm run build:web
+    staticPublishPath: web/dist
+    buildFilter:
+      paths:
+        - frontend/web/**
+        - frontend/shared/**
+        - frontend/package.json
+        - frontend/package-lock.json
+        - frontend/tsconfig.base.json
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Google reCAPTCHA site key. Google reCAPTCHA 관리 콘솔에서 onrender.com 도메인을 허용해야 로그인·가입이 동작한다.
+      - key: VITE_RECAPTCHA_SITE_KEY
+        sync: false
+      # 이 사이트의 주소 (예: https://altosfunding-web-sandbox.onrender.com). Google 로그인과 og:image 에 쓰인다.
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      # 위에서부터 순서대로 적용된다. 실제 파일이 있으면 규칙보다 파일이 먼저다.
+      - type: rewrite
+        source: /api/*
+        destination: http://121.254.254.52:8200/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # ── 관리자 백오피스 ─────────────────────────────────────────
+  - type: web
+    runtime: static
+    name: altosfunding-backoffice-sandbox
+    branch: develop
+    rootDir: frontend
+    buildCommand: npm ci && npm run build:backoffice
+    staticPublishPath: backoffice/dist
+    buildFilter:
+      paths:
+        - frontend/backoffice/**
+        - frontend/shared/**
+        - frontend/package.json
+        - frontend/package-lock.json
+        - frontend/tsconfig.base.json
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: VITE_RECAPTCHA_SITE_KEY
+        sync: false
+    headers:
+      # 관리자 화면은 검색엔진에 노출하지 않는다.
+      - path: /*
+        name: X-Robots-Tag
+        value: noindex, nofollow
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: http://121.254.254.52:8200/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
