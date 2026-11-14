@@ -11,6 +11,7 @@ export interface ChallengeTranslations {
   accountTypeStarter: string;
   accountTypeProfessional: string;
   accountTypeElite: string;
+  accountTypePrime: string;
   activeLabel: string;
   totalActiveChallenges: string;
   currentlyInProgress: string;

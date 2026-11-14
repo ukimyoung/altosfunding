@@ -715,6 +715,11 @@ export function ChallengeAccountPage() {
   const accountType100Count = getProductCount(100);
   const accountType300Count = getProductCount(300);
   const accountType500Count = getProductCount(500);
+  // Prime은 아직 서버 상품 코드가 정해지지 않아, 상품 ID나 이름에 'prime'이 들어간 상품을 센다.
+  const accountTypePrimeCount =
+    challengeSummary?.by_product.find((product) =>
+      `${product.product_id} ${product.product_name}`.toLowerCase().includes('prime'),
+    )?.count ?? 0;
 
   return (
     <div className="p-8">
@@ -754,19 +759,23 @@ export function ChallengeAccountPage() {
                 {text.typesLabel}
               </span>
             </div>
-            <h3 className="text-gray-400 text-sm mb-2">{text.accountTypes}</h3>
+            <h3 className="text-gray-400 text-sm mb-3">{text.accountTypes}</h3>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-gray-300 text-sm">{text.accountTypeStarter}</span>
-                <span className="text-white text-xl font-bold">{accountType100Count}</span>
+                <span className="text-white text-sm font-bold">{accountType100Count}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-300 text-sm">{text.accountTypeProfessional}</span>
-                <span className="text-white text-xl font-bold">{accountType300Count}</span>
+                <span className="text-white text-sm font-bold">{accountType300Count}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-300 text-sm">{text.accountTypeElite}</span>
-                <span className="text-white text-xl font-bold">{accountType500Count}</span>
+                <span className="text-white text-sm font-bold">{accountType500Count}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300 text-sm">{text.accountTypePrime}</span>
+                <span className="text-white text-sm font-bold">{accountTypePrimeCount}</span>
               </div>
             </div>
           </motion.div>
