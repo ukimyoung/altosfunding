@@ -6,7 +6,10 @@ Altos Funding 모노레포입니다.
 
 ```
 altosfunding/
-├── frontend/                     # 사용자 웹 화면 (프레임워크 결정 후 생성)
+├── frontend/
+│   ├── web/                      # 사용자용 웹
+│   ├── backoffice/               # 관리자용 백오피스
+│   └── shared/                   # 두 앱의 공용 코드
 ├── backend/
 │   ├── services/
 │   │   ├── core/                 # Core Backend (FastAPI, 공개 API)
