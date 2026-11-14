@@ -5,7 +5,7 @@ export const startNewChallengeKo: StartNewChallengeTranslations = {
   accountSizeTitle: '계정 규모(사이즈) 선택',
   accountSizeSubtitle: '회원님의 트레이딩 스타일에 맞는 펀딩 평가 단계를 선택하세요.',
 
-  tierNames: { starter: '스타터', pro: '프로페셔널', elite: '엘리트' },
+  tierNames: { starter: '스타터', pro: '프로페셔널', elite: '엘리트', prime: '프라임' },
 
   mostPopular: '가장 인기',
   fundingCapital: '펀딩 자본',
@@ -24,6 +24,15 @@ export const startNewChallengeKo: StartNewChallengeTranslations = {
   maxContracts: '최대 계약 수',
   consistency: '일관성',
   profitSplit: '수익 배분',
+  tooltips: {
+    profitTarget: '챌린지 단계를 통과하기 위해 달성해야 하는 목표 수익금입니다.',
+    maxDrawdownEod: '장 마감(EOD) 잔액을 기준으로 적용되는 최대 허용 손실폭입니다.',
+    dailyLossLimit: '하루 동안 허용되는 최대 손실 한도입니다.',
+    maxContracts: '운용 가능한 미니 및 마이크로 계약의 최대 포지션 수량입니다.',
+    consistency: '특정 단일 일자에 수익이 과도하게 집중되는 것을 방지하는 일관성 룰입니다.',
+    tradingPeriod: '챌린지 수료를 위해 최소한으로 매매해야 하는 일수입니다.',
+    profitSplit: '트레이더가 수익금의 80%를 가져가고 회사가 20%를 가져갑니다.',
+  },
   activationFee: '활성화 비용',
   consistencyRule: '일관성 규칙',
   none: '없음',

@@ -5,7 +5,7 @@ export interface StartNewChallengeTranslations {
   accountSizeSubtitle: string;
 
   // Account tier names
-  tierNames: { starter: string; pro: string; elite: string };
+  tierNames: { starter: string; pro: string; elite: string; prime: string };
 
   // Card labels
   mostPopular: string;
@@ -27,6 +27,15 @@ export interface StartNewChallengeTranslations {
   maxContracts: string;
   consistency: string;
   profitSplit: string;
+  tooltips: {
+    profitTarget: string;
+    maxDrawdownEod: string;
+    dailyLossLimit: string;
+    maxContracts: string;
+    consistency: string;
+    tradingPeriod: string;
+    profitSplit: string;
+  };
   activationFee: string;
   consistencyRule: string;
   none: string;
