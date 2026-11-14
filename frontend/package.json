@@ -1,0 +1,20 @@
+{
+  "name": "altosfunding-frontend",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "web",
+    "backoffice"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:web": "npm run dev -w @altosfunding/web",
+    "dev:backoffice": "npm run dev -w @altosfunding/backoffice",
+    "build": "npm run build -w @altosfunding/web -w @altosfunding/backoffice",
+    "build:web": "npm run build -w @altosfunding/web",
+    "build:backoffice": "npm run build -w @altosfunding/backoffice",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

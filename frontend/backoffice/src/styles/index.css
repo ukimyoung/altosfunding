@@ -1,0 +1,99 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+input[type='date']::-webkit-calendar-picker-indicator,
+input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+}
+
+.grecaptcha-badge {
+  visibility: hidden;
+}
+
+.email-template-editor {
+  width: 100%;
+}
+
+.email-template-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 7px 8px;
+  background: #f4f5f7;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+  border-radius: 8px 8px 0 0;
+}
+
+.email-template-editor-content {
+  min-height: 420px;
+  padding: 16px 18px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  outline: none;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  background: #fff;
+  font-family: 'Inter', 'DM Sans', 'Noto Sans KR', sans-serif;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.email-template-editor-content > :first-child {
+  margin-top: 0;
+}
+
+.email-template-editor-content > :last-child {
+  margin-bottom: 0;
+}
+
+.email-template-editor-content img {
+  max-width: 100%;
+  height: auto;
+}
+
+.email-template-editor-dark .email-template-editor-toolbar {
+  background: #232c44;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.email-template-editor-dark .email-template-editor-content {
+  background: #1a2035;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e8eaf0;
+}
+
+.email-template-editor-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 14px 0;
+}
+
+.email-template-editor-content th,
+.email-template-editor-content td {
+  min-width: 80px;
+  padding: 8px 10px;
+  border: 1px solid rgba(107, 114, 128, 0.45);
+  vertical-align: top;
+}
+
+.manual-email-preview-content p {
+  margin: 0;
+}
+
+.manual-email-preview-content p:last-child {
+  margin-bottom: 0;
+}
+
+.manual-email-preview-content p:empty,
+.manual-email-preview-content p:has(> br:only-child) {
+  min-height: 1.85em;
+}
+
+.manual-email-preview-content img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
