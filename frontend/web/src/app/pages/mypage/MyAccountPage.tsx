@@ -23,7 +23,8 @@ import {
   Plus,
 } from 'lucide-react';
 import { Toast } from '../../components/shared/Toast';
-import { TradingAccountSection } from '../../components/shared/TradingAccountSection';
+// Live 계정 생성 미지원으로 Trading Account Information 영역을 숨김. 다시 표시할 때 아래 import와 JSX 주석을 함께 해제한다.
+// import { TradingAccountSection } from '../../components/shared/TradingAccountSection';
 import { EditProfileModal } from './EditProfilePage';
 import type { MeResponse } from '@/api/user';
 import { formatGmtDate } from '@/app/utils/date';
@@ -463,8 +464,10 @@ export function MyAccountPage() {
           </div>
         </motion.div>
 
-        {/* Trading Account Information Section */}
+        {/* Trading Account Information Section
+            Live 계정 생성을 더 이상 지원하지 않아 일단 숨김 처리. 추후 다시 표시할 수 있으므로 삭제하지 않는다.
         <TradingAccountSection />
+        */}
 
         {/* Demo Accounts Section */}
         <motion.div
