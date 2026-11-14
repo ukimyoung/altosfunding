@@ -78,7 +78,7 @@ export const landingKo: LandingTranslations = {
   accounts: {
     title: '계정 규모 선택',
     subtitle: '트레이딩 실력에 맞는 펀딩 규모를 선택하세요',
-    tierNames: ['스타터', '프로페셔널', '엘리트'],
+    tierNames: ['스타터', '프로페셔널', '엘리트', '프라임'],
     labels: {
       profitTarget: '수익 목표',
       maxDrawdownEod: '최대 낙폭 (EOD)',
@@ -101,6 +101,15 @@ export const landingKo: LandingTranslations = {
       fundedStage: '펀딩 단계',
       topPerformance: '상위 10% 성과',
       topPerformanceSub: '트레이더 상위 10%에게만 자격이 주어집니다.',
+      tooltips: {
+        profitTarget: '챌린지 단계를 통과하기 위해 달성해야 하는 목표 수익금입니다.',
+        maxDrawdownEod: '장 마감(EOD) 잔액을 기준으로 적용되는 최대 허용 손실폭입니다.',
+        dailyLossLimit: '하루 동안 허용되는 최대 손실 한도입니다.',
+        maxContracts: '운용 가능한 미니 및 마이크로 계약의 최대 포지션 수량입니다.',
+        consistency: '특정 단일 일자에 수익이 과도하게 집중되는 것을 방지하는 일관성 룰입니다.',
+        tradingPeriod: '챌린지 수료를 위해 최소한으로 매매해야 하는 일수입니다.',
+        profitSplit: '트레이더가 수익금의 80%를 가져가고 회사가 20%를 가져갑니다.',
+      },
     },
   },
 

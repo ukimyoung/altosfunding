@@ -16,6 +16,16 @@ export interface TestimonialItem {
   quote: string;
 }
 
+export interface AccountTooltips {
+  profitTarget: string;
+  maxDrawdownEod: string;
+  dailyLossLimit: string;
+  maxContracts: string;
+  consistency: string;
+  tradingPeriod: string;
+  profitSplit: string;
+}
+
 export interface AccountLabels {
   profitTarget: string;
   maxDrawdownEod: string;
@@ -38,6 +48,7 @@ export interface AccountLabels {
   fundedStage: string;
   topPerformance: string;
   topPerformanceSub: string;
+  tooltips: AccountTooltips;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
