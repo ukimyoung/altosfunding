@@ -20,14 +20,14 @@ function figmaAssetResolver() {
   };
 }
 
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ mode, command }) => {
   // 개발 서버 설정은 .env.local 등에서 바꿀 수 있다. (.env.example 참고)
   const env = loadEnv(mode, __dirname, '');
   const devHost = env.DEV_SERVER_HOST || 'localadmin.altosfunding.com';
   const devPort = Number(env.DEV_SERVER_PORT || 5174);
   const apiProxyTarget = env.API_PROXY_TARGET || 'http://121.254.254.52:8200';
-  // mkcert는 로컬 HTTPS 인증서를 만든다. DEV_SERVER_HTTPS=false 로 끌 수 있다.
-  const useHttps = env.DEV_SERVER_HTTPS !== 'false';
+  // mkcert는 로컬 개발 서버용 HTTPS 인증서를 만든다. DEV_SERVER_HTTPS=false 로 끌 수 있고, 빌드 때는 쓰지 않는다.
+  const useHttps = command === 'serve' && env.DEV_SERVER_HTTPS !== 'false';
 
   return {
     plugins: [figmaAssetResolver(), react(), tailwindcss(), ...(useHttps ? [mkcert()] : [])],

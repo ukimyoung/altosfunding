@@ -60,3 +60,16 @@ npm run dev:backoffice   # https://localadmin.altosfunding.com:5174
 
 두 앱 모두 `/api` 상대 경로로 요청합니다. 개발 중에는 Vite proxy가 `API_PROXY_TARGET` 으로 넘기고, 운영에서는 각 앱 도메인의 `/api` 를 백엔드로 넘기는 리버스 프록시(또는 rewrite)가 필요합니다.
 인증(access token 메모리 보관, refresh token 쿠키로 자동 재발급)은 `shared/src/api/createApiClient.ts` 에 있습니다.
+
+## 배포 (Render)
+
+저장소 루트의 `render.yaml`(Blueprint)에 Sandbox용 정적 사이트 두 개가 정의되어 있습니다.
+
+| 서비스 | 브랜치 | 빌드 결과 |
+|---|---|---|
+| `altosfunding-web-sandbox` | `develop` | `frontend/web/dist` |
+| `altosfunding-backoffice-sandbox` | `develop` | `frontend/backoffice/dist` |
+
+- 각 사이트의 `/api/*` 요청은 Render rewrite로 기존 API 서버(`121.254.254.52:8200`)에 넘깁니다. 새 백엔드로 옮길 때는 `render.yaml` 의 destination만 바꾸면 됩니다.
+- 그 밖의 경로는 `index.html` 로 rewrite 해서 React Router가 처리합니다.
+- `VITE_*` 값은 빌드 시점에 번들에 들어가므로, Render에서 값을 바꾼 뒤에는 다시 배포해야 반영됩니다.
