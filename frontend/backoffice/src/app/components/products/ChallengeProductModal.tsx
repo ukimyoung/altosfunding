@@ -15,6 +15,7 @@ interface ChallengeProductModalProps {
 
 export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavigate, dark }: ChallengeProductModalProps) {
   const [activeTab, setActiveTab] = useState<"basic" | "schedule">("basic");
+  const [discountError, setDiscountError] = useState("");
   const { data: rulesetsData } = useListRulesetsQuery({ page: 1, size: 100 }, isOpen);
   const rulesets = rulesetsData?.items ?? [];
   const [formData, setFormData] = useState<ChallengeProduct>(
@@ -103,6 +104,7 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
       lastGeneratedDate: "",
     });
     setActiveTab("basic");
+    setDiscountError("");
   }, [isOpen, product]);
 
   if (!isOpen) return null;
@@ -121,6 +123,10 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
   };
 
   const handleSubmit = () => {
+    if (formData.discountAmount != null && formData.amount != null && formData.discountAmount > formData.amount) {
+      setDiscountError("할인가격은 원가격보다 클 수 없습니다.");
+      return;
+    }
     onSave(formData);
   };
 
@@ -197,13 +203,34 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
                       t={t}
                     />
                     <InputField
-                      label="금액"
+                      label="원가격"
                       type="number"
                       value={formData.amount == null ? "" : String(formData.amount)}
                       onChange={(v) => setFormData({ ...formData, amount: v === "" ? null : Number(v) })}
                       suffix="$"
                       t={t}
                     />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div>
+                      <InputField
+                        label="할인가격"
+                        type="number"
+                        value={formData.discountAmount == null ? "" : String(formData.discountAmount)}
+                        onChange={(v) => {
+                          setDiscountError("");
+                          setFormData({ ...formData, discountAmount: v === "" ? null : Number(v) });
+                        }}
+                        suffix="$"
+                        placeholder="-"
+                        hint={discountError ? undefined : "비우면 할인 없이 원가격으로 판매합니다"}
+                        t={t}
+                      />
+                      {discountError && (
+                        <div style={{ fontSize: 11, color: "#DC2626", marginTop: 4 }}>{discountError}</div>
+                      )}
+                    </div>
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>

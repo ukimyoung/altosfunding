@@ -2,6 +2,7 @@
 
 import json
 import re
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -146,6 +147,8 @@ async def _validate_product(session: AsyncSession, product: Product) -> None:
 
 
 async def _check_product(session: AsyncSession, product: Product) -> None:
+    if product.discount_price_usdt is not None and Decimal(str(product.discount_price_usdt)) > Decimal(str(product.price_usdt)):
+        raise AppError(400, "invalid_discount_price", "할인가격은 원가격보다 클 수 없습니다.")
     if product.mt4_login_pool_start > product.mt4_login_pool_end:
         raise AppError(400, "invalid_login_pool", "계좌번호 범위의 시작이 끝보다 클 수 없습니다.")
     if product.ruleset_id and not await session.get(Ruleset, product.ruleset_id):
@@ -186,7 +189,9 @@ async def create_product(session: AsyncSession, data: dict) -> Product:
     return product
 
 
-_NULLABLE_PRODUCT_FIELDS = {"type_code", "description", "ruleset_id", "next_product_id", "margin_call_pct", "stop_out_pct"}
+_NULLABLE_PRODUCT_FIELDS = {
+    "type_code", "description", "ruleset_id", "next_product_id", "margin_call_pct", "stop_out_pct", "discount_price_usdt",
+}
 
 
 async def update_product(session: AsyncSession, product: Product, data: dict) -> None:

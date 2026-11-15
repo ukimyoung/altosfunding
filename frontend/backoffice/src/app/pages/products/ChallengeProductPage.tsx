@@ -143,6 +143,10 @@ export function ChallengeProductPage() {
           payload: {
             name: getCatalogProductUpdateValue(product.productName, exists.productName),
             price_usdt: getCatalogProductUpdateValue(product.amount, exists.amount),
+            discount_price_usdt: getCatalogProductUpdateValue(
+              product.discountAmount ?? null,
+              exists.discountAmount ?? null,
+            ),
             mt4_group: getCatalogProductUpdateValue(product.mtsGroupId, exists.mtsGroupId),
             capital: getCatalogProductUpdateValue(product.capital, exists.capital),
             leverage: getCatalogProductUpdateValue(product.leverage, exists.leverage),
@@ -184,6 +188,7 @@ export function ChallengeProductPage() {
         {
           name: product.productName,
           price_usdt: product.amount,
+          discount_price_usdt: product.discountAmount ?? null,
           tier_type: 'CHALLENGE',
           mt4_group: product.mtsGroupId,
           capital: product.capital,
@@ -370,7 +375,8 @@ function ChallengeProductTable({
             {[
               // 최신 디자인(Make 1114) 컬럼. 이전 '상품 / 티어', '마진콜', 'Stop Out' 컬럼은 목록에서 숨김(수정 팝업에서 관리)
               '상품명',
-              '가격',
+              '원가격',
+              '할인가격',
               '자본금',
               '레버리지',
               'Trading 기간',
@@ -430,6 +436,16 @@ function ChallengeProductTable({
                 </td>
                 <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 500, color: t.text }}>
                   {formatUsd(product.amount)}
+                </td>
+                <td
+                  style={{
+                    padding: '14px 16px',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: product.discountAmount == null ? t.textHint : '#DC2626',
+                  }}
+                >
+                  {formatUsd(product.discountAmount)}
                 </td>
                 <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 500, color: t.text }}>
                   {formatUsd(product.capital)}
