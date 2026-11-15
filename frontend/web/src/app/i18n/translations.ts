@@ -31,6 +31,7 @@ import { rewardTranslations } from './locales/mypage/reward/index';
 
 export type { ReferralTranslations } from './locales/mypage/referral/index';
 import { referralTranslations } from './locales/mypage/referral/index';
+import { affiliateTranslations } from './locales/mypage/affiliate/index';
 
 export type { MyAccountTranslations } from './locales/mypage/myAccount/index';
 import { myAccountTranslations } from './locales/mypage/myAccount/index';
@@ -70,6 +71,9 @@ export interface DashboardNav {
   reward: string;
   rewardSub: string;
   referral: string;
+  affiliate: string;
+  affiliatePerformance: string;
+  affiliateDetail: string;
   myProfile: string;
   myAccount: string;
   myAsset: string;
@@ -91,6 +95,9 @@ export interface DashboardTopBar {
     announcements: string;
     rewardDashboard: string;
     referral: string;
+    affiliate: string;
+    affiliatePerformance: string;
+    affiliateDetail: string;
     purchaseHistory: string;
     newChallenge: string;
     alphaAccount: string;
@@ -107,6 +114,9 @@ export interface DashboardTopBar {
     announcements: string;
     rewardDashboard: string;
     referral: string;
+    affiliate: string;
+    affiliatePerformance: string;
+    affiliateDetail: string;
     purchaseHistory: string;
     newChallenge: string;
     alphaAccount: string;
@@ -152,6 +162,7 @@ export interface Translations extends LandingTranslations {
   purchaseHistory: import('./locales/mypage/purchaseHistory/index').PurchaseHistoryTranslations;
   reward: import('./locales/mypage/reward/index').RewardTranslations;
   referral: import('./locales/mypage/referral/index').ReferralTranslations;
+  affiliate: import('./locales/mypage/affiliate/index').AffiliateTranslations;
   myAccount: import('./locales/mypage/myAccount/index').MyAccountTranslations;
   myAsset: import('./locales/mypage/myAsset/index').MyAssetTranslations;
   security: import('./locales/mypage/security/index').SecurityTranslations;
@@ -188,6 +199,7 @@ export const translations: Record<Locale, Translations> = {
     purchaseHistory: purchaseHistoryTranslations.en,
     reward: rewardTranslations.en,
     referral: referralTranslations.en,
+    affiliate: affiliateTranslations.en,
     myAccount: myAccountTranslations.en,
     myAsset: myAssetTranslations.en,
     security: securityTranslations.en,
@@ -213,6 +225,9 @@ export const translations: Record<Locale, Translations> = {
         reward: 'Reward',
         rewardSub: 'Reward',
         referral: 'Referral',
+        affiliate: 'Affiliate Program',
+        affiliatePerformance: 'Affiliate Performance',
+        affiliateDetail: 'Performance Detail',
         myProfile: 'My Profile',
         myAccount: 'My Account',
         myAsset: 'My Asset',
@@ -233,6 +248,9 @@ export const translations: Record<Locale, Translations> = {
           announcements: 'Announcements',
           rewardDashboard: 'Rewards',
           referral: 'Referral Network',
+          affiliate: 'Affiliate Program',
+          affiliatePerformance: 'Affiliate Performance',
+          affiliateDetail: 'Performance Detail',
           purchaseHistory: 'Purchase History',
           newChallenge: 'Start New Challenge',
           alphaAccount: 'Challenge Account',
@@ -249,6 +267,9 @@ export const translations: Record<Locale, Translations> = {
           announcements: 'Browse critical updates, new features, and important notices',
           rewardDashboard: 'Track and manage your earnings and bonuses',
           referral: 'Grow your network and earn referral rewards',
+          affiliate: 'Manage your multi-level IB network and commission performance',
+          affiliatePerformance: 'Track IB levels, commissions, and your downline network',
+          affiliateDetail: 'Review granular affiliate performance and commission records',
           purchaseHistory: 'View all your challenge purchases and payment history',
           newChallenge: 'Select your account type and begin your trading journey',
           alphaAccount:
@@ -287,6 +308,7 @@ export const translations: Record<Locale, Translations> = {
     purchaseHistory: purchaseHistoryTranslations.ko,
     reward: rewardTranslations.ko,
     referral: referralTranslations.ko,
+    affiliate: affiliateTranslations.ko,
     myAccount: myAccountTranslations.ko,
     myAsset: myAssetTranslations.ko,
     security: securityTranslations.ko,
@@ -312,6 +334,9 @@ export const translations: Record<Locale, Translations> = {
         reward: '리워드',
         rewardSub: '리워드',
         referral: '레퍼럴',
+        affiliate: '제휴프로그램',
+        affiliatePerformance: '제휴 성과',
+        affiliateDetail: '성과 상세',
         myProfile: '내 프로필',
         myAccount: '내 계정',
         myAsset: '내 자산',
@@ -332,6 +357,9 @@ export const translations: Record<Locale, Translations> = {
           announcements: '공지사항',
           rewardDashboard: '리워드',
           referral: '레퍼럴 네트워크',
+          affiliate: '제휴프로그램',
+          affiliatePerformance: '제휴 성과',
+          affiliateDetail: '성과 상세',
           purchaseHistory: '구매 내역',
           newChallenge: '새 챌린지 시작',
           alphaAccount: '챌린지 계좌',
@@ -348,6 +376,9 @@ export const translations: Record<Locale, Translations> = {
           announcements: '중요 업데이트, 새 기능, 공지사항을 확인하세요',
           rewardDashboard: '수익 및 보너스를 추적 및 관리하세요',
           referral: '네트워크를 늘리고 레퍼럴 리워드를 획득하세요',
+          affiliate: '다단계 IB 네트워크와 커미션 성과를 관리하세요',
+          affiliatePerformance: 'IB 레벨, 커미션, 하위 네트워크 성과를 확인하세요',
+          affiliateDetail: '세부 제휴 성과와 커미션 기록을 확인하세요',
           purchaseHistory: '모든 챌린지 구매 및 결제 내역을 확인하세요',
           newChallenge: '계정 유형을 선택하고 트레이딩 여정을 시작하세요',
           alphaAccount: '모든 활성 및 완료된 챌린지 계좌를 모니터링하세요',

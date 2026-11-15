@@ -10,6 +10,8 @@ import { MyAssetPage } from './MyAssetPage';
 import { RewardDashboardPage } from './RewardDashboardPage';
 import { FundedAccountPage } from './FundedAccountPage';
 import { ReferralPage } from './ReferralPage';
+import { AffiliatePerformancePage } from './AffiliatePerformancePage';
+import { AffiliatePerformanceDetailPage } from './AffiliatePerformanceDetailPage';
 import { PurchaseHistoryPage } from './PurchaseHistoryPage';
 import { StartNewChallengePage } from './StartNewChallengePage';
 import { ChallengeAccountPage } from './ChallengeAccountPage';
@@ -41,6 +43,7 @@ import {
   Clock,
   Menu,
   Gift,
+  Handshake,
   ChevronUp,
   Globe,
   LogOut,
@@ -146,6 +149,24 @@ export function MyPage() {
       subItems: [
         { id: 'reward-dashboard', label: text.nav.rewardSub, path: '/my-page/reward' },
         { id: 'referral', label: text.nav.referral, path: '/my-page/referral' },
+      ],
+    },
+    {
+      id: 'affiliate',
+      label: text.nav.affiliate,
+      icon: <Handshake size={20} />,
+      path: '/my-page/affiliate/performance',
+      subItems: [
+        {
+          id: 'affiliate-performance',
+          label: text.nav.affiliatePerformance,
+          path: '/my-page/affiliate/performance',
+        },
+        {
+          id: 'affiliate-detail',
+          label: text.nav.affiliateDetail,
+          path: '/my-page/affiliate/detail',
+        },
       ],
     },
     {
@@ -266,6 +287,9 @@ export function MyPage() {
       '/my-page/purchase-history': 'purchase-history',
       '/my-page/reward': 'reward-dashboard',
       '/my-page/referral': 'referral',
+      '/my-page/affiliate': 'affiliate-performance',
+      '/my-page/affiliate/performance': 'affiliate-performance',
+      '/my-page/affiliate/detail': 'affiliate-detail',
       '/my-page/my-profile': 'my-account',
       '/my-page/my-account': 'my-account',
       '/my-page/my-asset': 'my-asset',
@@ -300,6 +324,8 @@ export function MyPage() {
         setExpandedMenus((prev) =>
           prev.includes('reward-center') ? prev : [...prev, 'reward-center'],
         );
+      } else if (['affiliate-performance', 'affiliate-detail'].includes(menuId)) {
+        setExpandedMenus((prev) => (prev.includes('affiliate') ? prev : [...prev, 'affiliate']));
       }
     }
   }, [location.pathname]);
@@ -372,6 +398,10 @@ export function MyPage() {
         return text.topBar.titles.rewardDashboard;
       case 'referral':
         return text.topBar.titles.referral;
+      case 'affiliate-performance':
+        return text.topBar.titles.affiliatePerformance;
+      case 'affiliate-detail':
+        return text.topBar.titles.affiliateDetail;
       case 'purchase-history':
         return text.topBar.titles.purchaseHistory;
       case 'new-challenge':
@@ -409,6 +439,10 @@ export function MyPage() {
         return text.topBar.subtitles.rewardDashboard;
       case 'referral':
         return text.topBar.subtitles.referral;
+      case 'affiliate-performance':
+        return text.topBar.subtitles.affiliatePerformance;
+      case 'affiliate-detail':
+        return text.topBar.subtitles.affiliateDetail;
       case 'purchase-history':
         return text.topBar.subtitles.purchaseHistory;
       case 'new-challenge':
@@ -663,7 +697,7 @@ export function MyPage() {
           marginLeft: isMobile ? 0 : '256px',
         }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className="flex-1 w-full"
+        className="flex-1 w-full min-w-0"
       >
         {/* Top Bar */}
         <div className="bg-[#0f0f17] border-b border-[#1a1a24] px-4 sm:px-8 py-4">
@@ -724,6 +758,10 @@ export function MyPage() {
           <RewardDashboardPage />
         ) : activeMenu === 'referral' ? (
           <ReferralPage />
+        ) : activeMenu === 'affiliate-performance' ? (
+          <AffiliatePerformancePage />
+        ) : activeMenu === 'affiliate-detail' ? (
+          <AffiliatePerformanceDetailPage />
         ) : activeMenu === 'purchase-history' ? (
           <PurchaseHistoryPage />
         ) : activeMenu === 'new-challenge' ? (
