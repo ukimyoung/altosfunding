@@ -29,6 +29,7 @@ import { TransactionApprovalPage } from './pages/transactions/TransactionApprova
 import { CompetitionListPage } from './pages/competitions/CompetitionListPage';
 import { RewardReferralPage } from './pages/reward-referrals/RewardReferralPage';
 import { CouponManagementPage } from './pages/coupons/CouponManagementPage';
+import { DemoOptionsManagementPage } from './pages/demo-options/DemoOptionsManagementPage';
 import { InquiryListPage } from './pages/inquiries/InquiryListPage';
 import { FaqListPage } from './pages/faq/FaqListPage';
 import { EmailNotificationPage } from './pages/email-notifications/EmailNotificationPage';
@@ -160,6 +161,10 @@ export const router = createBrowserRouter([
       {
         path: appPath(ROUTE_BY_PAGE_ID['coupon-management']),
         Component: CouponManagementPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['demo-option-management']),
+        Component: DemoOptionsManagementPage,
       },
       {
         path: appPath(ROUTE_BY_PAGE_ID.inquiry),

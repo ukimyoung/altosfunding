@@ -109,3 +109,74 @@ def test_demo_options(client, db):
         assert client.get("/api/v1/demo/options").json()["allowed_leverages"] == [50, 100]
     finally:
         run_sql("update core.platform_config set value = '[100, 200, 500]' where scope = 'DEMO' and key = 'allowed_leverages'")
+
+
+def _restore_demo_config():
+    run_sql("""
+        update core.platform_config set value = case key
+          when 'allowed_leverages' then '[100, 200, 500]'::jsonb
+          when 'allowed_capitals' then '[10000, 50000, 100000]'::jsonb
+          when 'default_leverage' then '100'::jsonb
+          when 'default_capital' then '10000'::jsonb
+        end
+        where scope = 'DEMO'
+    """)
+
+
+def test_admin_platform_config_demo(client, admin):
+    try:
+        items = client.get("/api/v1/admin/platform-config/DEMO", headers=admin).json()
+        assert {i["key"]: i["value"] for i in items} == {
+            "allowed_capitals": [10000, 50000, 100000],
+            "allowed_leverages": [100, 200, 500],
+            "default_capital": 10000,
+            "default_leverage": 100,
+        }
+        assert {i["key"]: i["value_type"] for i in items}["allowed_leverages"] == "JSON"
+
+        res = client.put("/api/v1/admin/platform-config/DEMO/allowed_leverages", headers=admin,
+                         json={"value": [50, 100, 300], "value_type": "JSON"})
+        assert res.status_code == 200, res.text
+        assert res.json()["value"] == [50, 100, 300]
+        # 기존 서버 클라이언트처럼 문자열로 보내도 받는다.
+        res = client.put("/api/v1/admin/platform-config/DEMO/default_leverage", headers=admin,
+                         json={"value": "300", "value_type": "INTEGER"})
+        assert res.status_code == 200 and res.json()["value"] == 300
+        res = client.put("/api/v1/admin/platform-config/DEMO/allowed_capitals", headers=admin,
+                         json={"value": [5000, 25000.5], "value_type": "JSON"})
+        assert res.status_code == 200 and res.json()["value"] == [5000, 25000.5]
+
+        # 기본값(10000)이 목록에서 빠졌으면 첫 값을 기본값으로 내려준다.
+        assert client.get("/api/v1/demo/options").json() == {
+            "allowed_leverages": [50, 100, 300],
+            "allowed_capitals": [5000, 25000.5],
+            "default_leverage": 300,
+            "default_capital": 5000,
+        }
+
+        bad = [
+            ("allowed_leverages", {"value": [], "value_type": "JSON"}),
+            ("allowed_leverages", {"value": [100, 100], "value_type": "JSON"}),
+            ("allowed_leverages", {"value": [100.5], "value_type": "JSON"}),
+            ("allowed_leverages", {"value": [0, 100], "value_type": "JSON"}),
+            ("allowed_capitals", {"value": ["abc"], "value_type": "JSON"}),
+            ("allowed_capitals", {"value": "[1,", "value_type": "JSON"}),
+            ("default_capital", {"value": -1, "value_type": "INTEGER"}),
+            ("default_leverage", {"value": True, "value_type": "BOOLEAN"}),
+            ("unknown_key", {"value": 1, "value_type": "INTEGER"}),
+        ]
+        for key, body in bad:
+            res = client.put(f"/api/v1/admin/platform-config/DEMO/{key}", headers=admin, json=body)
+            assert res.status_code == 422, (key, body, res.text)
+        assert client.put("/api/v1/admin/platform-config/NOPE/x", headers=admin,
+                          json={"value": 1}).status_code == 422
+    finally:
+        _restore_demo_config()
+
+
+def test_admin_platform_config_requires_admin(client, member):  # noqa: F811
+    assert client.get("/api/v1/admin/platform-config/DEMO").status_code == 401
+    token = _login(client, email=EMAIL).json()["access_token"]
+    res = client.put("/api/v1/admin/platform-config/DEMO/default_leverage",
+                     headers={"Authorization": f"Bearer {token}"}, json={"value": 200, "value_type": "INTEGER"})
+    assert res.status_code == 403

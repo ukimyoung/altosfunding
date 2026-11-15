@@ -20,6 +20,7 @@ import {
   Image,
   Bell,
   Ticket,
+  MonitorSmartphone,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -101,6 +102,7 @@ export const NAV: NavSection[] = [
       { id: 'marketing-popup', label: '마케팅 팝업 관리', icon: Image },
       { id: 'reward-referral', label: '리워드/래퍼럴 관리', icon: Gift },
       { id: 'coupon-management', label: '쿠폰 관리', icon: Ticket },
+      { id: 'demo-option-management', label: '데모 계정 관리', icon: MonitorSmartphone },
       { id: 'inquiry', label: '문의하기', icon: MessageCircle },
       { id: 'faq', label: 'FAQ', icon: HelpCircle },
       { id: 'email-notification', label: '이메일/알림 관리', icon: Mail },
@@ -157,6 +159,7 @@ export const BC: Record<string, { parts: string[] }> = {
   'marketing-popup': { parts: ['운영 관리', '마케팅 팝업 관리'] },
   'reward-referral': { parts: ['운영 관리', '리워드/래퍼럴 관리'] },
   'coupon-management': { parts: ['운영 관리', '쿠폰 관리'] },
+  'demo-option-management': { parts: ['운영 관리', '데모 계정 관리'] },
   inquiry: { parts: ['운영 관리', '문의하기'] },
   faq: { parts: ['운영 관리', 'FAQ'] },
   'email-notification': { parts: ['운영 관리', '이메일/알림 관리'] },
@@ -196,6 +199,7 @@ export const ROUTE_BY_PAGE_ID: Record<string, string> = {
   'marketing-popup': '/marketing-popup',
   'reward-referral': '/reward-referral',
   'coupon-management': '/coupon-management',
+  'demo-option-management': '/demo-option-management',
   inquiry: '/inquiry',
   faq: '/faq',
   'email-notification': '/email-notification',

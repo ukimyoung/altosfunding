@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import axios from 'axios';
 import { useMeQuery } from '@/app/queries/profile';
 import { useCreateDemoAccountMutation, useDemoOptionsQuery } from '@/app/queries/demo';
+import { DEMO_OPTIONS_FALLBACK } from '@/api/demo';
 import { accountsQueryKeys, useAccountsQuery } from '@/app/queries/accounts';
 import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { useQueryClient } from '@tanstack/react-query';
@@ -134,8 +135,8 @@ export function MyAccountPage() {
   const [showDemoPassword, setShowDemoPassword] = useState<Record<string, boolean>>({});
   const [demoFormData, setDemoFormData] = useState({
     platform: 'MT4',
-    balance: '50000',
-    leverage: '1:100',
+    balance: String(DEMO_OPTIONS_FALLBACK.default_capital),
+    leverage: `1:${DEMO_OPTIONS_FALLBACK.default_leverage}`,
   });
   const { data: demoOptions } = useDemoOptionsQuery(isCreateDemoModalOpen);
   const createDemoAccountMutation = useCreateDemoAccountMutation();
@@ -255,8 +256,8 @@ export function MyAccountPage() {
           setIsCreateDemoModalOpen(false);
           setDemoFormData({
             platform: 'MT4',
-            balance: String(demoOptions?.default_capital ?? 10000),
-            leverage: `1:${demoOptions?.default_leverage ?? 100}`,
+            balance: String(demoOptions?.default_capital ?? DEMO_OPTIONS_FALLBACK.default_capital),
+            leverage: `1:${demoOptions?.default_leverage ?? DEMO_OPTIONS_FALLBACK.default_leverage}`,
           });
           setToastType('success');
           setToastTitle(text.successTitle);
@@ -828,7 +829,7 @@ export function MyAccountPage() {
                         className="w-full bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#0052FF] transition-colors"
                       >
                         {(
-                          demoOptions?.allowed_capitals ?? [10000, 25000, 50000, 100000, 200000]
+                          demoOptions?.allowed_capitals ?? DEMO_OPTIONS_FALLBACK.allowed_capitals
                         ).map((capital) => (
                           <option key={capital} value={String(capital)}>
                             ${capital.toLocaleString('en-US')}
@@ -849,7 +850,7 @@ export function MyAccountPage() {
                         }
                         className="w-full bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#0052FF] transition-colors"
                       >
-                        {(demoOptions?.allowed_leverages ?? [50, 100, 200]).map((leverage) => (
+                        {(demoOptions?.allowed_leverages ?? DEMO_OPTIONS_FALLBACK.allowed_leverages).map((leverage) => (
                           <option key={leverage} value={`1:${leverage}`}>
                             1:{leverage}
                           </option>
