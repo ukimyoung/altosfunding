@@ -143,6 +143,8 @@ export function ChallengeProductPage() {
           payload: {
             name: getCatalogProductUpdateValue(product.productName, exists.productName),
             price_usdt: getCatalogProductUpdateValue(product.amount, exists.amount),
+            is_recommended:
+              product.mostPopular === exists.mostPopular ? undefined : product.mostPopular,
             discount_price_usdt: getCatalogProductUpdateValue(
               product.discountAmount ?? null,
               exists.discountAmount ?? null,
@@ -189,6 +191,7 @@ export function ChallengeProductPage() {
           name: product.productName,
           price_usdt: product.amount,
           discount_price_usdt: product.discountAmount ?? null,
+          is_recommended: product.mostPopular,
           tier_type: 'CHALLENGE',
           mt4_group: product.mtsGroupId,
           capital: product.capital,

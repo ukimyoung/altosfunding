@@ -51,46 +51,52 @@ def test_product_create_list_update_status(client, admin):
     res = _product(client, admin, ruleset_id=rs["id"])
     assert res.status_code == 200, res.text
     p = res.json()
-    assert p["product_id"] == "CHALLENGE_10K"
+    assert p["product_id"] == "1001"
     assert p["ruleset_name"] == "Standard"
     assert p["capital"] == 10000 and p["price_usdt"] == 99
 
-    # 같은 티어·자본금이면 뒤에 번호를 붙인다. 계좌번호 범위는 데모 서버 상품끼리 겹치면 안 된다.
+    # 상품코드는 티어 1자리 + 일련번호 3자리. 계좌번호 범위는 데모 서버 상품끼리 겹치면 안 된다.
     res = _product(client, admin, name="Challenge $10K B")
     assert res.status_code == 409 and res.json()["error_code"] == "login_pool_overlap"
     res = _product(client, admin, name="Challenge $10K B", mt4_login_pool_start=1100000, mt4_login_pool_end=1199999)
-    assert res.json()["product_id"] == "CHALLENGE_10K_2"
+    assert res.json()["product_id"] == "1002"
     # 펀디드는 실서버라 범위가 겹쳐도 된다.
     funded = _product(client, admin, name="Funded $10K", tier_type="FUNDED").json()
-    assert funded["product_id"] == "FUNDED_10K"
+    assert funded["product_id"] == "2001"
 
-    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin,
-                     json={"price_usdt": 79, "next_product_id": "FUNDED_10K", "margin_call_pct": None, "name": None})
+    res = client.put("/api/v1/catalog/products/1001", headers=admin,
+                     json={"price_usdt": 79, "next_product_id": "2001", "margin_call_pct": None, "name": None})
     assert res.status_code == 200, res.text
-    assert res.json()["price_usdt"] == 79 and res.json()["next_product_id"] == "FUNDED_10K"
+    assert res.json()["price_usdt"] == 79 and res.json()["next_product_id"] == "2001"
     assert res.json()["name"] == "Challenge $10K"
     assert res.json()["discount_price_usdt"] is None
 
     # 할인가격: 원가격 이하만 허용, null로 보내면 할인 해제
-    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"discount_price_usdt": 59})
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"discount_price_usdt": 59})
     assert res.status_code == 200 and res.json()["discount_price_usdt"] == 59
-    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"discount_price_usdt": 80})
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"discount_price_usdt": 80})
     assert res.json()["error_code"] == "invalid_discount_price"
-    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"price_usdt": 50})
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"price_usdt": 50})
     assert res.json()["error_code"] == "invalid_discount_price"
-    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"discount_price_usdt": None})
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"discount_price_usdt": None})
     assert res.status_code == 200 and res.json()["discount_price_usdt"] is None
 
-    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"ruleset_id": "missing"})
+    # 상품코드 앞자리가 티어라 티어는 바꿀 수 없다. 추천 여부는 바꿀 수 있다.
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"tier_type": "FUNDED"})
+    assert res.json()["error_code"] == "tier_type_immutable"
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"is_recommended": True})
+    assert res.status_code == 200 and res.json()["is_recommended"] is True
+
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"ruleset_id": "missing"})
     assert res.json()["error_code"] == "ruleset_not_found"
 
-    res = client.patch("/api/v1/catalog/products/CHALLENGE_10K_2/status", headers=admin, json={"is_active": False})
+    res = client.patch("/api/v1/catalog/products/1002/status", headers=admin, json={"is_active": False})
     assert res.json()["is_active"] is False
 
     # 로그인 없이 목록 조회
     client.cookies.clear()
     page = client.get("/api/v1/catalog/products", params={"tier_type": "CHALLENGE"}).json()
-    assert [p["product_id"] for p in page["items"]] == ["CHALLENGE_10K", "CHALLENGE_10K_2"]
+    assert [p["product_id"] for p in page["items"]] == ["1001", "1002"]
     page = client.get("/api/v1/catalog/products", params={"tier_type": "CHALLENGE", "active_only": True}).json()
     assert page["total"] == 1
 
@@ -191,3 +197,40 @@ def test_admin_platform_config_requires_admin(client, member):  # noqa: F811
     res = client.put("/api/v1/admin/platform-config/DEMO/default_leverage",
                      headers={"Authorization": f"Bearer {token}"}, json={"value": 200, "value_type": "INTEGER"})
     assert res.status_code == 403
+
+
+def test_product_code_migration(client, admin):
+    """예전 'CHALLENGE_10K' 형식 ID를 4자리 상품코드로 바꾸는 마이그레이션을 검증한다."""
+    from pathlib import Path
+
+    from tests.conftest import MIGRATIONS_DIR
+
+    sql = (Path(MIGRATIONS_DIR) / "20261116000000_core_product_numeric_code.sql").read_text()
+    run_sql("alter table core.products drop constraint products_id_code_check")
+    run_sql("""insert into core.products (id, name, capital, tier_type, mt4_login_pool_start, mt4_login_pool_end, created_at)
+               values ('CHALLENGE_10K', 'A', 10000, 'CHALLENGE', 1, 10, now() - interval '2 day'),
+                      ('CHALLENGE_10K_2', 'B', 10000, 'CHALLENGE', 11, 20, now() - interval '1 day'),
+                      ('FUNDED_10K', 'C', 10000, 'FUNDED', 1, 10, now())""")
+    run_sql("update core.products set next_product_id = 'FUNDED_10K' where id = 'CHALLENGE_10K'")
+    run_sql("""insert into core.challenge_schedules (name_template, product_id, interval_days, duration_days)
+               values ('Daily', 'CHALLENGE_10K_2', 1, 1)""")
+    import asyncio
+
+    import asyncpg
+
+    from tests.conftest import TEST_DATABASE_URL, _asyncpg_dsn
+
+    async def _apply():
+        conn = await asyncpg.connect(_asyncpg_dsn(TEST_DATABASE_URL))
+        try:
+            await conn.execute(sql[sql.index("create temporary table"):])
+        finally:
+            await conn.close()
+
+    # FK를 다시 거는 앞부분은 이미 적용되어 있으므로 코드 변환 부분부터 실행한다.
+    asyncio.run(_apply())
+
+    rows = run_sql("select name, id, next_product_id from core.products order by id")
+    assert [(r["name"], r["id"], r["next_product_id"]) for r in rows] == [
+        ("A", "1001", "2001"), ("B", "1002", None), ("C", "2001", None)]
+    assert run_sql("select product_id from core.challenge_schedules")[0]["product_id"] == "1002"
