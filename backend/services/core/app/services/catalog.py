@@ -1,7 +1,6 @@
 """상품·룰셋 관리."""
 
 import json
-import re
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -125,19 +124,19 @@ async def product_out_with_ruleset(session: AsyncSession, product: Product) -> P
     return product_out(product, name)
 
 
-def _capital_label(capital: float) -> str:
-    if capital >= 1000 and capital % 1000 == 0:
-        return f"{int(capital // 1000)}K"
-    return re.sub(r"\.0+$", "", f"{capital:g}").replace(".", "_")
+# 상품코드 4자리: 앞자리 티어 + 티어별 일련번호 3자리 (예: 1001)
+TIER_CODE_PREFIX = {"CHALLENGE": "1", "FUNDED": "2", "DEMO": "3", "LIVE": "4"}
 
 
-async def _generate_product_id(session: AsyncSession, tier_type: str, capital: float) -> str:
-    base = f"{tier_type}_{_capital_label(capital)}"
-    candidate, n = base, 1
-    while await session.get(Product, candidate):
-        n += 1
-        candidate = f"{base}_{n}"
-    return candidate
+async def _generate_product_id(session: AsyncSession, tier_type: str) -> str:
+    prefix = TIER_CODE_PREFIX[tier_type]
+    last = await session.scalar(
+        select(func.max(Product.product_id)).where(Product.product_id.like(f"{prefix}___"))
+    )
+    seq = int(last[1:]) + 1 if last else 1
+    if seq > 999:
+        raise AppError(409, "product_code_exhausted", "이 티어의 상품코드(999개)를 모두 사용했습니다.")
+    return f"{prefix}{seq:03d}"
 
 
 async def _validate_product(session: AsyncSession, product: Product) -> None:
@@ -176,12 +175,7 @@ async def _check_product(session: AsyncSession, product: Product) -> None:
 
 
 async def create_product(session: AsyncSession, data: dict) -> Product:
-    product_id = data.pop("product_id", None)
-    if product_id:
-        if await session.get(Product, product_id):
-            raise AppError(409, "product_already_exists", "이미 있는 상품 ID입니다.")
-    else:
-        product_id = await _generate_product_id(session, data["tier_type"], data["capital"])
+    product_id = await _generate_product_id(session, data["tier_type"])
     product = Product(product_id=product_id, **data)
     await _validate_product(session, product)
     session.add(product)
@@ -195,6 +189,9 @@ _NULLABLE_PRODUCT_FIELDS = {
 
 
 async def update_product(session: AsyncSession, product: Product, data: dict) -> None:
+    # 상품코드 앞자리가 티어라서 만든 뒤에는 티어를 바꿀 수 없다.
+    if data.get("tier_type") is not None and data["tier_type"] != product.tier_type:
+        raise AppError(400, "tier_type_immutable", "상품의 티어는 바꿀 수 없습니다.")
     for field, value in data.items():
         if value is None and field not in _NULLABLE_PRODUCT_FIELDS:
             continue

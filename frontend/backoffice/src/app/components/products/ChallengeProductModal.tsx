@@ -4,6 +4,11 @@ import type { ChallengeProduct } from "../../types/product";
 import { SCHEDULE_STATUS, ASSIGNMENT_METHOD, ACCOUNT_RANGE_HINTS } from "../../constants/status";
 import { useListRulesetsQuery } from "../../queries/rulesets";
 
+const RECOMMEND_OPTIONS = [
+  { value: "N", label: "비추천 (기본)" },
+  { value: "Y", label: "추천" },
+] as const;
+
 interface ChallengeProductModalProps {
   product: ChallengeProduct | null;
   isOpen: boolean;
@@ -231,6 +236,13 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
                         <div style={{ fontSize: 11, color: "#DC2626", marginTop: 4 }}>{discountError}</div>
                       )}
                     </div>
+                    <SelectField
+                      label="추천"
+                      options={RECOMMEND_OPTIONS}
+                      value={formData.mostPopular ? "Y" : "N"}
+                      onChange={(v) => setFormData({ ...formData, mostPopular: v === "Y" })}
+                      t={t}
+                    />
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>

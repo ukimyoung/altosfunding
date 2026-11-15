@@ -92,8 +92,7 @@ class RulesetPage(BaseModel):
 
 
 class ProductCreate(BaseModel):
-    # 비우면 서버가 만든다 (예: CHALLENGE_10K)
-    product_id: str | None = Field(default=None, max_length=50, pattern=r"^[A-Za-z0-9_\-]+$")
+    # 상품코드(product_id)는 서버가 만든다: 티어 1자리 + 일련번호 3자리 (예: 1001)
     name: str = Field(min_length=1, max_length=200)
     type_code: str | None = None
     description: str | None = None

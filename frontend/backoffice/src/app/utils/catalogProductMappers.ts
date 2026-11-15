@@ -36,6 +36,7 @@ export const mapCatalogProductToChallengeProduct = (
 ): ChallengeProduct => ({
   ...baseProductFields(product),
   discountAmount: product.discount_price_usdt ?? null,
+  mostPopular: product.is_recommended ?? false,
   passConditionType: '-',
   passConditionValue: 0,
   drawdownMethod: '-',

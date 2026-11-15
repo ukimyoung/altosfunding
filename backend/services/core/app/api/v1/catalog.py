@@ -55,7 +55,7 @@ async def list_products(
 
 @router.post("/catalog/products", response_model=ProductOut, summary="상품 생성 (관리자)")
 async def create_product(body: ProductCreate, admin: AdminUser, session: Session) -> ProductOut:
-    """product_id를 비우면 `CHALLENGE_10K`처럼 티어와 자본금으로 만든다."""
+    """상품코드(product_id)는 티어 1자리 + 일련번호 3자리로 만든다. 예: 챌린지 1001, 펀디드 2001"""
     product = await catalog.create_product(session, body.model_dump())
     await session.commit()
     return await catalog.product_out_with_ruleset(session, product)
