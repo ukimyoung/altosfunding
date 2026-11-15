@@ -15,6 +15,9 @@ export const useDemoOptionsQuery = (enabled: boolean) =>
     queryKey: demoQueryKeys.options(),
     queryFn: getDemoOptions,
     enabled,
+    // 백오피스에서 선택지를 바꾸면 팝업을 다시 열 때 바로 보이도록 매번 새로 받는다.
+    staleTime: 0,
+    refetchOnMount: 'always',
     retry: false,
   });
 

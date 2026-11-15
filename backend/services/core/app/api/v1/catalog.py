@@ -3,11 +3,14 @@
 import math
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Path, Query
 
 from app.api.v1.auth import Session
 from app.deps import AdminUser
 from app.schemas.catalog import (
+    ConfigItemOut,
+    ConfigScope,
+    ConfigUpsertRequest,
     DemoOptionsResponse,
     ProductCreate,
     ProductOut,
@@ -114,3 +117,27 @@ async def update_ruleset(ruleset_id: str, body: RulesetUpdate, admin: AdminUser,
 async def demo_options(session: Session) -> DemoOptionsResponse:
     """선택지는 core.platform_config(scope=DEMO)에서 읽는다."""
     return await catalog.demo_options(session)
+
+
+# ── 플랫폼 설정 (관리자) ────────────────────────────────────
+# 기존 서버의 /admin/platform-config와 같은 경로·요청 형태다.
+# 백오피스 '데모 계정 관리' 화면은 DEMO scope의 선택지를 이 API로 바꾼다.
+
+
+@router.get("/admin/platform-config/{scope}", response_model=list[ConfigItemOut], summary="scope별 설정 목록")
+async def list_platform_configs(scope: ConfigScope, admin: AdminUser, session: Session) -> list[ConfigItemOut]:
+    return await catalog.list_configs(session, scope)
+
+
+@router.put("/admin/platform-config/{scope}/{key}", response_model=ConfigItemOut, summary="설정값 등록 또는 수정")
+async def upsert_platform_config(
+    scope: ConfigScope,
+    body: ConfigUpsertRequest,
+    admin: AdminUser,
+    session: Session,
+    key: str = Path(min_length=1, max_length=100),
+) -> ConfigItemOut:
+    """DEMO scope는 allowed_leverages·allowed_capitals(양수 목록, 중복 불가), default_leverage·default_capital(양수)만 받는다."""
+    config = await catalog.upsert_config(session, scope, key, body.value, body.value_type, body.description)
+    await session.commit()
+    return catalog.config_item_out(config)

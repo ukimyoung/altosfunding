@@ -1,5 +1,6 @@
 """상품·룰셋 관리."""
 
+import json
 import re
 
 from sqlalchemy import func, select
@@ -7,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
 from app.models import PlatformConfig, Product, Ruleset
-from app.schemas.catalog import DemoOptionsResponse, ProductOut, RulesetOut
+from app.schemas.catalog import ConfigItemOut, DemoOptionsResponse, ProductOut, RulesetOut
 from app.security import generate_human_code
 
 # 같은 MT4 서버를 쓰는 상품끼리는 계좌번호 범위가 겹치면 안 된다.
@@ -214,4 +215,120 @@ _DEMO_DEFAULTS = {
 async def demo_options(session: AsyncSession) -> DemoOptionsResponse:
     rows = await session.execute(select(PlatformConfig.key, PlatformConfig.value).where(PlatformConfig.scope == "DEMO"))
     values = {**_DEMO_DEFAULTS, **dict(rows.all())}
-    return DemoOptionsResponse(**{k: values[k] for k in _DEMO_DEFAULTS})
+    leverages = values["allowed_leverages"] or _DEMO_DEFAULTS["allowed_leverages"]
+    capitals = values["allowed_capitals"] or _DEMO_DEFAULTS["allowed_capitals"]
+    # 관리자가 선택지를 바꾸는 중에 기본값이 목록에서 빠질 수 있다. 그때는 목록의 첫 값을 기본값으로 쓴다.
+    default_leverage = values["default_leverage"]
+    if default_leverage not in leverages:
+        default_leverage = leverages[0]
+    default_capital = values["default_capital"]
+    if default_capital not in capitals:
+        default_capital = capitals[0]
+    return DemoOptionsResponse(
+        allowed_leverages=leverages,
+        allowed_capitals=capitals,
+        default_leverage=default_leverage,
+        default_capital=default_capital,
+    )
+
+
+# ── 플랫폼 설정 (관리자) ────────────────────────────────────
+
+# 데모 계좌 선택지는 화면과 계좌 생성 검증에 바로 쓰이므로 키와 값 형태를 검사한다.
+_DEMO_LIST_KEYS = {"allowed_leverages": int, "allowed_capitals": float}
+_DEMO_NUMBER_KEYS = {"default_leverage": int, "default_capital": float}
+_DEMO_MAX_OPTIONS = 20
+
+
+def _invalid(message: str) -> AppError:
+    return AppError(422, "invalid_config_value", message)
+
+
+def _value_type_of(value: object) -> str:
+    if isinstance(value, bool):
+        return "BOOLEAN"
+    if isinstance(value, int):
+        return "INTEGER"
+    if isinstance(value, float):
+        return "FLOAT"
+    if isinstance(value, str):
+        return "STRING"
+    return "JSON"
+
+
+def _coerce(value: object, value_type: str) -> object:
+    """기존 서버 클라이언트는 값을 문자열로 보내기도 하므로 value_type에 맞춰 바꾼다."""
+    if not isinstance(value, str) or value_type == "STRING":
+        return value
+    try:
+        if value_type == "INTEGER":
+            return int(value)
+        if value_type == "FLOAT":
+            return float(value)
+        if value_type == "BOOLEAN":
+            return value.strip().lower() in ("true", "1", "yes")
+        return json.loads(value)
+    except ValueError as exc:
+        raise _invalid(f"값을 {value_type}로 읽을 수 없습니다.") from exc
+
+
+def _positive_number(value: object, kind: type, label: str) -> int | float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise _invalid(f"{label}은(는) 숫자여야 합니다.")
+    if kind is int and value != int(value):
+        raise _invalid(f"{label}은(는) 정수여야 합니다.")
+    if value <= 0:
+        raise _invalid(f"{label}은(는) 0보다 커야 합니다.")
+    return int(value) if kind is int or value == int(value) else value
+
+
+def _validate_demo_value(key: str, value: object) -> object:
+    if key in _DEMO_LIST_KEYS:
+        if not isinstance(value, list) or not value:
+            raise _invalid("선택지는 하나 이상 있어야 합니다.")
+        if len(value) > _DEMO_MAX_OPTIONS:
+            raise _invalid(f"선택지는 {_DEMO_MAX_OPTIONS}개까지 등록할 수 있습니다.")
+        items = [_positive_number(v, _DEMO_LIST_KEYS[key], "선택지 값") for v in value]
+        if len(set(items)) != len(items):
+            raise _invalid("같은 값을 두 번 등록할 수 없습니다.")
+        return items
+    if key in _DEMO_NUMBER_KEYS:
+        return _positive_number(value, _DEMO_NUMBER_KEYS[key], "기본값")
+    raise _invalid(f"DEMO 설정에는 {key} 키를 쓸 수 없습니다.")
+
+
+def config_item_out(config: PlatformConfig) -> ConfigItemOut:
+    return ConfigItemOut(
+        scope=config.scope,
+        key=config.key,
+        value=config.value,
+        value_type=_value_type_of(config.value),
+        description=config.description,
+        updated_at=config.updated_at,
+    )
+
+
+async def list_configs(session: AsyncSession, scope: str) -> list[ConfigItemOut]:
+    rows = await session.scalars(
+        select(PlatformConfig).where(PlatformConfig.scope == scope).order_by(PlatformConfig.key)
+    )
+    return [config_item_out(c) for c in rows]
+
+
+async def upsert_config(
+    session: AsyncSession, scope: str, key: str, value: object, value_type: str, description: str | None
+) -> PlatformConfig:
+    value = _coerce(value, value_type)
+    if scope == "DEMO":
+        value = _validate_demo_value(key, value)
+    config = await session.get(PlatformConfig, (scope, key), with_for_update=True)
+    if config is None:
+        config = PlatformConfig(scope=scope, key=key, value=value, description=description)
+        session.add(config)
+    else:
+        config.value = value
+        if description is not None:
+            config.description = description
+    await session.flush()
+    await session.refresh(config)
+    return config

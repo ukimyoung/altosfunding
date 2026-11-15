@@ -189,3 +189,28 @@ class DemoOptionsResponse(BaseModel):
     allowed_capitals: list[float]
     default_leverage: int
     default_capital: float
+
+
+# ── 플랫폼 설정 (관리자) ────────────────────────────────────
+
+ConfigScope = Literal["DEMO", "PAYOUT", "RISK", "CHALLENGE", "LIVE", "SYSTEM", "REWARD"]
+ValueType = Literal["STRING", "INTEGER", "FLOAT", "JSON", "BOOLEAN"]
+
+
+class ConfigItemOut(BaseModel):
+    """기존 서버 응답과 같은 필드를 쓴다. 단, value는 문자열이 아니라 저장된 JSON 값 그대로다."""
+
+    scope: str
+    key: str
+    value: object
+    value_type: ValueType
+    description: str | None
+    updated_at: datetime
+
+
+class ConfigUpsertRequest(BaseModel):
+    """기존 서버와 같은 요청 형태. value_type이 JSON/INTEGER/FLOAT/BOOLEAN이면 문자열 값도 변환해서 저장한다."""
+
+    value: object
+    value_type: ValueType = "STRING"
+    description: str | None = None
