@@ -1,3 +1,4 @@
+from app.models.catalog import PlatformConfig, Product, Ruleset
 from app.models.user import (
     EmailVerification,
     LoginHistory,
@@ -12,7 +13,10 @@ __all__ = [
     "EmailVerification",
     "LoginHistory",
     "PasswordResetToken",
+    "PlatformConfig",
+    "Product",
     "RefreshToken",
+    "Ruleset",
     "User",
     "UserBackupCode",
     "UserStatusHistory",
