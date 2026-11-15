@@ -45,7 +45,7 @@ async def _truncate() -> None:
 
     conn = await asyncpg.connect(_asyncpg_dsn(TEST_DATABASE_URL))
     try:
-        await conn.execute("truncate core.email_verifications, core.users restart identity cascade")
+        await conn.execute("truncate core.email_verifications, core.users, core.products, core.rulesets restart identity cascade")
     finally:
         await conn.close()
 

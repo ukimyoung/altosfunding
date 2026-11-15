@@ -59,6 +59,16 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 | POST | `/api/v1/admin/users/{id}/reset-password` | 비밀번호 강제 재설정 |
 | GET | `/api/v1/admin/users/{id}/status-history` | 상태 변경 이력 |
 
+| GET | `/api/v1/catalog/products` | 상품 목록 (로그인 불필요, `tier_type`, `active_only`, `page`, `size`) |
+| POST | `/api/v1/catalog/products` | 상품 생성. `product_id`를 비우면 `CHALLENGE_10K`처럼 만든다 |
+| PUT | `/api/v1/catalog/products/{id}` | 상품 수정 |
+| PATCH | `/api/v1/catalog/products/{id}/status` | 상품 활성/비활성 |
+| GET·POST | `/api/v1/admin/rulesets` | 룰셋 목록·생성 (`id`를 비우면 `RS-XXXXXX`) |
+| GET·PATCH | `/api/v1/admin/rulesets/{id}` | 룰셋 상세·수정 |
+| GET | `/api/v1/demo/options` | 데모 계좌 레버리지·자본금 선택지 (`core.platform_config`의 `DEMO` 값) |
+
+상품의 MT4 계좌번호 범위는 같은 MT4 서버를 쓰는 상품끼리 겹칠 수 없다 (챌린지·데모 = 데모 서버, 펀디드·라이브 = 실서버).
+
 관리자 API는 `role=ADMIN` 계정만 쓸 수 있다. 첫 관리자는 가입 후 Supabase SQL Editor에서 `update core.users set role = 'ADMIN' where email = '...'`로 지정한다.
 아직 없는 기능: 회원별 파트너 실적(`partner-stats`)은 쿠폰 기능과 함께, 계좌 수·총자산은 트레이딩 계좌 기능과 함께 채운다.
 
