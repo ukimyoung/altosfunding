@@ -3,10 +3,16 @@
 import math
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, Query, Request
+from fastapi import APIRouter, Cookie, Depends, Query, Request, Response
 from sqlalchemy import func, select
 
-from app.api.v1.auth import REFRESH_COOKIE, Session, _locale
+from app.api.v1.auth import (
+    REFRESH_COOKIE,
+    TWO_FACTOR_COOKIE,
+    Session,
+    _delete_cookie,
+    _locale,
+)
 from app.deps import CurrentUser
 from app.errors import AppError
 from app.models import LoginHistory, User
@@ -26,7 +32,7 @@ from app.schemas.auth import (
     WithdrawEmailRequest,
     WithdrawEmailResponse,
 )
-from app.services import password, signup, two_factor
+from app.services import password, signup, two_factor, user_admin
 from app.services.email import EmailSender, get_email_sender
 from app.services.recaptcha import verify_recaptcha
 
@@ -34,15 +40,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 async def _user_out(session, user: User) -> UserOut:
-    referrer_code = None
-    if user.referrer_id:
-        referrer_code = await session.scalar(
-            select(User.referral_code).where(User.id == user.referrer_id)
-        )
-    total_referrals = await session.scalar(
-        select(func.count()).select_from(User).where(User.referrer_id == user.id)
-    )
-    return signup.to_user_out(user, referrer_code=referrer_code, total_referrals=total_referrals or 0)
+    return await user_admin.user_out(session, user, for_admin=False)
 
 
 @router.get("/me", response_model=UserOut, summary="내 정보 조회")
@@ -179,3 +177,18 @@ async def regenerate_backup_codes(
     body: TwoFactorCodeRequest, user: CurrentUser, session: Session
 ) -> BackupCodesResponse:
     return BackupCodesResponse(backup_codes=await two_factor.regenerate_backup_codes(session, user, body.code))
+
+
+# ── 탈퇴 ────────────────────────────────────────────────────
+
+
+@router.post("/account/withdraw", response_model=OkResponse, summary="회원 탈퇴 (본인)")
+async def withdraw_account(user: CurrentUser, session: Session, response: Response) -> OkResponse:
+    """개인정보를 지우고 모든 기기의 로그인을 끊는다. 관리자 계정은 직접 탈퇴할 수 없다."""
+    if user.role == "ADMIN":
+        raise AppError(400, "admin_self_withdraw_forbidden", "Admin accounts cannot be withdrawn via this endpoint")
+    await user_admin.withdraw(session, user, "회원 본인 탈퇴", user.id)
+    await session.commit()
+    _delete_cookie(response, REFRESH_COOKIE)
+    _delete_cookie(response, TWO_FACTOR_COOKIE)
+    return OkResponse(message_key="auth.account_withdrawn")

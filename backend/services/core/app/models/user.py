@@ -130,3 +130,15 @@ class PasswordResetToken(Base):
     expires_at: Mapped[datetime]
     used_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class UserStatusHistory(Base):
+    __tablename__ = "user_status_history"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
+    from_status: Mapped[str]
+    to_status: Mapped[str]
+    reason: Mapped[str | None]
+    changed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

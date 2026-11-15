@@ -5,8 +5,8 @@ import secrets
 import string
 
 from argon2 import PasswordHasher
-from cryptography.fernet import Fernet
 from argon2.exceptions import InvalidHashError, VerificationError
+from cryptography.fernet import Fernet
 
 from app.config import settings
 

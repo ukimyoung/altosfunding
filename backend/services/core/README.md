@@ -48,6 +48,24 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 | GET | `/api/v1/auth/google/login` | Google 로그인 화면으로 이동 (`state`=돌아갈 사용자 웹 주소, `prompt`) |
 | GET | `/api/v1/auth/google/callback` | Google 콜백. 성공 시 `{웹}/my-page?login_success=true`(신규 가입이면 `&welcome=true`), 2FA 회원은 `{웹}/login/2fa`, 실패 시 `{웹}/login?error=google_auth_failed&detail=...` |
 | GET | `/api/v1/auth/google/url` | Google 로그인 주소만 반환 |
+| POST | `/api/v1/auth/account/withdraw` | 본인 탈퇴. 개인정보 익명화, 모든 로그인 해제 (관리자 계정은 불가) |
+| GET | `/api/v1/admin/users` | 회원 목록 (`keyword`, `status`, `grade`, `kyc_status`, `is_active`, `page`, `size`). 탈퇴 회원은 `status=WITHDRAWN`일 때만 |
+| GET | `/api/v1/admin/users/summary` | 회원 수 요약 (상태·등급·KYC·어제 가입) |
+| POST | `/api/v1/admin/users` | 회원 직접 생성 (이메일 인증 완료 상태) |
+| GET | `/api/v1/admin/users/{id}` | 회원 상세 |
+| PATCH | `/api/v1/admin/users/{id}/profile` | 회원 정보·등급·KYC 상태·상태·비밀번호 수정 |
+| POST | `/api/v1/admin/users/{id}/suspend` · `/ban` · `/activate` | 비활성 / 영구 정지 / 활성 복귀. 막으면 그 회원의 모든 로그인을 바로 끊는다 |
+| POST | `/api/v1/admin/users/{id}/withdraw` | 관리자 탈퇴 처리 |
+| POST | `/api/v1/admin/users/{id}/reset-password` | 비밀번호 강제 재설정 |
+| GET | `/api/v1/admin/users/{id}/status-history` | 상태 변경 이력 |
+
+관리자 API는 `role=ADMIN` 계정만 쓸 수 있다. 첫 관리자는 가입 후 Supabase SQL Editor에서 `update core.users set role = 'ADMIN' where email = '...'`로 지정한다.
+아직 없는 기능: 회원별 파트너 실적(`partner-stats`)은 쿠폰 기능과 함께, 계좌 수·총자산은 트레이딩 계좌 기능과 함께 채운다.
+
+## 배포 (Render, 테스트용)
+`render.yaml`의 `altosfunding-core-sandbox` 서비스. Render 대시보드에서 Blueprint를 동기화하면 만들어지고, `DATABASE_URL`(Supabase staging Session pooler 연결 문자열) 등 `sync: false` 값을 입력해야 한다.
+- 배포 확인: `/health`, `/health/db`, API 문서 `/docs`
+- 로컬 웹에서 시험: `frontend/web/.env.local`에 `API_PROXY_TARGET=https://altosfunding-core-sandbox.onrender.com`
 
 Google 로그인 참고
 - 같은 이메일로 이메일 가입한 회원은 Google로도 로그인된다 (Google이 인증한 이메일만 허용, 기존 서버와 동일). 처음 쓰는 이메일이면 바로 가입된다.

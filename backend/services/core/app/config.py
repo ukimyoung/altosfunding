@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -52,6 +53,15 @@ class Settings(BaseSettings):
     email_code_max_attempts: int = 5
     # 인증을 마친 뒤 이 시간 안에 가입을 끝내야 한다.
     signup_verification_valid_minutes: int = 30
+
+    @field_validator("database_url")
+    @classmethod
+    def _use_asyncpg_driver(cls, value: str) -> str:
+        # Supabase 대시보드의 연결 문자열(postgresql://...)을 그대로 넣어도 되게 한다.
+        for prefix in ("postgresql://", "postgres://"):
+            if value.startswith(prefix):
+                return "postgresql+asyncpg://" + value[len(prefix):]
+        return value
 
     @property
     def allowed_frontend_origins(self) -> set[str]:
