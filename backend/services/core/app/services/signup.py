@@ -1,5 +1,6 @@
 """회원 가입: 이메일 인증코드 발송 → 코드 확인 → 가입."""
 
+import secrets
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
@@ -125,6 +126,20 @@ async def _generate_unique(session: AsyncSession, column, length: int, prefix: s
     raise AppError(500, "code_generation_failed", "잠시 후 다시 시도해 주세요.")
 
 
+def _random_uid() -> str:
+    # 첫 자리는 1~9로 해서 항상 10자리 숫자가 되게 한다.
+    return str(secrets.randbelow(9) + 1) + "".join(str(secrets.randbelow(10)) for _ in range(9))
+
+
+async def generate_uid(session: AsyncSession) -> str:
+    """회원 Account ID: 임의의 10자리 숫자. 이미 쓰는 번호면 다시 뽑는다 (탈퇴 회원 번호 포함)."""
+    for _ in range(20):
+        candidate = _random_uid()
+        if not await session.scalar(select(func.count()).where(User.uid == candidate)):
+            return candidate
+    raise AppError(500, "code_generation_failed", "잠시 후 다시 시도해 주세요.")
+
+
 async def register(session: AsyncSession, body: RegisterRequest) -> UserOut:
     email = normalize_email(body.email)
 
@@ -160,7 +175,7 @@ async def register(session: AsyncSession, body: RegisterRequest) -> UserOut:
 
     now = _now()
     user = User(
-        uid=await _generate_unique(session, User.uid, 8, prefix="AF"),
+        uid=await generate_uid(session),
         email=email,
         password_hash=hash_password(body.password),
         auth_provider="LOCAL",
