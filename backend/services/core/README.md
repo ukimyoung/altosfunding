@@ -68,6 +68,7 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 | GET | `/api/v1/demo/options` | 데모 계좌 레버리지·자본금 선택지 (`core.platform_config`의 `DEMO` 값) |
 
 | GET | `/api/v1/challenges/summary` | 모집 중·진행 중 챌린지 회차 (로그인 불필요) |
+| GET | `/api/v1/challenges/products` | Start New Challenge 상품 카드: 활성 챌린지 상품(원가격·할인가격·추천·레버리지·Trading 기간), 룰셋 조건(금액 환산), 펀디드 단계(next_product_id 또는 자본금이 같은 펀디드 상품), 지금 신청할 수 있는 모집 중 회차 (로그인 불필요) |
 | GET·POST | `/api/v1/admin/challenges` | 회차 목록(`status`, `date`, `product_id`, `schedule_id`)·직접 생성 |
 | GET | `/api/v1/admin/challenges/{id}` | 회차 상세 |
 | POST | `/api/v1/admin/challenges/{id}/start`, `/close` | 바로 시작, 종료 (`cancel_reason`을 넣으면 취소) |

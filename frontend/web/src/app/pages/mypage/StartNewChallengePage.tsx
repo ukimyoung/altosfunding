@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -17,8 +17,8 @@ import { Toast } from '../../components/shared/Toast';
 import { SuccessNotification } from '../../components/shared/SuccessNotification';
 import { validateCoupon, type ValidateCouponResponse } from '@/api/coupons';
 import { completePayment } from '@/api/orders';
-import type { Product } from '@/api/products';
-import { useListProductsQuery } from '@/app/queries/products';
+import type { ChallengeOffer, ChallengeOfferFunded, ChallengeOfferRules } from '@/api/products';
+import { useListChallengeOffersQuery } from '@/app/queries/products';
 import { useMyAssetQuery } from '@/app/queries/assets';
 import { useMeQuery } from '@/app/queries/profile';
 import { hasRequiredProfileName } from '@/app/utils/profile';
@@ -26,176 +26,54 @@ import { useLocale } from '@/app/i18n/LocaleContext';
 import { BannerPopup } from '@/app/components/shared/BannerPopup';
 import { InfoTooltip } from '@/app/components/shared/InfoTooltip';
 
-type TemplateId = 'starter' | 'pro' | 'elite' | 'prime';
-
+// 카드 한 장 = 판매 중인 챌린지 상품 하나 (백오피스 챌린지 관리 > 상품 템플릿 > 챌린지 상품).
+// 예전 하드코딩 템플릿(Starter/Pro/Elite/Prime) 대신 Core /challenges/products 값을 그대로 쓴다.
 type AccountType = {
   id: string;
+  /** 지금 신청할 수 있는 모집 중 회차. 없으면 카드를 선택할 수 없다. */
   challengeId?: string;
   name: string;
+  /** 실제 결제 금액 (할인가격이 있으면 할인가격) */
   price: number;
-  originalFee: string;
+  /** 할인 중일 때만 원가격 (취소선 표시용) */
+  originalPrice: number | null;
   capital: number;
-  templateId?: TemplateId;
-  challengeStage: {
-    profitTarget: string;
-    maxDrawdown: string;
-    dailyLossLimit: string | null;
-    maxContracts: string;
-    consistency: string;
-    tradingPeriod: string;
-  };
-  fundedStage: {
-    profitTarget: string | null;
-    maxDrawdown: string;
-    dailyLossLimit: string;
-    maxContracts: string;
-    consistency: string | null;
-    profitSplit: string;
-  };
-  isRecommended?: boolean;
+  leverage: number;
+  durationDays: number;
+  rules: ChallengeOfferRules | null;
+  funded: ChallengeOfferFunded | null;
+  isRecommended: boolean;
+  isAvailable: boolean;
 };
-
-type AccountTemplate = Omit<
-  AccountType,
-  'id' | 'challengeId' | 'price' | 'capital' | 'isRecommended'
-> & {
-  id: TemplateId;
-  /** Funding capital this template describes; used to match API products. */
-  templateCapital: number;
-};
-
-const accountTemplates: AccountTemplate[] = [
-  {
-    id: 'starter',
-    templateId: 'starter',
-    name: 'Starter',
-    originalFee: '$80',
-    templateCapital: 10000,
-    challengeStage: {
-      profitTarget: '$600',
-      maxDrawdown: '$500',
-      dailyLossLimit: null,
-      maxContracts: '1 Mini (10 Micro)',
-      consistency: '40%',
-      tradingPeriod: '5 Days',
-    },
-    fundedStage: {
-      profitTarget: null,
-      maxDrawdown: '$500',
-      dailyLossLimit: '$200',
-      maxContracts: '2 Mini (20 Micro)',
-      consistency: null,
-      profitSplit: '80/20',
-    },
-  },
-  {
-    id: 'pro',
-    templateId: 'pro',
-    name: 'Professional',
-    originalFee: '$131',
-    templateCapital: 25000,
-    challengeStage: {
-      profitTarget: '$1,500',
-      maxDrawdown: '$1,000',
-      dailyLossLimit: null,
-      maxContracts: '2 Mini (20 Micro)',
-      consistency: '40%',
-      tradingPeriod: '5 Days',
-    },
-    fundedStage: {
-      profitTarget: null,
-      maxDrawdown: '$1,000',
-      dailyLossLimit: '$500',
-      maxContracts: '2 Mini (20 Micro)',
-      consistency: null,
-      profitSplit: '80/20',
-    },
-  },
-  {
-    id: 'elite',
-    templateId: 'elite',
-    name: 'Elite',
-    originalFee: '$188',
-    templateCapital: 50000,
-    challengeStage: {
-      profitTarget: '$3,000',
-      maxDrawdown: '$2,000',
-      dailyLossLimit: null,
-      maxContracts: '4 Mini (40 Micro)',
-      consistency: '40%',
-      tradingPeriod: '5 Days',
-    },
-    fundedStage: {
-      profitTarget: null,
-      maxDrawdown: '$2,000',
-      dailyLossLimit: '$1,000',
-      maxContracts: '4 Mini (40 Micro)',
-      consistency: null,
-      profitSplit: '80/20',
-    },
-  },
-  {
-    id: 'prime',
-    templateId: 'prime',
-    name: 'Prime',
-    originalFee: '$320',
-    templateCapital: 100000,
-    challengeStage: {
-      profitTarget: '$6,000',
-      maxDrawdown: '$3,500',
-      dailyLossLimit: null,
-      maxContracts: '6 Mini (60 Micro)',
-      consistency: '40%',
-      tradingPeriod: '5 Days',
-    },
-    fundedStage: {
-      profitTarget: null,
-      maxDrawdown: '$3,500',
-      dailyLossLimit: '$2,000',
-      maxContracts: '6 Mini (60 Micro)',
-      consistency: null,
-      profitSplit: '80/20',
-    },
-  },
-];
 
 const formatCapital = (capital: number) => `$${capital.toLocaleString('en-US')}`;
 
-const getAccountTemplateForProduct = (product: Product, index: number) => {
-  const capitalTemplate = accountTemplates.find(
-    (template) => template.templateCapital === product.capital,
-  );
+const formatMoney = (amount: number) =>
+  `$${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
 
-  if (capitalTemplate) {
-    return capitalTemplate;
-  }
+const formatPrice = (amount: number) =>
+  amount.toLocaleString('en-US', { maximumFractionDigits: 2 });
 
-  const productText = `${product.product_id} ${product.challenge_name}`.toLowerCase();
-  const matchedTemplate = accountTemplates.find(
-    (template) =>
-      productText.includes(template.id) || productText.includes(template.name.toLowerCase()),
-  );
+const toAccountType = (offer: ChallengeOffer): AccountType => ({
+  id: offer.product_id,
+  challengeId: offer.open_challenge?.challenge_id,
+  name: offer.name,
+  price: offer.final_price_usdt,
+  originalPrice:
+    offer.discount_price_usdt != null && offer.discount_price_usdt < offer.price_usdt
+      ? offer.price_usdt
+      : null,
+  capital: offer.capital,
+  leverage: offer.leverage,
+  durationDays: offer.duration_days,
+  rules: offer.rules,
+  funded: offer.funded,
+  isRecommended: offer.is_recommended,
+  isAvailable: Boolean(offer.open_challenge),
+});
 
-  return matchedTemplate ?? accountTemplates[index] ?? accountTemplates[0];
-};
-
-const mergeAccountTypesWithProducts = (products: Product[]) => {
-  return products.map((product, index) => {
-    const template = getAccountTemplateForProduct(product, index);
-
-    const { templateCapital: _templateCapital, ...templateFields } = template;
-
-    return {
-      ...templateFields,
-      id: product.product_id,
-      challengeId: product.challenge_id,
-      name: template.name,
-      price: product.price_usdt,
-      capital: product.capital,
-      isRecommended: product.is_recommended,
-    };
-  });
-};
+// 결제(지갑·쿠폰·주문 생성)는 Core에 아직 없다. 다음 단계에서 true로 바꾸면 아래 결제 모달 흐름이 동작한다.
+const PAYMENT_ENABLED = false;
 
 const formatUsdt = (amount: number) =>
   `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT`;
@@ -237,14 +115,22 @@ export function StartNewChallengePage() {
   const { T } = useLocale();
   const text = T.startNewChallenge;
   const tooltips = text.tooltips;
-  const tierNames: Record<string, string> = text.tierNames;
-  const getAccountDisplayName = (account: AccountType) =>
-    account.templateId ? tierNames[account.templateId] : account.name;
-  const formatAccountTextValue = (value: string) => {
-    if (value === 'None' || value === 'Non') return text.none;
-    if (value === '5 Days') return text.fiveDays;
-    return value;
-  };
+  const getAccountDisplayName = (account: AccountType) => account.name;
+  const formatDays = (days: number) => text.daysFormat.replace('{n}', String(days));
+  // 금액이 0이거나 없으면 '없음'
+  const formatLimit = (amount: number | null | undefined) =>
+    amount ? formatMoney(amount) : text.none;
+  const formatLeverage = (leverage: number) => `1:${leverage}`;
+  const formatProfitSplit = (payoutRatio: number) =>
+    `${formatPrice(payoutRatio)}/${formatPrice(100 - payoutRatio)}`;
+  const profitSplitTooltip = (payoutRatio: number) =>
+    tooltips.profitSplit
+      .replace('{trader}', formatPrice(payoutRatio))
+      .replace('{company}', formatPrice(100 - payoutRatio));
+  const maxDrawdownLabel = (rules: ChallengeOfferRules | null) =>
+    rules?.dd_calc_method === 'EOD' ? text.maxDrawdownEod : text.maxDrawdown;
+  const maxDrawdownTooltip = (rules: ChallengeOfferRules | null) =>
+    rules?.dd_calc_method === 'EOD' ? tooltips.maxDrawdownEod : tooltips.maxDrawdown;
   const [selectedAccount, setSelectedAccount] = useState<string>('');
   const [quantity, setQuantity] = useState<number>(1);
   const [showPaymentSuccessToast, setShowPaymentSuccessToast] = useState<boolean>(false);
@@ -253,6 +139,7 @@ export function StartNewChallengePage() {
   const [isValidatingChallenge, setIsValidatingChallenge] = useState<boolean>(false);
   const [showPaymentModal, setShowPaymentModal] = useState<boolean>(false);
   const [apiErrorMessage, setApiErrorMessage] = useState<string>('');
+  const [showPaymentComingSoon, setShowPaymentComingSoon] = useState<boolean>(false);
   const [discountCode, setDiscountCode] = useState('');
   const [couponPreview, setCouponPreview] = useState<ValidateCouponResponse | null>(null);
   const [discountMessage, setDiscountMessage] = useState('');
@@ -260,13 +147,16 @@ export function StartNewChallengePage() {
     'idle',
   );
   const {
-    data: challengeSummary,
+    data: challengeOffers,
     isLoading: isChallengeSummaryLoading,
     refetch: refetchChallengeSummary,
-  } = useListProductsQuery();
+  } = useListChallengeOffersQuery();
   const { data: myAssetSummary, refetch: refetchMyAsset } = useMyAssetQuery();
   const { data: me } = useMeQuery();
-  const sortedChallenges = mergeAccountTypesWithProducts(challengeSummary?.challenges ?? []);
+  const sortedChallenges = useMemo(
+    () => (challengeOffers?.items ?? []).map(toAccountType),
+    [challengeOffers],
+  );
 
   const selectedAccountData = sortedChallenges.find(
     (challenge) => challenge.id === selectedAccount,
@@ -280,17 +170,13 @@ export function StartNewChallengePage() {
   const amountNeeded = Math.max(totalAmount - totalAsset, 0);
 
   useEffect(() => {
-    if (!sortedChallenges.length) {
-      return;
-    }
-
-    const hasSelectedChallenge = sortedChallenges.some(
-      (challenge) => challenge.id === selectedAccount,
-    );
+    const available = sortedChallenges.filter((challenge) => challenge.isAvailable);
+    const hasSelectedChallenge = available.some((challenge) => challenge.id === selectedAccount);
 
     if (!hasSelectedChallenge) {
+      // 추천 상품을 먼저, 없으면 신청할 수 있는 첫 상품을 고른다.
       setSelectedAccount(
-        sortedChallenges.find((challenge) => challenge.isRecommended)?.id ?? sortedChallenges[0].id,
+        available.find((challenge) => challenge.isRecommended)?.id ?? available[0]?.id ?? '',
       );
     }
   }, [selectedAccount, sortedChallenges]);
@@ -379,9 +265,7 @@ export function StartNewChallengePage() {
 
   const getLatestSelectedAccount = async () => {
     const refreshedChallengeSummary = await refetchChallengeSummary();
-    const latestChallenges = mergeAccountTypesWithProducts(
-      refreshedChallengeSummary.data?.challenges ?? [],
-    );
+    const latestChallenges = (refreshedChallengeSummary.data?.items ?? []).map(toAccountType);
 
     return latestChallenges.find((challenge) => challenge.id === selectedAccount);
   };
@@ -405,7 +289,11 @@ export function StartNewChallengePage() {
         return;
       }
 
-      if (latestSelectedAccount.challengeId !== selectedAccountData.challengeId) {
+      // 상품 수정은 신규 구매분부터 적용되므로, 보고 있던 가격과 달라졌으면 다시 확인하게 한다.
+      if (
+        latestSelectedAccount.challengeId !== selectedAccountData.challengeId ||
+        latestSelectedAccount.price !== selectedAccountData.price
+      ) {
         setApiErrorMessage(text.challengeChanged);
         return;
       }
@@ -414,6 +302,11 @@ export function StartNewChallengePage() {
       return;
     } finally {
       setIsValidatingChallenge(false);
+    }
+
+    if (!PAYMENT_ENABLED) {
+      setShowPaymentComingSoon(true);
+      return;
     }
 
     // [본 결제 모달 로직 - 테스트 종료 후 사용]
@@ -440,7 +333,7 @@ export function StartNewChallengePage() {
   };
 
   const handleCompletePayment = async () => {
-    if (!selectedAccountData) {
+    if (!selectedAccountData?.challengeId) {
       return;
     }
 
@@ -493,6 +386,16 @@ export function StartNewChallengePage() {
         message={apiErrorMessage}
         isVisible={Boolean(apiErrorMessage)}
         onClose={() => setApiErrorMessage('')}
+        duration={3000}
+        position="top"
+      />
+
+      <Toast
+        type="info"
+        title={text.paymentComingSoonTitle}
+        message={text.paymentComingSoonMsg}
+        isVisible={showPaymentComingSoon}
+        onClose={() => setShowPaymentComingSoon(false)}
         duration={3000}
         position="top"
       />
@@ -864,17 +767,26 @@ export function StartNewChallengePage() {
             ) : (
               <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
                 {sortedChallenges.map((account, index) => {
+                  const isSelected = selectedAccount === account.id;
+                  const funded = account.funded;
                   return (
                     <motion.div
                       key={account.id}
                       initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      animate={{ opacity: account.isAvailable ? 1 : 0.55, y: 0 }}
                       transition={{ delay: index * 0.1 }}
-                      onClick={() => setSelectedAccount(account.id)}
-                      className={`relative cursor-pointer rounded-2xl border-2 bg-[#0f0f17] p-5 transition-all hover:scale-105 ${
-                        selectedAccount === account.id
+                      onClick={() => account.isAvailable && setSelectedAccount(account.id)}
+                      aria-disabled={!account.isAvailable}
+                      className={`relative rounded-2xl border-2 bg-[#0f0f17] p-5 transition-all ${
+                        account.isAvailable
+                          ? 'cursor-pointer hover:scale-105'
+                          : 'cursor-not-allowed'
+                      } ${
+                        isSelected
                           ? 'border-[#0052FF] shadow-lg shadow-[#0052FF]/20'
-                          : 'border-[#2a2a3a] hover:border-[#0052FF]/50'
+                          : account.isAvailable
+                            ? 'border-[#2a2a3a] hover:border-[#0052FF]/50'
+                            : 'border-[#2a2a3a]'
                       }`}
                     >
                       {account.isRecommended && (
@@ -885,13 +797,13 @@ export function StartNewChallengePage() {
                         </div>
                       )}
 
-                      {/* Compact header: tier name, then capital and one-time fee side by side */}
+                      {/* Compact header: product name, then capital and one-time fee side by side */}
                       <div className="mb-4 border-b border-[#2a2a3a] pb-4">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-xs uppercase tracking-wider text-gray-500">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="truncate text-xs uppercase tracking-wider text-gray-500">
                             {getAccountDisplayName(account)}
                           </span>
-                          {selectedAccount === account.id && (
+                          {isSelected && (
                             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0052FF]">
                               <Check size={12} className="text-white" />
                             </div>
@@ -906,16 +818,23 @@ export function StartNewChallengePage() {
                           </div>
                           <div className="text-right">
                             <div className="flex items-baseline justify-end gap-1.5">
-                              <span className="text-xs text-gray-500 line-through">
-                                {account.originalFee}
-                              </span>
+                              {account.originalPrice != null && (
+                                <span className="text-xs text-gray-500 line-through">
+                                  ${formatPrice(account.originalPrice)}
+                                </span>
+                              )}
                               <span className="text-2xl font-bold leading-tight text-white">
-                                ${account.price}
+                                ${formatPrice(account.price)}
                               </span>
                             </div>
                             <div className="mt-0.5 text-xs text-gray-400">{text.oneTimeFee}</div>
                           </div>
                         </div>
+                        {!account.isAvailable && (
+                          <div className="mt-3 rounded-lg bg-[#1a1a24] px-3 py-1.5 text-center text-xs text-gray-400">
+                            {text.noOpenRound}
+                          </div>
+                        )}
                       </div>
 
                       <div className="space-y-4">
@@ -930,16 +849,16 @@ export function StartNewChallengePage() {
                                 {text.profitTarget}
                               </span>
                               <span className="text-right text-sm font-bold text-white">
-                                {account.challengeStage.profitTarget}
+                                {formatLimit(account.rules?.profit_target_amt)}
                               </span>
                             </div>
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
-                                <InfoTooltip content={tooltips.maxDrawdownEod} />
-                                {text.maxDrawdownEod}
+                                <InfoTooltip content={maxDrawdownTooltip(account.rules)} />
+                                {maxDrawdownLabel(account.rules)}
                               </span>
                               <span className="text-right text-sm font-bold text-white">
-                                {account.challengeStage.maxDrawdown}
+                                {account.rules ? formatMoney(account.rules.max_drawdown_amt) : '-'}
                               </span>
                             </div>
                             <div className="flex items-start justify-between gap-3">
@@ -948,60 +867,69 @@ export function StartNewChallengePage() {
                                 {text.dailyLossLimit}
                               </span>
                               <span className="text-right text-sm font-bold text-white">
-                                {account.challengeStage.dailyLossLimit ?? text.none}
+                                {formatLimit(account.rules?.daily_loss_limit_amt)}
                               </span>
                             </div>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.leverage} />
+                                {text.leverage}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {formatLeverage(account.leverage)}
+                              </span>
+                            </div>
+                            {/* 최대 계약 수·일관성은 상품/룰셋에 값이 없어 숨김 (데이터가 생기면 다시 표시)
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.maxContracts} />
                                 {text.maxContracts}
                               </span>
-                              <span className="text-right text-sm font-bold text-white">
-                                {account.challengeStage.maxContracts}
-                              </span>
+                              <span className="text-right text-sm font-bold text-white">-</span>
                             </div>
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.consistency} />
                                 {text.consistency}
                               </span>
-                              <span className="text-right text-sm font-bold text-white">
-                                {account.challengeStage.consistency}
-                              </span>
+                              <span className="text-right text-sm font-bold text-white">-</span>
                             </div>
+                            */}
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.tradingPeriod} />
                                 {text.tradingPeriod}
                               </span>
                               <span className="text-right text-sm font-bold text-white">
-                                {formatAccountTextValue(account.challengeStage.tradingPeriod)}
+                                {formatDays(account.durationDays)}
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <div>
-                          <h3 className="mb-3 text-sm font-bold text-white">
-                            {text.fundedStage}
-                          </h3>
-                          <div className="space-y-3">
+                        {/* 펀디드 단계: 연결된 펀디드 상품(없으면 자본금이 같은 펀디드 상품)이 있을 때만 */}
+                        {funded && (
+                          <div>
+                            <h3 className="mb-3 text-sm font-bold text-white">
+                              {text.fundedStage}
+                            </h3>
+                            <div className="space-y-3">
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.profitTarget} />
                                 {text.profitTarget}
                               </span>
                               <span className="text-right text-sm font-bold text-white">
-                                {account.fundedStage.profitTarget ?? text.none}
+                                {formatLimit(funded.rules?.profit_target_amt)}
                               </span>
                             </div>
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
-                                <InfoTooltip content={tooltips.maxDrawdownEod} />
-                                {text.maxDrawdownEod}
+                                <InfoTooltip content={maxDrawdownTooltip(funded.rules)} />
+                                {maxDrawdownLabel(funded.rules)}
                               </span>
                               <span className="text-right text-sm font-bold text-white">
-                                {account.fundedStage.maxDrawdown}
+                                {funded.rules ? formatMoney(funded.rules.max_drawdown_amt) : '-'}
                               </span>
                             </div>
                             <div className="flex items-start justify-between gap-3">
@@ -1010,38 +938,46 @@ export function StartNewChallengePage() {
                                 {text.dailyLossLimit}
                               </span>
                               <span className="text-right text-sm font-bold text-white">
-                                {account.fundedStage.dailyLossLimit}
+                                {formatLimit(funded.rules?.daily_loss_limit_amt)}
                               </span>
                             </div>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.leverage} />
+                                {text.leverage}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {formatLeverage(funded.leverage)}
+                              </span>
+                            </div>
+                            {/* 최대 계약 수·일관성은 상품/룰셋에 값이 없어 숨김 (데이터가 생기면 다시 표시)
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.maxContracts} />
                                 {text.maxContracts}
                               </span>
-                              <span className="text-right text-sm font-bold text-white">
-                                {account.fundedStage.maxContracts}
-                              </span>
+                              <span className="text-right text-sm font-bold text-white">-</span>
                             </div>
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.consistency} />
                                 {text.consistency}
                               </span>
-                              <span className="text-right text-sm font-bold text-white">
-                                {account.fundedStage.consistency ?? text.none}
-                              </span>
+                              <span className="text-right text-sm font-bold text-white">-</span>
                             </div>
+                            */}
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
-                                <InfoTooltip content={tooltips.profitSplit} />
+                                <InfoTooltip content={profitSplitTooltip(funded.payout_ratio)} />
                                 {text.profitSplit}
                               </span>
                               <span className="text-right text-sm font-bold text-white">
-                                {account.fundedStage.profitSplit}
+                                {formatProfitSplit(funded.payout_ratio)}
                               </span>
                             </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </motion.div>
                   );
@@ -1097,7 +1033,14 @@ export function StartNewChallengePage() {
                   </span>
                   {selectedAccountData && (
                     <div className="flex items-baseline gap-1">
-                      <span className="text-[#00FF94] font-semibold">${selectedAccountFee}</span>
+                      {selectedAccountData.originalPrice != null && (
+                        <span className="text-xs text-gray-500 line-through">
+                          ${formatPrice(selectedAccountData.originalPrice)}
+                        </span>
+                      )}
+                      <span className="text-[#00FF94] font-semibold">
+                        ${formatPrice(selectedAccountFee)}
+                      </span>
                       <span className="text-white/50 text-xs font-normal">USDT</span>
                     </div>
                   )}
@@ -1110,7 +1053,9 @@ export function StartNewChallengePage() {
               <div className="flex items-center justify-between pt-2">
                 <span className="text-xl font-bold text-white">{text.totalAmount}</span>
                 <div className="text-right">
-                  <div className="text-3xl font-bold text-[#00FF94]">{totalAmount} USDT</div>
+                  <div className="text-3xl font-bold text-[#00FF94]">
+                    ${formatPrice(totalAmount)} USDT
+                  </div>
                 </div>
               </div>
             </div>

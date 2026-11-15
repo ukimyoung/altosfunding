@@ -14,12 +14,13 @@
 
 import datetime as dt
 from datetime import UTC, datetime, time, timedelta
+from decimal import Decimal
 
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
-from app.models import Challenge, ChallengeSchedule, Holiday, Product
+from app.models import Challenge, ChallengeSchedule, Holiday, Product, Ruleset
 from app.security import generate_human_code
 
 PENDING, ACTIVE, CLOSED, CANCELLED = "PENDING", "ACTIVE", "CLOSED", "CANCELLED"
@@ -275,6 +276,121 @@ async def summary(session: AsyncSession) -> dict:
     # 계좌 기능이 들어오기 전까지는 진행 중 회차의 참가자 수 합계로 대신한다.
     total_active = sum(c["current_participants"] for c in challenges if c["status"] == ACTIVE)
     return {"challenges": challenges, "total_active_accounts": total_active}
+
+
+def _offer_rules(ruleset: Ruleset | None, capital: Decimal) -> dict | None:
+    if ruleset is None:
+        return None
+
+    def amount(pct: Decimal | None) -> float | None:
+        return None if pct is None else float((capital * pct / 100).quantize(Decimal("0.01")))
+
+    # 최대 손실 금액이 따로 정해져 있으면 그 값을, 없으면 비율로 계산한 값을 쓴다.
+    max_dd_amt = ruleset.max_dd_normal_amt
+    return {
+        "ruleset_id": ruleset.id,
+        "ruleset_name": ruleset.name,
+        "profit_target_pct": None if ruleset.profit_target_pct is None else float(ruleset.profit_target_pct),
+        "profit_target_amt": amount(ruleset.profit_target_pct),
+        "max_drawdown_pct": float(ruleset.max_dd_normal_pct),
+        "max_drawdown_amt": float(max_dd_amt) if max_dd_amt is not None else amount(ruleset.max_dd_normal_pct),
+        "daily_loss_limit_pct": float(ruleset.daily_loss_limit_pct),
+        "daily_loss_limit_amt": amount(ruleset.daily_loss_limit_pct),
+        "dd_calc_method": ruleset.dd_calc_method,
+        "min_trading_days": ruleset.min_trading_days,
+        "pass_condition_type": ruleset.pass_condition_type,
+        "pass_condition_pct": None if ruleset.pass_condition_pct is None else float(ruleset.pass_condition_pct),
+        "pass_condition_amt": None if ruleset.pass_condition_amt is None else float(ruleset.pass_condition_amt),
+    }
+
+
+async def offers(session: AsyncSession) -> list[dict]:
+    """사용자 웹 Start New Challenge 카드. 판매 중인 챌린지 상품과 지금 신청할 수 있는 회차.
+
+    - 상품: 활성 챌린지 상품, 자본금 순.
+    - 펀디드 단계: next_product_id가 있으면 그 상품, 없으면 자본금이 같은 활성 펀디드 상품.
+    - 신청 회차: 모집 중(PENDING)이고 정원이 남은 회차 중 가장 먼저 시작하는 것.
+    """
+    products = list(
+        await session.scalars(
+            select(Product)
+            .where(Product.tier_type == "CHALLENGE", Product.is_active.is_(True))
+            .order_by(Product.capital, Product.product_id)
+        )
+    )
+    if not products:
+        return []
+    funded_products = list(
+        await session.scalars(
+            select(Product)
+            .where(Product.tier_type == "FUNDED", Product.is_active.is_(True))
+            .order_by(Product.product_id)
+        )
+    )
+    funded_by_id = {p.product_id: p for p in funded_products}
+    funded_by_capital: dict[Decimal, Product] = {}
+    for p in funded_products:
+        funded_by_capital.setdefault(p.capital, p)
+
+    ruleset_ids = {p.ruleset_id for p in [*products, *funded_products] if p.ruleset_id}
+    rulesets = {
+        r.id: r for r in await session.scalars(select(Ruleset).where(Ruleset.id.in_(ruleset_ids)))
+    } if ruleset_ids else {}
+
+    rounds: dict[str, Challenge] = {}
+    for c in await session.scalars(
+        select(Challenge)
+        .where(
+            Challenge.product_id.in_([p.product_id for p in products]),
+            Challenge.status == PENDING,
+            Challenge.current_participants < Challenge.group_size,
+        )
+        .order_by(Challenge.start_at, Challenge.challenge_id)
+    ):
+        rounds.setdefault(c.product_id, c)
+
+    items = []
+    for p in products:
+        funded = funded_by_id.get(p.next_product_id) if p.next_product_id else None
+        funded = funded or funded_by_capital.get(p.capital)
+        c = rounds.get(p.product_id)
+        price = p.discount_price_usdt if p.discount_price_usdt is not None else p.price_usdt
+        items.append(
+            {
+                "product_id": p.product_id,
+                "name": p.name,
+                "description": p.description,
+                "capital": float(p.capital),
+                "price_usdt": float(p.price_usdt),
+                "discount_price_usdt": None if p.discount_price_usdt is None else float(p.discount_price_usdt),
+                "final_price_usdt": float(price),
+                "is_recommended": p.is_recommended,
+                "leverage": p.leverage,
+                "duration_days": p.duration_days,
+                "rules": _offer_rules(rulesets.get(p.ruleset_id), p.capital),
+                "funded": None
+                if funded is None
+                else {
+                    "product_id": funded.product_id,
+                    "name": funded.name,
+                    "capital": float(funded.capital),
+                    "leverage": funded.leverage,
+                    "payout_ratio": float(funded.payout_ratio),
+                    "rules": _offer_rules(rulesets.get(funded.ruleset_id), funded.capital),
+                },
+                "open_challenge": None
+                if c is None
+                else {
+                    "challenge_id": c.challenge_id,
+                    "challenge_name": c.name,
+                    "start_at": c.start_at,
+                    "end_at": c.end_at,
+                    "current_participants": c.current_participants,
+                    "group_size": c.group_size,
+                },
+            }
+        )
+    return items
 
 
 # ── 스케줄 ──────────────────────────────────────────────────

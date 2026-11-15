@@ -27,6 +27,11 @@ export interface StartNewChallengeTranslations {
   maxContracts: string;
   consistency: string;
   profitSplit: string;
+  leverage: string;
+  daysFormat: string; // "{n} Days"
+  noOpenRound: string;
+  paymentComingSoonTitle: string;
+  paymentComingSoonMsg: string;
   tooltips: {
     profitTarget: string;
     maxDrawdownEod: string;
@@ -34,7 +39,9 @@ export interface StartNewChallengeTranslations {
     maxContracts: string;
     consistency: string;
     tradingPeriod: string;
-    profitSplit: string;
+    profitSplit: string; // "{trader}" / "{company}"
+    maxDrawdown: string;
+    leverage: string;
   };
   activationFee: string;
   consistencyRule: string;
