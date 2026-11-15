@@ -13,6 +13,12 @@ class EmailSender(Protocol):
 
     async def send_password_reset(self, email: str, reset_url: str, locale: str) -> None: ...
 
+    async def send_contact_received(self, email: str, name: str, subject: str, contact_id: int, locale: str) -> None: ...
+
+    async def send_contact_replied(
+        self, email: str, name: str, subject: str, inquiry: str, reply: str, contact_id: int, locale: str
+    ) -> None: ...
+
 
 class ConsoleEmailSender:
     """메일을 보내지 않고 로그에 남긴다. local/sandbox 전용."""
@@ -27,6 +33,18 @@ class ConsoleEmailSender:
     async def send_password_reset(self, email: str, reset_url: str, locale: str) -> None:
         self.sent.append({"email": email, "reset_url": reset_url, "purpose": "PASSWORD_RESET", "locale": locale})
         logger.warning("[console email] 비밀번호 재설정 링크 → %s: %s", email, reset_url)
+
+    async def send_contact_received(self, email: str, name: str, subject: str, contact_id: int, locale: str) -> None:
+        self.sent.append({"email": email, "purpose": "CONTACT_RECEIVED", "contact_id": str(contact_id), "locale": locale})
+        logger.warning("[console email] 문의 접수 안내 → %s: #%s %s", email, contact_id, subject)
+
+    async def send_contact_replied(
+        self, email: str, name: str, subject: str, inquiry: str, reply: str, contact_id: int, locale: str
+    ) -> None:
+        self.sent.append(
+            {"email": email, "purpose": "CONTACT_REPLIED", "contact_id": str(contact_id), "reply": reply, "locale": locale}
+        )
+        logger.warning("[console email] 문의 답변 → %s: #%s %s", email, contact_id, subject)
 
 
 _console_sender = ConsoleEmailSender()
