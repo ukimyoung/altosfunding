@@ -18,6 +18,7 @@ from app.schemas.challenge import (
     ChallengeOut,
     ChallengePage,
     ChallengeStatus,
+    ChallengeOffersResponse,
     ChallengeSummaryResponse,
     HolidayCreate,
     HolidayOut,
@@ -62,6 +63,16 @@ async def _schedule_out(session, schedule) -> ScheduleOut:
 @router.get("/challenges/summary", response_model=ChallengeSummaryResponse, summary="참가할 수 있는 챌린지 회차 (로그인 불필요)")
 async def challenges_summary(session: Session) -> ChallengeSummaryResponse:
     return ChallengeSummaryResponse(**await svc.summary(session))
+
+
+@router.get(
+    "/challenges/products",
+    response_model=ChallengeOffersResponse,
+    summary="Start New Challenge 상품 카드 (로그인 불필요)",
+)
+async def challenge_offers(session: Session) -> ChallengeOffersResponse:
+    """판매 중인 챌린지 상품과 룰셋·펀디드 단계 조건, 지금 신청할 수 있는 모집 중 회차."""
+    return ChallengeOffersResponse(items=await svc.offers(session))
 
 
 # ── 관리자: 회차 ────────────────────────────────────────────

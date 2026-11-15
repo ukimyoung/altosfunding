@@ -271,3 +271,44 @@ def test_internal_job_endpoint(client, admin, challenge_product, monkeypatch):  
 
     res = client.post("/api/v1/admin/schedules/run-due", headers=admin)
     assert res.status_code == 200
+
+
+def test_challenge_offers(client, admin, challenge_product):  # noqa: F811
+    from tests.test_catalog import _ruleset
+
+    rs = _ruleset(client, admin, profit_target_pct=6, max_dd_normal_pct=5, daily_loss_limit_pct=0)
+    funded_rs = _ruleset(client, admin, max_dd_normal_amt=700, daily_loss_limit_pct=2)
+    assert client.put(f"/api/v1/catalog/products/{challenge_product}", headers=admin,
+                      json={"ruleset_id": rs["id"], "discount_price_usdt": 59, "is_recommended": True}).status_code == 200
+    funded = _product(client, admin, tier_type="FUNDED", name="Funded $10K", ruleset_id=funded_rs["id"],
+                      payout_ratio=80, leverage=50, mt4_login_pool_start=2000000,
+                      mt4_login_pool_end=2099999).json()
+    other = _product(client, admin, name="Challenge $25K", capital=25000, price_usdt=150,
+                     mt4_login_pool_start=1100000, mt4_login_pool_end=1199999).json()
+    _product(client, admin, name="Hidden", capital=5000, is_active=False,
+             mt4_login_pool_start=1200000, mt4_login_pool_end=1299999)
+
+    # 회차가 없으면 상품만 보이고 신청 회차는 비어 있다.
+    res = client.get("/api/v1/challenges/products")
+    assert res.status_code == 200, res.text
+    items = res.json()["items"]
+    assert [i["product_id"] for i in items] == [challenge_product, other["product_id"]]
+    first = items[0]
+    assert (first["price_usdt"], first["discount_price_usdt"], first["final_price_usdt"]) == (99, 59, 59)
+    assert first["is_recommended"] is True and first["open_challenge"] is None
+    assert first["rules"]["profit_target_amt"] == 600 and first["rules"]["max_drawdown_amt"] == 500
+    assert first["rules"]["daily_loss_limit_amt"] == 0
+    # 펀디드 단계는 자본금이 같은 펀디드 상품
+    assert first["funded"]["product_id"] == funded["product_id"] and first["funded"]["payout_ratio"] == 80
+    assert first["funded"]["rules"]["max_drawdown_amt"] == 700
+    assert first["funded"]["rules"]["daily_loss_limit_amt"] == 200
+    assert items[1]["final_price_usdt"] == 150 and items[1]["rules"] is None and items[1]["funded"] is None
+
+    # 모집 중 회차가 생기면 그 회차를 신청 대상으로 준다. 정원이 차면 빠진다.
+    _schedule(client, admin, challenge_product)
+    _run_jobs(_utc(2026, 11, 16, 23))
+    pending = [c for c in _challenges() if c["status"] == "PENDING"][0]
+    first = client.get("/api/v1/challenges/products").json()["items"][0]
+    assert first["open_challenge"]["challenge_id"] == pending["id"]
+    run_sql("update core.challenges set current_participants = group_size where status = 'PENDING'")
+    assert client.get("/api/v1/challenges/products").json()["items"][0]["open_challenge"] is None

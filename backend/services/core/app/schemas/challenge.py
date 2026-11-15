@@ -200,6 +200,63 @@ class ChallengeSummaryResponse(BaseModel):
     total_active_accounts: int
 
 
+class OfferRules(BaseModel):
+    """상품에 연결된 룰셋 중 화면에 보여줄 값. 금액은 상품 자본금으로 계산한다."""
+
+    ruleset_id: str
+    ruleset_name: str
+    profit_target_pct: float | None
+    profit_target_amt: float | None
+    max_drawdown_pct: float
+    max_drawdown_amt: float
+    daily_loss_limit_pct: float
+    daily_loss_limit_amt: float
+    dd_calc_method: str
+    min_trading_days: int
+    pass_condition_type: str
+    pass_condition_pct: float | None
+    pass_condition_amt: float | None
+
+
+class OfferFunded(BaseModel):
+    product_id: str
+    name: str
+    capital: float
+    leverage: int
+    payout_ratio: float
+    rules: OfferRules | None
+
+
+class OfferRound(BaseModel):
+    challenge_id: str
+    challenge_name: str
+    start_at: datetime
+    end_at: datetime
+    current_participants: int
+    group_size: int
+
+
+class ChallengeOffer(BaseModel):
+    product_id: str
+    name: str
+    description: str | None
+    capital: float
+    price_usdt: float
+    discount_price_usdt: float | None
+    final_price_usdt: float
+    is_recommended: bool
+    leverage: int
+    duration_days: int
+    rules: OfferRules | None
+    funded: OfferFunded | None
+    # 지금 신청할 수 있는 모집 중 회차. 없으면 상품만 보여주고 선택은 막는다.
+    open_challenge: OfferRound | None
+
+
+class ChallengeOffersResponse(BaseModel):
+    items: list[ChallengeOffer]
+
+
 class JobRunResponse(BaseModel):
     created: int
     started: int
