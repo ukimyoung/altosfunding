@@ -20,6 +20,8 @@ os.environ["DATABASE_URL"] = TEST_DATABASE_URL
 os.environ["DATABASE_NULL_POOL"] = "true"
 os.environ["RECAPTCHA_SECRET_KEY"] = ""
 os.environ["EMAIL_BACKEND"] = "console"
+# 테스트 클라이언트는 http라서 Secure 쿠키를 돌려보내지 않는다.
+os.environ["COOKIE_SECURE"] = "false"
 
 
 def _asyncpg_dsn(url: str) -> str:

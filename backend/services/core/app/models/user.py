@@ -55,6 +55,7 @@ class User(Base):
     subscribed_newsletter: Mapped[bool] = mapped_column(server_default="false")
 
     last_login_at: Mapped[datetime | None]
+    last_login_ip: Mapped[str | None]
     withdrawn_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -71,4 +72,33 @@ class EmailVerification(Base):
     expires_at: Mapped[datetime]
     verified_at: Mapped[datetime | None]
     consumed_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.users.id", ondelete="CASCADE")
+    )
+    token_hash: Mapped[str] = mapped_column(String, unique=True)
+    expires_at: Mapped[datetime]
+    revoked_at: Mapped[datetime | None]
+    ip_address: Mapped[str | None]
+    user_agent: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class LoginHistory(Base):
+    __tablename__ = "login_history"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.users.id", ondelete="CASCADE")
+    )
+    ip_address: Mapped[str | None]
+    user_agent: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

@@ -30,3 +30,9 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 | POST | `/api/v1/auth/email/send-verification` | 가입용 6자리 인증코드 발송 (30분 유효, 60초 재발송 제한) |
 | POST | `/api/v1/auth/email/verify` | 인증코드 확인 (5회 오입력 시 재발송 필요) |
 | POST | `/api/v1/auth/register` | 회원가입 (인증 완료 후 30분 안에) |
+| POST | `/api/v1/auth/login` | 이메일 로그인. access token은 본문, refresh token은 HttpOnly 쿠키(`refreshToken`, Path `/api/v1/auth`) |
+| POST | `/api/v1/auth/refresh` | 쿠키로 access token 재발급. refresh token도 매번 새로 바뀌고, 이미 쓴 토큰이 다시 오면 그 회원의 세션을 모두 끊는다 |
+| POST | `/api/v1/auth/logout` | 현재 refresh token 폐기, 쿠키 삭제 |
+| GET | `/api/v1/auth/me` | 내 정보 (Bearer 토큰 필요) |
+
+인증이 필요한 API는 `app/deps.py`의 `CurrentUser`(회원), `AdminUser`(관리자)를 쓴다.

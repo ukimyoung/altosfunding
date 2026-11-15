@@ -90,3 +90,31 @@ class UserOut(BaseModel):
     grade: str = "NORMAL"
     total_referrals: int = 0
     can_change_password: bool | None = None
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+    recaptcha_token: str | None = None
+
+
+class RefreshTokenRequest(BaseModel):
+    # 쿠키가 우선이고, 쿠키를 못 쓰는 클라이언트를 위해 body도 받는다.
+    refresh_token: str | None = None
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str | None = None
+    token_type: str = "bearer"
+    user_id: str
+    role: str
+    first_name: str | None = None
+    last_name: str | None = None
+    is_new_user: bool = False
+
+
+class TwoFactorRequiredResponse(BaseModel):
+    requires_2fa: bool = True
+    user_id: str
+    message: str

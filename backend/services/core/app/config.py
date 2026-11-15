@@ -13,6 +13,14 @@ class Settings(BaseSettings):
     # 이메일 인증코드 HMAC, JWT 서명 등에 쓰는 비밀 값. 배포 환경에서는 반드시 바꾼다.
     secret_key: str = "change-me-local-only"
 
+    # 로그인 토큰. access token은 짧게 두고, 만료되면 프론트가 refresh 쿠키로 다시 받는다.
+    jwt_access_expire_minutes: int = 30
+    jwt_refresh_expire_days: int = 7
+    jwt_2fa_temp_expire_minutes: int = 10
+    # refresh 쿠키. Render rewrite 덕분에 프론트와 API가 같은 도메인이라 lax로 충분하다.
+    cookie_secure: bool = True
+    cookie_samesite: str = "lax"
+
     # Google reCAPTCHA 서버 키. 비어 있으면 local/sandbox에서는 검증을 건너뛴다. live에서는 필수.
     recaptcha_secret_key: str = ""
     recaptcha_min_score: float = 0.5
