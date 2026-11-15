@@ -10,7 +10,13 @@ from app.config import settings
 from app.errors import AppError
 from app.models import EmailVerification, User
 from app.schemas.auth import RegisterRequest, UserOut, VerificationPurpose
-from app.security import codes_match, generate_human_code, generate_numeric_code, hash_code, hash_password
+from app.security import (
+    codes_match,
+    generate_human_code,
+    generate_numeric_code,
+    hash_code,
+    hash_password,
+)
 from app.services.email import EmailSender
 
 

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -196,6 +197,90 @@ class LoginHistoryOut(BaseModel):
 
 class LoginHistoryPage(BaseModel):
     items: list[LoginHistoryOut]
+    total: int
+    page: int
+    size: int
+    pages: int
+
+
+# ── 관리자 회원 관리 ────────────────────────────────────────
+
+UserStatusLiteral = Literal["ACTIVE", "INACTIVE", "BANNED"]
+UserGradeLiteral = Literal["NORMAL", "VIP"]
+KycStatusLiteral = Literal["NONE", "PENDING", "APPROVED", "REJECTED"]
+
+
+class AdminUserCreateRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8, max_length=128)
+    first_name: str | None = None
+    last_name: str | None = None
+    phone: str | None = None
+    country: str | None = None
+    state_province: str | None = None
+    city: str | None = None
+    zip_code: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    admin_note: str | None = None
+    role: Literal["USER"] = "USER"
+    grade: UserGradeLiteral = "NORMAL"
+    status: UserStatusLiteral = "ACTIVE"
+    kyc_status: KycStatusLiteral = "NONE"
+
+
+class AdminProfileUpdateRequest(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    country: str | None = None
+    city: str | None = None
+    state_province: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    zip_code: str | None = None
+    phone: str | None = None
+    avatar_url: str | None = None
+    referrer_code: str | None = None
+    password: str | None = Field(default=None, min_length=8, max_length=128)
+    status: UserStatusLiteral | None = None
+    kyc_status: KycStatusLiteral | None = None
+    grade: UserGradeLiteral | None = None
+    admin_note: str | None = None
+
+
+class SuspendRequest(BaseModel):
+    reason: str = "Suspicious activity"
+
+
+class BanRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+    admin_note: str | None = None
+
+
+class AdminPasswordResetRequest(BaseModel):
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class UserPage(BaseModel):
+    items: list[UserOut]
+    total: int
+    page: int
+    size: int
+    pages: int
+
+
+class StatusHistoryOut(BaseModel):
+    id: int
+    user_id: str
+    from_status: str
+    to_status: str
+    reason: str | None = None
+    changed_by: str | None = None
+    created_at: datetime
+
+
+class StatusHistoryPage(BaseModel):
+    items: list[StatusHistoryOut]
     total: int
     page: int
     size: int

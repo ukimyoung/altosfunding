@@ -5,6 +5,7 @@ from app.models.user import (
     RefreshToken,
     User,
     UserBackupCode,
+    UserStatusHistory,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "RefreshToken",
     "User",
     "UserBackupCode",
+    "UserStatusHistory",
 ]
