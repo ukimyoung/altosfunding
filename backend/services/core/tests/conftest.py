@@ -40,11 +40,24 @@ async def _reset_schema() -> None:
         await conn.close()
 
 
+def _contact_category_seed() -> str:
+    """마이그레이션이 넣는 기본 문의 카테고리 7개를 테스트마다 다시 넣는다."""
+    sql = next(MIGRATIONS_DIR.glob("*_core_contact_categories.sql")).read_text(encoding="utf-8")
+    start = sql.index("insert into core.contact_categories")
+    return sql[start : sql.index(";", start) + 1]
+
+
+_CONTACT_CATEGORY_RESET = (
+    "truncate core.contact_messages, core.contact_categories restart identity cascade;\n" + _contact_category_seed()
+)
+
+
 async def _truncate() -> None:
     import asyncpg
 
     conn = await asyncpg.connect(_asyncpg_dsn(TEST_DATABASE_URL))
     try:
+        await conn.execute(_CONTACT_CATEGORY_RESET)
         await conn.execute("truncate core.contact_messages, core.announcements, core.announcement_categories, core.email_verifications, core.users, core.challenges, core.challenge_schedules, core.holidays, core.products, core.rulesets restart identity cascade")
     finally:
         await conn.close()

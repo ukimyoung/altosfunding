@@ -47,6 +47,18 @@ export interface ContentLanguage {
   updated_at: string;
 }
 
+export interface ContactCategoryOption {
+  code: string;
+  name: string;
+}
+
+// 문의 카테고리 (백오피스 '문의하기 > 카테고리 관리'에서 관리). 이름은 Accept-Language 언어로 온다.
+export const getContactCategories = async () => {
+  const response = await api.get<ContactCategoryOption[]>('/v1/support/contact/categories');
+
+  return response.data;
+};
+
 export const submitContact = async (payload: ContactRequest) => {
   const response = await api.post<ContactResponse>('/v1/support/contact', payload);
 
