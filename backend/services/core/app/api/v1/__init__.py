@@ -6,6 +6,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.catalog import router as catalog_router
 from app.api.v1.challenges import router as challenges_router
 from app.api.v1.google import router as google_router
+from app.api.v1.kyc import router as kyc_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth_router)
@@ -14,3 +15,4 @@ router.include_router(google_router)
 router.include_router(admin_users_router)
 router.include_router(catalog_router)
 router.include_router(challenges_router)
+router.include_router(kyc_router)
