@@ -14,12 +14,80 @@ import { Toast } from '../../components/shared/Toast';
 import { type MeResponse, type UpdateProfileRequest } from '@/api/user';
 import { useLocale } from '@/app/i18n/LocaleContext';
 import { clearAccessToken } from '@altosfunding/shared/auth/tokenStore';
+import {
+  getCountries,
+  getCountryCallingCode,
+  parsePhoneNumber,
+  type Country,
+} from 'react-phone-number-input';
+import labelsEn from 'react-phone-number-input/locale/en';
+
+const COUNTRY_LABELS = labelsEn as Record<string, string>;
+// 회원가입 화면과 같은 순서: 자주 쓰는 국가를 위에 두고 나머지는 이름순
+const PRIORITY_PHONE_COUNTRIES: Country[] = ['US', 'CA', 'GB'];
+const PHONE_COUNTRY_OPTIONS = [
+  ...PRIORITY_PHONE_COUNTRIES,
+  ...getCountries()
+    .filter((code) => !PRIORITY_PHONE_COUNTRIES.includes(code))
+    .sort((a, b) => (COUNTRY_LABELS[a] ?? a).localeCompare(COUNTRY_LABELS[b] ?? b)),
+].map((code) => ({
+  code,
+  label: `+${getCountryCallingCode(code)} ${COUNTRY_LABELS[code] ?? code}`,
+}));
+const DEFAULT_PHONE_COUNTRY: Country = 'US';
+const PHONE_MAX_DIGITS = 15;
+
+const onlyDigits = (value: string) => value.replace(/\D/g, '').slice(0, PHONE_MAX_DIGITS);
+
+// 저장된 번호(+821012345678 형태)를 국가코드와 나머지 숫자로 나눈다.
+const splitPhone = (phone: string, fallbackCountry: Country) => {
+  const value = phone.trim();
+
+  if (!value) {
+    return { phoneCountry: fallbackCountry, phoneNumber: '' };
+  }
+
+  try {
+    const parsed = parsePhoneNumber(value.startsWith('+') ? value : `+${value}`);
+
+    if (parsed?.country) {
+      return { phoneCountry: parsed.country as Country, phoneNumber: parsed.nationalNumber };
+    }
+  } catch {
+    // 형식을 알 수 없는 예전 값은 숫자만 남긴다.
+  }
+
+  return { phoneCountry: fallbackCountry, phoneNumber: onlyDigits(value) };
+};
+
+// 국가코드와 번호를 합쳐 회원가입과 같은 국제 형식(+821012345678)으로 저장한다.
+// 국내식으로 앞에 0을 붙여 입력해도(01012345678) 국가 규칙에 맞게 0을 뺀다.
+const joinPhone = (phoneCountry: Country, phoneNumber: string) => {
+  const digits = onlyDigits(phoneNumber);
+
+  if (!digits) {
+    return '';
+  }
+
+  try {
+    const parsed = parsePhoneNumber(digits, phoneCountry);
+
+    if (parsed) {
+      return parsed.number;
+    }
+  } catch {
+    // 아래 기본 형식으로 저장
+  }
+
+  return `+${getCountryCallingCode(phoneCountry)}${digits}`;
+};
 
 type ProfileFormData = {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
+  phoneCountry: Country;
+  phoneNumber: string;
   country: string;
   city: string;
   stateProvince: string;
@@ -34,7 +102,7 @@ const getProfileFormData = (me: MeResponse): ProfileFormData => {
     firstName: me.first_name || '',
     lastName: me.last_name || '',
     email: me.email || '',
-    phone: me.phone || '',
+    ...splitPhone(me.phone || '', DEFAULT_PHONE_COUNTRY),
     country: me.country || '',
     city: me.city || '',
     stateProvince: me.state_province || '',
@@ -70,7 +138,7 @@ const getUpdateProfilePayload = (
     address_line1: formData.addressLine1.trim(),
     address_line2: formData.addressLine2.trim(),
     zip_code: formData.zipCode.trim(),
-    phone: formData.phone.trim(),
+    phone: joinPhone(formData.phoneCountry, formData.phoneNumber),
     // 현재 사용 안함: 프로필 수정 시 기존 Google avatar_url을 덮어쓰지 않도록 전송하지 않음.
     // avatar_url: avatarUrl,
   };
@@ -111,7 +179,8 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
     firstName: '',
     lastName: '',
     email: '',
-    phone: '',
+    phoneCountry: DEFAULT_PHONE_COUNTRY,
+    phoneNumber: '',
     country: '',
     city: '',
     stateProvince: '',
@@ -153,6 +222,25 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handlePhoneCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const phoneCountry = e.target.value as Country;
+    setFormData((prev) => ({ ...prev, phoneCountry }));
+  };
+
+  // 전화번호 칸에는 숫자만 들어가게 한다. 붙여 넣기나 한글 입력도 숫자 외에는 지운다.
+  const handlePhoneNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const phoneNumber = onlyDigits(e.target.value);
+    setFormData((prev) => ({ ...prev, phoneNumber }));
+  };
+
+  const blockNonDigitInput = (e: React.FormEvent<HTMLInputElement>) => {
+    const data = (e.nativeEvent as InputEvent).data;
+
+    if (data && /\D/.test(data)) {
+      e.preventDefault();
+    }
   };
 
   const handleSave = async () => {
@@ -352,19 +440,39 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
                         />
                       </div>
 
-                      {/* Phone */}
+                      {/* Phone: 국가코드 선택 + 숫자만 입력 */}
                       <div>
                         <label className="block text-gray-400 text-sm mb-2 font-medium">
                           {text.phoneNumber}
                         </label>
-                        <input
-                          type="tel"
-                          name="phone"
-                          value={formData.phone}
-                          onChange={handleInputChange}
-                          className="w-full bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#0052FF] transition-colors"
-                          placeholder={text.phonePlaceholder}
-                        />
+                        <div className="flex gap-2">
+                          <select
+                            name="phoneCountry"
+                            value={formData.phoneCountry}
+                            onChange={handlePhoneCountryChange}
+                            aria-label={text.phoneCountryCode}
+                            className="w-28 flex-shrink-0 bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-2 py-3 text-white text-sm focus:outline-none focus:border-[#0052FF] transition-colors"
+                          >
+                            {PHONE_COUNTRY_OPTIONS.map((option) => (
+                              <option key={option.code} value={option.code}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="tel"
+                            name="phoneNumber"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoComplete="tel-national"
+                            maxLength={PHONE_MAX_DIGITS}
+                            value={formData.phoneNumber}
+                            onBeforeInput={blockNonDigitInput}
+                            onChange={handlePhoneNumberChange}
+                            className="min-w-0 flex-1 bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#0052FF] transition-colors"
+                            placeholder={text.phonePlaceholder}
+                          />
+                        </div>
                       </div>
 
                       {/* Referrer Code */}

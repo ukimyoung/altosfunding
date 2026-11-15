@@ -110,6 +110,7 @@ export interface MyAccountTranslations {
   cannotBeChanged: string;
   emailPlaceholder: string;
   phonePlaceholder: string;
+  phoneCountryCode: string;
   registrationDate: string;
   addressInformation: string;
   country: string;
