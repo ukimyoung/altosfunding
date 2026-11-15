@@ -19,6 +19,8 @@ export interface CatalogProduct {
   stop_out_pct: number | null;
   ruleset_id: string | null;
   ruleset_name: string | null;
+  /** 펀디드 상품에만: 연관 챌린지 상품 id (예: 1001) */
+  related_id?: string | null;
   funding_start_delay_hours: number | null;
   leverage: number | null;
   duration_days: number | null;
@@ -58,6 +60,7 @@ export interface CreateCatalogProductRequest {
   mt4_login_pool_start?: number | null;
   mt4_login_pool_end?: number | null;
   ruleset_id?: string | null;
+  related_id?: string | null;
 }
 
 export type UpdateCatalogProductRequest = Omit<CreateCatalogProductRequest, 'tier_type'>;

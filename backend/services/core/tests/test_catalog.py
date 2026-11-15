@@ -234,3 +234,29 @@ def test_product_code_migration(client, admin):
     assert [(r["name"], r["id"], r["next_product_id"]) for r in rows] == [
         ("A", "1001", "2001"), ("B", "1002", None), ("C", "2001", None)]
     assert run_sql("select product_id from core.challenge_schedules")[0]["product_id"] == "1002"
+
+
+def test_funded_related_challenge(client, admin):
+    challenge = _product(client, admin).json()["product_id"]
+    other = _product(client, admin, name="C2", mt4_login_pool_start=1100000, mt4_login_pool_end=1199999).json()
+    body = {"tier_type": "FUNDED", "name": "Funded", "mt4_login_pool_start": 2000000, "mt4_login_pool_end": 2099999}
+    res = _product(client, admin, related_id=challenge, **body)
+    assert res.status_code == 200, res.text
+    funded = res.json()
+    assert funded["related_id"] == challenge
+
+    # 챌린지 상품 하나에는 펀디드 상품 하나만
+    body2 = {**body, "name": "Funded 2", "mt4_login_pool_start": 2100000, "mt4_login_pool_end": 2199999}
+    res = _product(client, admin, related_id=challenge, **body2)
+    assert res.status_code == 409 and res.json()["error_code"] == "related_product_taken"
+    # 챌린지 상품이 아니면 안 된다 / 챌린지 상품에는 지정할 수 없다
+    assert _product(client, admin, related_id=funded["product_id"], **body2).status_code == 400
+    assert _product(client, admin, related_id=challenge, name="C3", mt4_login_pool_start=1200000,
+                    mt4_login_pool_end=1299999).status_code == 400
+    assert _product(client, admin, related_id="1999", **body2).status_code == 400
+
+    url = f"/api/v1/catalog/products/{funded['product_id']}"
+    res = client.put(url, headers=admin, json={"related_id": other["product_id"]})
+    assert res.status_code == 200 and res.json()["related_id"] == other["product_id"]
+    res = client.put(url, headers=admin, json={"related_id": None})
+    assert res.status_code == 200 and res.json()["related_id"] is None

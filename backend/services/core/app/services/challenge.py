@@ -308,7 +308,8 @@ async def offers(session: AsyncSession) -> list[dict]:
     """사용자 웹 Start New Challenge 카드. 판매 중인 챌린지 상품과 지금 신청할 수 있는 회차.
 
     - 상품: 활성 챌린지 상품, 자본금 순.
-    - 펀디드 단계: next_product_id가 있으면 그 상품, 없으면 자본금이 같은 활성 펀디드 상품.
+    - 펀디드 단계: 이 챌린지 상품을 연관 챌린지 상품(related_id)으로 지정한 활성 펀디드 상품.
+      없으면 next_product_id 상품.
     - 신청 회차: 모집 중(PENDING)이고 정원이 남은 회차 중 가장 먼저 시작하는 것.
     """
     products = list(
@@ -328,9 +329,7 @@ async def offers(session: AsyncSession) -> list[dict]:
         )
     )
     funded_by_id = {p.product_id: p for p in funded_products}
-    funded_by_capital: dict[Decimal, Product] = {}
-    for p in funded_products:
-        funded_by_capital.setdefault(p.capital, p)
+    funded_by_related = {p.related_id: p for p in funded_products if p.related_id}
 
     ruleset_ids = {p.ruleset_id for p in [*products, *funded_products] if p.ruleset_id}
     rulesets = {
@@ -351,8 +350,9 @@ async def offers(session: AsyncSession) -> list[dict]:
 
     items = []
     for p in products:
-        funded = funded_by_id.get(p.next_product_id) if p.next_product_id else None
-        funded = funded or funded_by_capital.get(p.capital)
+        funded = funded_by_related.get(p.product_id)
+        if funded is None and p.next_product_id:
+            funded = funded_by_id.get(p.next_product_id)
         c = rounds.get(p.product_id)
         price = p.discount_price_usdt if p.discount_price_usdt is not None else p.price_usdt
         items.append(

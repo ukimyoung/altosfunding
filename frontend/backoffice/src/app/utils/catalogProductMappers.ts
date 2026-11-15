@@ -65,6 +65,7 @@ export const mapCatalogProductToFundedProduct = (product: CatalogProduct): Funde
   dailyDrawdown: '-',
   maxDrawdownVip: null,
   creationDelayHours: product.funding_start_delay_hours,
+  relatedChallengeId: product.related_id ?? '',
 });
 
 export const mapCatalogProductToLiveDemoProduct = (

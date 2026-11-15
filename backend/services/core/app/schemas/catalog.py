@@ -108,6 +108,8 @@ class ProductCreate(BaseModel):
     mt4_login_pool_start: int = Field(default=100000, gt=0)
     mt4_login_pool_end: int = Field(default=199999, gt=0)
     next_product_id: str | None = None
+    # 펀디드 상품에만: 연관 챌린지 상품 id (예: 1001)
+    related_id: str | None = None
     funding_start_delay_hours: int = Field(default=0, ge=0)
     duration_days: int = Field(default=30, ge=0)
     margin_call_pct: float | None = Field(default=None, ge=0)
@@ -133,6 +135,7 @@ class ProductUpdateRequest(BaseModel):
     mt4_login_pool_start: int | None = Field(default=None, gt=0)
     mt4_login_pool_end: int | None = Field(default=None, gt=0)
     next_product_id: str | None = None
+    related_id: str | None = None
     funding_start_delay_hours: int | None = Field(default=None, ge=0)
     duration_days: int | None = Field(default=None, ge=0)
     margin_call_pct: float | None = Field(default=None, ge=0)
@@ -167,6 +170,7 @@ class ProductOut(BaseModel):
     mt4_login_pool_end: int
     last_mt4_login: int | None
     next_product_id: str | None
+    related_id: str | None = None
     funding_start_delay_hours: int
     duration_days: int
     margin_call_pct: float | None
