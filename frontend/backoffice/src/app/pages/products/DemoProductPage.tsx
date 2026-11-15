@@ -282,7 +282,7 @@ function ProductTable({
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr style={{ background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-            {['그룹 아이디', '레버리지', '마진콜', 'Stop Out', '적용 룰셋', '관리'].map((header) => (
+            {['상품명', '그룹 아이디', '레버리지', '마진콜', 'Stop Out', '적용 룰셋', '관리'].map((header) => (
               <th
                 key={header}
                 style={{ padding: '12px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: t.textSec, whiteSpace: 'nowrap' }}
@@ -304,6 +304,9 @@ function ProductTable({
                   opacity: isSuspended ? 0.75 : 1,
                 }}
               >
+                <td style={{ padding: 16, fontSize: 13, fontWeight: 600, color: t.text }}>
+                  {product.productName || '-'}
+                </td>
                 <td style={{ padding: 16, fontSize: 13, fontWeight: 500, color: t.text, fontFamily: "'DM Mono', monospace" }}>
                   {product.mtsGroupId || '-'}
                 </td>
