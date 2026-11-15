@@ -1,9 +1,15 @@
 """공통 에러 응답.
 
-기존 서버와 같은 형태를 유지한다. 프론트는 `detail.error_code`, `detail.message`를 읽고,
-일부 화면은 최상위 `message`를 읽는다.
+기존 서버와 같은 형태를 유지한다. 기존 서버는 최상위에 error_code, message_key, message를 두었고,
+일부 프론트 화면(비밀번호 찾기 등)은 `detail.error_code`, `detail.message`를 읽으므로 두 곳 모두 채운다.
+error_code는 기존 서버와 같은 소문자 snake_case를 쓴다 (예: email_already_exists).
 
-    {"detail": {"error_code": "EMAIL_ALREADY_REGISTERED", "message": "..."}, "message": "..."}
+    {
+      "error_code": "email_already_exists",
+      "message_key": "error.email_already_exists",
+      "message": "...",
+      "detail": {"error_code": "email_already_exists", "message": "..."}
+    }
 """
 
 from fastapi import FastAPI, Request
@@ -24,7 +30,9 @@ def register_error_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=exc.status_code,
             content={
-                "detail": {"error_code": exc.error_code, "message": exc.message},
+                "error_code": exc.error_code,
+                "message_key": f"error.{exc.error_code}",
                 "message": exc.message,
+                "detail": {"error_code": exc.error_code, "message": exc.message},
             },
         )

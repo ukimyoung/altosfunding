@@ -62,16 +62,16 @@ async def send_verification_code(
 
     if purpose is not VerificationPurpose.SIGNUP:
         # 출금·비밀번호 재설정용 코드는 해당 기능을 만들 때 연결한다.
-        raise AppError(400, "UNSUPPORTED_PURPOSE", "지원하지 않는 인증 목적입니다.")
+        raise AppError(400, "unsupported_purpose", "지원하지 않는 인증 목적입니다.")
 
     if await _find_active_user_by_email(session, email):
-        raise AppError(409, "EMAIL_ALREADY_REGISTERED", "이미 가입된 이메일입니다.")
+        raise AppError(409, "email_already_exists", "이미 가입된 이메일입니다.")
 
     now = _now()
     latest = await _latest_verification(session, email, purpose)
     cooldown = timedelta(seconds=settings.email_code_resend_cooldown_seconds)
     if latest and latest.created_at > now - cooldown:
-        raise AppError(429, "VERIFICATION_RESEND_TOO_SOON", "잠시 후 다시 요청해 주세요.")
+        raise AppError(429, "rate_limit_exceeded", "잠시 후 다시 요청해 주세요.")
 
     code = generate_numeric_code()
     session.add(
@@ -93,18 +93,18 @@ async def verify_code(
     verification = await _latest_verification(session, email, purpose)
 
     if verification is None or verification.expires_at <= _now():
-        raise AppError(400, "VERIFICATION_EXPIRED", "인증코드가 없거나 만료되었습니다. 코드를 다시 받아 주세요.")
+        raise AppError(400, "verification_code_expired", "인증코드가 없거나 만료되었습니다. 코드를 다시 받아 주세요.")
 
     if verification.verified_at is not None:
         return
 
     if verification.attempts >= settings.email_code_max_attempts:
-        raise AppError(429, "VERIFICATION_TOO_MANY_ATTEMPTS", "입력 횟수를 초과했습니다. 코드를 다시 받아 주세요.")
+        raise AppError(429, "verification_too_many_attempts", "입력 횟수를 초과했습니다. 코드를 다시 받아 주세요.")
 
     if not codes_match(code, verification.code_hash):
         verification.attempts += 1
         await session.commit()
-        raise AppError(400, "INVALID_VERIFICATION_CODE", "인증코드가 올바르지 않습니다.")
+        raise AppError(400, "invalid_verification_code", "인증코드가 올바르지 않습니다.")
 
     verification.verified_at = _now()
     await session.commit()
@@ -116,7 +116,7 @@ async def _generate_unique(session: AsyncSession, column, length: int, prefix: s
         exists = await session.scalar(select(func.count()).where(column == candidate))
         if not exists:
             return candidate
-    raise AppError(500, "CODE_GENERATION_FAILED", "잠시 후 다시 시도해 주세요.")
+    raise AppError(500, "code_generation_failed", "잠시 후 다시 시도해 주세요.")
 
 
 async def register(session: AsyncSession, body: RegisterRequest) -> UserOut:
@@ -124,13 +124,13 @@ async def register(session: AsyncSession, body: RegisterRequest) -> UserOut:
 
     if body.auth_provider != "LOCAL":
         # Google 가입은 Google 로그인 기능과 함께 연결한다.
-        raise AppError(400, "UNSUPPORTED_AUTH_PROVIDER", "지원하지 않는 가입 방식입니다.")
+        raise AppError(400, "unsupported_auth_provider", "지원하지 않는 가입 방식입니다.")
 
     if not body.agree_to_terms:
-        raise AppError(400, "TERMS_NOT_AGREED", "이용약관에 동의해야 가입할 수 있습니다.")
+        raise AppError(400, "tos_not_accepted", "이용약관에 동의해야 가입할 수 있습니다.")
 
     if await _find_active_user_by_email(session, email):
-        raise AppError(409, "EMAIL_ALREADY_REGISTERED", "이미 가입된 이메일입니다.")
+        raise AppError(409, "email_already_exists", "이미 가입된 이메일입니다.")
 
     verification = await _latest_verification(session, email, VerificationPurpose.SIGNUP)
     valid_since = _now() - timedelta(minutes=settings.signup_verification_valid_minutes)
@@ -139,7 +139,7 @@ async def register(session: AsyncSession, body: RegisterRequest) -> UserOut:
         or verification.verified_at is None
         or verification.verified_at < valid_since
     ):
-        raise AppError(400, "EMAIL_NOT_VERIFIED", "이메일 인증을 먼저 완료해 주세요.")
+        raise AppError(400, "email_not_verified", "이메일 인증을 먼저 완료해 주세요.")
 
     referrer: User | None = None
     referral_code = _clean(body.referral_code)
@@ -150,7 +150,7 @@ async def register(session: AsyncSession, body: RegisterRequest) -> UserOut:
             )
         )
         if referrer is None:
-            raise AppError(400, "INVALID_REFERRAL_CODE", "존재하지 않는 초대 코드입니다.")
+            raise AppError(400, "invalid_referrer_code", "존재하지 않는 초대 코드입니다.")
 
     now = _now()
     user = User(
@@ -181,7 +181,7 @@ async def register(session: AsyncSession, body: RegisterRequest) -> UserOut:
     except IntegrityError as exc:
         # 같은 이메일로 동시에 가입 요청이 들어온 경우
         await session.rollback()
-        raise AppError(409, "EMAIL_ALREADY_REGISTERED", "이미 가입된 이메일입니다.") from exc
+        raise AppError(409, "email_already_exists", "이미 가입된 이메일입니다.") from exc
 
     await session.refresh(user)
     return to_user_out(user, referrer_code=referrer.referral_code if referrer else None)

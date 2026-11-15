@@ -77,11 +77,11 @@ def test_full_signup_flow(client, sent_emails):
 def test_register_requires_verified_email(client, sent_emails):
     res = client.post("/api/v1/auth/register", json=_payload())
     assert res.status_code == 400
-    assert res.json()["detail"]["error_code"] == "EMAIL_NOT_VERIFIED"
+    assert res.json()["detail"]["error_code"] == "email_not_verified"
 
     _send(client)
     res = client.post("/api/v1/auth/register", json=_payload())
-    assert res.json()["detail"]["error_code"] == "EMAIL_NOT_VERIFIED"
+    assert res.json()["detail"]["error_code"] == "email_not_verified"
 
 
 def test_verification_cannot_be_reused(client, sent_emails):
@@ -89,7 +89,7 @@ def test_verification_cannot_be_reused(client, sent_emails):
     run_sql("update core.users set status = 'WITHDRAWN'")
     # 탈퇴 후 같은 이메일 재가입은 새 인증이 필요하다.
     res = client.post("/api/v1/auth/register", json=_payload())
-    assert res.json()["detail"]["error_code"] == "EMAIL_NOT_VERIFIED"
+    assert res.json()["detail"]["error_code"] == "email_not_verified"
 
 
 def test_duplicate_email_rejected(client, sent_emails):
@@ -98,8 +98,9 @@ def test_duplicate_email_rejected(client, sent_emails):
     res = _send(client, "trader@example.com")
     assert res.status_code == 409
     body = res.json()
-    assert body["detail"]["error_code"] == "EMAIL_ALREADY_REGISTERED"
+    assert body["detail"]["error_code"] == "email_already_exists"
     assert body["message"] == body["detail"]["message"]
+    assert body["error_code"] == "email_already_exists"
 
 
 def test_wrong_code_and_attempt_limit(client, sent_emails):
@@ -110,11 +111,11 @@ def test_wrong_code_and_attempt_limit(client, sent_emails):
     for _ in range(5):
         res = _verify(client, wrong)
         assert res.status_code == 400
-        assert res.json()["detail"]["error_code"] == "INVALID_VERIFICATION_CODE"
+        assert res.json()["detail"]["error_code"] == "invalid_verification_code"
 
     res = _verify(client, code)
     assert res.status_code == 429
-    assert res.json()["detail"]["error_code"] == "VERIFICATION_TOO_MANY_ATTEMPTS"
+    assert res.json()["detail"]["error_code"] == "verification_too_many_attempts"
 
 
 def test_expired_code(client, sent_emails):
@@ -122,14 +123,14 @@ def test_expired_code(client, sent_emails):
     run_sql("update core.email_verifications set expires_at = now() - interval '1 minute'")
     res = _verify(client, sent_emails[-1]["code"])
     assert res.status_code == 400
-    assert res.json()["detail"]["error_code"] == "VERIFICATION_EXPIRED"
+    assert res.json()["detail"]["error_code"] == "verification_code_expired"
 
 
 def test_resend_cooldown(client, sent_emails):
     assert _send(client).status_code == 201
     res = _send(client)
     assert res.status_code == 429
-    assert res.json()["detail"]["error_code"] == "VERIFICATION_RESEND_TOO_SOON"
+    assert res.json()["detail"]["error_code"] == "rate_limit_exceeded"
 
     run_sql("update core.email_verifications set created_at = now() - interval '2 minutes'")
     assert _send(client).status_code == 201
@@ -140,7 +141,7 @@ def test_resend_cooldown(client, sent_emails):
 def test_terms_required(client, sent_emails):
     res = _signup(client, sent_emails, agree_to_terms=False)
     assert res.status_code == 400
-    assert res.json()["detail"]["error_code"] == "TERMS_NOT_AGREED"
+    assert res.json()["detail"]["error_code"] == "tos_not_accepted"
 
 
 def test_referral_code(client, sent_emails):
@@ -164,7 +165,7 @@ def test_referral_code(client, sent_emails):
 def test_invalid_referral_code(client, sent_emails):
     res = _signup(client, sent_emails, referral_code="NOPE1234")
     assert res.status_code == 400
-    assert res.json()["detail"]["error_code"] == "INVALID_REFERRAL_CODE"
+    assert res.json()["detail"]["error_code"] == "invalid_referrer_code"
 
 
 def test_validation_errors(client):

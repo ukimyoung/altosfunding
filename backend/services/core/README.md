@@ -4,7 +4,7 @@
 
 - API 경로는 기존 서버와 같은 `/api/v1/...`이고, 요청·응답 형태도 기존 서버(openapi.json)와 맞춘다.
 - DB는 Supabase Postgres에 SQLAlchemy(async) + asyncpg로 직접 접속한다. 테이블 정의의 기준은 `supabase/migrations/`의 SQL이다.
-- 에러 응답: `{"detail": {"error_code": "...", "message": "..."}, "message": "..."}`
+- 에러 응답: `{"error_code", "message_key", "message", "detail": {"error_code", "message"}}` (error_code는 기존 서버와 같은 소문자 snake_case)
 
 ```bash
 cd backend/services/core
