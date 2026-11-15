@@ -5,14 +5,15 @@ from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field
 
-ContactCategory = Literal["billing", "technical", "account", "verification", "trading", "payout", "general"]
+# 카테고리는 core.contact_categories의 code. 백오피스에서 추가·수정한다.
+ContactCategory = str
 ContactStatus = Literal["RECEIVED", "PROCESSING", "ANSWERED"]
 
 
 class ContactSubmitRequest(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     email: EmailStr
-    category: ContactCategory
+    category: str = Field(min_length=1, max_length=40)
     subject: str = Field(min_length=1, max_length=500)
     message: str = Field(min_length=1, max_length=1000)
     recaptcha_token: str | None = None
@@ -58,3 +59,39 @@ class InquiryDraftRequest(BaseModel):
 
 class InquiryReplyRequest(BaseModel):
     reply_body: str = Field(min_length=1, max_length=10000)
+
+
+# ── 카테고리 ────────────────────────────────────────────────
+
+
+class ContactCategoryLocaleBody(BaseModel):
+    name: str | None = Field(default=None, max_length=100)
+
+
+class ContactCategoryCreate(BaseModel):
+    """name 또는 locales.en.name이 필요하다."""
+
+    name: str | None = Field(default=None, max_length=100)
+    locales: dict[str, ContactCategoryLocaleBody] | None = None
+
+
+class ContactCategoryUpdate(ContactCategoryCreate):
+    pass
+
+
+class ContactCategoryReorderRequest(BaseModel):
+    ordered_ids: list[int] = Field(min_length=1)
+
+
+class ContactCategoryAdminOut(BaseModel):
+    id: int
+    code: str
+    name: str
+    sort_order: int
+    contact_count: int
+    locales: dict[str, dict[str, str]]
+
+
+class ContactCategoryPublicOut(BaseModel):
+    code: str
+    name: str

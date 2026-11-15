@@ -1,7 +1,18 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getContact, listContacts, sendContactReply, updateContactDraft } from '@/api/contact';
+import {
+  createContactCategory,
+  deleteContactCategory,
+  getContact,
+  listContactCategories,
+  listContacts,
+  reorderContactCategories,
+  sendContactReply,
+  updateContactCategory,
+  updateContactDraft,
+} from '@/api/contact';
 import type {
   ListContactsParams,
+  SaveContactCategoryRequest,
   SendContactReplyRequest,
   UpdateContactDraftRequest,
 } from '@/api/contact';
@@ -11,6 +22,7 @@ export const contactQueryKeys = {
   lists: () => [...contactQueryKeys.all, 'list'] as const,
   list: (params: ListContactsParams) => [...contactQueryKeys.lists(), params] as const,
   detail: (contactId: number) => [...contactQueryKeys.all, 'detail', contactId] as const,
+  categories: () => [...contactQueryKeys.all, 'categories'] as const,
 };
 
 export function useContactsQuery(params: ListContactsParams) {
@@ -63,4 +75,41 @@ export function useSendContactReplyMutation() {
       queryClient.invalidateQueries({ queryKey: contactQueryKeys.lists() });
     },
   });
+}
+
+export function useContactCategoriesQuery() {
+  return useQuery({
+    queryKey: contactQueryKeys.categories(),
+    queryFn: listContactCategories,
+  });
+}
+
+function useCategoryMutation<TVariables, TData>(mutationFn: (variables: TVariables) => Promise<TData>) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: contactQueryKeys.categories() });
+    },
+  });
+}
+
+export function useCreateContactCategoryMutation() {
+  return useCategoryMutation((payload: SaveContactCategoryRequest) => createContactCategory(payload));
+}
+
+export function useUpdateContactCategoryMutation() {
+  return useCategoryMutation(
+    ({ categoryId, payload }: { categoryId: string; payload: SaveContactCategoryRequest }) =>
+      updateContactCategory(categoryId, payload),
+  );
+}
+
+export function useDeleteContactCategoryMutation() {
+  return useCategoryMutation((categoryId: string) => deleteContactCategory(categoryId));
+}
+
+export function useReorderContactCategoriesMutation() {
+  return useCategoryMutation((orderedIds: number[]) => reorderContactCategories(orderedIds));
 }

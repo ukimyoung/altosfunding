@@ -1,13 +1,7 @@
 import api from './axios';
 
-export type ContactCategory =
-  | 'billing'
-  | 'technical'
-  | 'account'
-  | 'verification'
-  | 'trading'
-  | 'payout'
-  | 'general';
+// 카테고리 code. '카테고리 관리'에서 추가할 수 있다 (기본: billing, technical, account, verification, trading, payout, general).
+export type ContactCategory = string;
 
 export type ContactStatus = 'RECEIVED' | 'PROCESSING' | 'ANSWERED';
 
@@ -96,4 +90,82 @@ export const sendContactReply = async (
   );
 
   return response.data;
+};
+
+// ── 카테고리 관리 ────────────────────────────────────────────
+
+export interface ContactCategoryLocale {
+  name: string;
+}
+
+export interface AdminContactCategory {
+  id: string;
+  code: string;
+  name: string;
+  sort_order: number;
+  contact_count: number;
+  locales: Record<string, ContactCategoryLocale>;
+}
+
+interface ServerContactCategory {
+  id: string | number;
+  code: string;
+  name?: string | null;
+  sort_order?: number | null;
+  contact_count?: number | null;
+  locales?: Record<string, Partial<ContactCategoryLocale> | null> | null;
+}
+
+export interface SaveContactCategoryRequest {
+  name?: string;
+  locales?: Record<string, ContactCategoryLocale>;
+}
+
+const normalizeContactCategory = (category: ServerContactCategory): AdminContactCategory => {
+  const locales = Object.fromEntries(
+    Object.entries(category.locales ?? {}).map(([code, locale]) => [code, { name: locale?.name ?? '' }]),
+  );
+
+  return {
+    id: String(category.id),
+    code: category.code,
+    name: category.name ?? locales.en?.name ?? category.code,
+    sort_order: category.sort_order ?? 0,
+    contact_count: category.contact_count ?? 0,
+    locales,
+  };
+};
+
+export const listContactCategories = async (): Promise<AdminContactCategory[]> => {
+  const response = await api.get<ServerContactCategory[]>('/v1/admin/contacts/categories');
+
+  return response.data.map(normalizeContactCategory);
+};
+
+export const createContactCategory = async (
+  payload: SaveContactCategoryRequest,
+): Promise<AdminContactCategory> => {
+  const response = await api.post<ServerContactCategory>('/v1/admin/contacts/categories', payload);
+
+  return normalizeContactCategory(response.data);
+};
+
+export const updateContactCategory = async (
+  categoryId: string,
+  payload: SaveContactCategoryRequest,
+): Promise<AdminContactCategory> => {
+  const response = await api.put<ServerContactCategory>(
+    `/v1/admin/contacts/categories/${categoryId}`,
+    payload,
+  );
+
+  return normalizeContactCategory(response.data);
+};
+
+export const deleteContactCategory = async (categoryId: string): Promise<void> => {
+  await api.delete(`/v1/admin/contacts/categories/${categoryId}`);
+};
+
+export const reorderContactCategories = async (orderedIds: number[]): Promise<void> => {
+  await api.put('/v1/admin/contacts/categories/reorder', { ordered_ids: orderedIds });
 };

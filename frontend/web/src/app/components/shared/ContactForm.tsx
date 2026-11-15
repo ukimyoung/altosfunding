@@ -3,6 +3,7 @@ import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
 import { Send, CheckCircle, AlertCircle } from 'lucide-react';
 import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { useLocale } from '@/app/i18n/LocaleContext';
+import { useContactCategoriesQuery } from '@/app/queries/support';
 
 interface ContactFormData {
   name: string;
@@ -29,10 +30,11 @@ interface ContactFormProps {
 
 export function ContactForm({ onSuccess, initialValues, onSubmit }: ContactFormProps) {
   const { executeRecaptcha } = useGoogleReCaptcha();
-  const { T } = useLocale();
+  const { T, locale } = useLocale();
   const text = T.contactUs;
-  const inquiryCategories = [
-    { value: '', label: text.placeholderCategoryDefault },
+  // 카테고리는 백오피스에서 관리한다. 목록을 못 받으면 기본 카테고리를 보여 준다.
+  const { data: contactCategories } = useContactCategoriesQuery(locale);
+  const defaultCategories = [
     { value: 'billing', label: text.catBillingPayments },
     { value: 'technical', label: text.catTechnicalSupport },
     { value: 'account', label: text.catAccountManagement },
@@ -40,6 +42,12 @@ export function ContactForm({ onSuccess, initialValues, onSubmit }: ContactFormP
     { value: 'trading', label: text.catTradingQuestions },
     { value: 'payout', label: text.catPayoutRequests },
     { value: 'general', label: text.catGeneralInquiry },
+  ];
+  const inquiryCategories = [
+    { value: '', label: text.placeholderCategoryDefault },
+    ...(contactCategories?.length
+      ? contactCategories.map((category) => ({ value: category.code, label: category.name }))
+      : defaultCategories),
   ];
   const [formData, setFormData] = useState<ContactFormData>({
     name: initialValues?.name ?? '',

@@ -6,12 +6,16 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 
 from app.api.v1.auth import Session, _client_ip
 from app.deps import AdminUser, OptionalUser
 from app.schemas.contact import (
-    ContactCategory,
+    ContactCategoryAdminOut,
+    ContactCategoryCreate,
+    ContactCategoryPublicOut,
+    ContactCategoryReorderRequest,
+    ContactCategoryUpdate,
     ContactStatus,
     ContactSubmitRequest,
     ContactSubmitResponse,
@@ -21,6 +25,7 @@ from app.schemas.contact import (
     InquiryReplyRequest,
 )
 from app.services import contact as svc
+from app.services import contact_category as category_svc
 from app.services.announcement import request_locale
 from app.services.email import EmailSender, get_email_sender
 from app.services.recaptcha import verify_recaptcha
@@ -29,6 +34,15 @@ public_router = APIRouter(prefix="/support", tags=["support"])
 admin_router = APIRouter(prefix="/admin/contacts", tags=["admin-contacts"])
 
 Sender = Annotated[EmailSender, Depends(get_email_sender)]
+AcceptLanguage = Annotated[str | None, Header(alias="Accept-Language")]
+
+
+@public_router.get(
+    "/contact/categories", response_model=list[ContactCategoryPublicOut], summary="문의 카테고리 목록"
+)
+async def list_public_categories(session: Session, accept_language: AcceptLanguage = None) -> list[ContactCategoryPublicOut]:
+    """문의 폼의 카테고리 선택지. 이름은 Accept-Language 언어로 (없으면 영어)."""
+    return await category_svc.list_public(session, request_locale(accept_language))
 
 
 @public_router.post("/contact", status_code=201, response_model=ContactSubmitResponse, summary="문의 제출")
@@ -38,7 +52,7 @@ async def submit_contact(
     session: Session,
     sender: Sender,
     user: OptionalUser,
-    accept_language: Annotated[str | None, Header(alias="Accept-Language")] = None,
+    accept_language: AcceptLanguage = None,
 ) -> ContactSubmitResponse:
     """로그인하지 않아도 된다. 로그인한 상태면 문의에 회원을 연결한다."""
     await verify_recaptcha(body.recaptcha_token, _client_ip(request))
@@ -51,7 +65,7 @@ async def list_contacts(
     admin: AdminUser,
     session: Session,
     q: Annotated[str | None, Query(description="이름 또는 제목 검색 (이메일 제외)")] = None,
-    category: ContactCategory | None = None,
+    category: Annotated[str | None, Query(max_length=40)] = None,
     status: ContactStatus | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
     size: Annotated[int, Query(ge=1, le=100)] = 20,
@@ -60,6 +74,51 @@ async def list_contacts(
     return InquiryListResponse(
         **await svc.list_admin(session, keyword=q, category=category, status=status, page=page, size=size)
     )
+
+
+# ── 관리자: 카테고리 ────────────────────────────────────────
+# 고정 경로(/categories)를 /{contact_id}보다 먼저 둔다.
+
+
+@admin_router.get("/categories", response_model=list[ContactCategoryAdminOut], summary="카테고리 목록")
+async def list_categories(admin: AdminUser, session: Session) -> list[ContactCategoryAdminOut]:
+    return await category_svc.list_admin(session)
+
+
+@admin_router.post("/categories", response_model=ContactCategoryAdminOut, status_code=201, summary="카테고리 추가")
+async def create_category(body: ContactCategoryCreate, admin: AdminUser, session: Session) -> ContactCategoryAdminOut:
+    """name 또는 locales.en.name이 필요하다. code는 영문 이름으로 자동으로 만든다."""
+    out = await category_svc.create(session, body.name, body.locales)
+    await session.commit()
+    return out
+
+
+@admin_router.put("/categories/reorder", status_code=204, summary="카테고리 순서 변경")
+async def reorder_categories(body: ContactCategoryReorderRequest, admin: AdminUser, session: Session) -> Response:
+    await category_svc.reorder(session, body.ordered_ids)
+    await session.commit()
+    return Response(status_code=204)
+
+
+@admin_router.put("/categories/{category_id}", response_model=ContactCategoryAdminOut, summary="카테고리 수정")
+async def update_category(
+    category_id: int, body: ContactCategoryUpdate, admin: AdminUser, session: Session
+) -> ContactCategoryAdminOut:
+    """locales에 보낸 언어만 바꾼다. 빈 이름을 보내면 그 언어 이름을 지운다. code는 바뀌지 않는다."""
+    out = await category_svc.update(session, category_id, body.name, body.locales)
+    await session.commit()
+    return out
+
+
+@admin_router.delete("/categories/{category_id}", status_code=204, summary="카테고리 삭제")
+async def delete_category(category_id: int, admin: AdminUser, session: Session) -> Response:
+    """문의가 남아 있으면 409 category_in_use."""
+    await category_svc.delete(session, category_id)
+    await session.commit()
+    return Response(status_code=204)
+
+
+# ── 관리자: 문의 ────────────────────────────────────────────
 
 
 @admin_router.get("/{contact_id}", response_model=InquiryDetailOut, summary="문의 상세")

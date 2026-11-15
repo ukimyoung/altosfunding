@@ -1,6 +1,6 @@
 from app.models.announcement import Announcement, AnnouncementCategory
 from app.models.catalog import PlatformConfig, Product, Ruleset
-from app.models.contact import ContactMessage
+from app.models.contact import ContactCategory, ContactMessage
 from app.models.challenge import Challenge, ChallengeSchedule, Holiday
 from app.models.user import (
     EmailVerification,
@@ -17,6 +17,7 @@ __all__ = [
     "AnnouncementCategory",
     "Challenge",
     "ChallengeSchedule",
+    "ContactCategory",
     "ContactMessage",
     "EmailVerification",
     "Holiday",

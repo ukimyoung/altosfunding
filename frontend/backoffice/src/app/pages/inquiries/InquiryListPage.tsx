@@ -23,11 +23,24 @@ import {
 import { Toast } from '../../components/shared/Toast';
 import { useAppShell } from '../../layouts/AppShell';
 import {
+  useContactCategoriesQuery,
   useContactsQuery,
   useContactQuery,
+  useCreateContactCategoryMutation,
+  useDeleteContactCategoryMutation,
+  useReorderContactCategoriesMutation,
   useSendContactReplyMutation,
+  useUpdateContactCategoryMutation,
   useUpdateContactDraftMutation,
 } from '../../queries/contacts';
+import {
+  InquiryCategoryModal,
+  type InquiryCategoryOption,
+} from '../../components/inquiries/InquiryCategoryModal';
+import { useListActiveLanguagesQuery } from '../../queries/languages';
+import { DEFAULT_LANGUAGES } from '../../types/language';
+import { toSupportedLanguages } from '../../utils/supportedLanguages';
+import type { AdminContactCategory } from '@/api/contact';
 import { formatKstDateTime } from '../../utils/utils';
 
 type ToastState = {
@@ -41,8 +54,13 @@ type ContactApiErrorResponse = {
 
 const ITEMS_PER_PAGE = 20;
 
-const inquiryCategories: { value: '' | ApiContactCategory; label: string }[] = [
-  { value: '', label: '카테고리: 전체' },
+const ALL_CATEGORY_OPTION: { value: '' | ApiContactCategory; label: string } = {
+  value: '',
+  label: '카테고리: 전체',
+};
+
+// 카테고리 목록을 불러오기 전에 쓰는 기본값. 실제 목록은 '카테고리 관리'에서 관리한다.
+const DEFAULT_CATEGORY_OPTIONS: { value: ApiContactCategory; label: string }[] = [
   { value: 'billing', label: 'Billing & Payments' },
   { value: 'technical', label: 'Technical Support' },
   { value: 'account', label: 'Account Management' },
@@ -59,11 +77,32 @@ const STATUS_OPTIONS: { value: '' | ApiContactStatus; label: string }[] = [
   { value: 'ANSWERED', label: '답변완료' },
 ];
 
-const CATEGORY_LABELS = Object.fromEntries(
-  inquiryCategories
-    .filter((category) => category.value)
-    .map((category) => [category.value, category.label]),
-) as Record<string, string>;
+const EXTRA_CATEGORY_COLORS = [
+  { bg: 'rgba(236,72,153,0.1)', color: '#DB2777', border: 'rgba(236,72,153,0.2)' },
+  { bg: 'rgba(14,165,233,0.1)', color: '#0284C7', border: 'rgba(14,165,233,0.2)' },
+  { bg: 'rgba(132,204,22,0.12)', color: '#65A30D', border: 'rgba(132,204,22,0.25)' },
+  { bg: 'rgba(249,115,22,0.1)', color: '#EA580C', border: 'rgba(249,115,22,0.2)' },
+];
+
+const toCategoryOption = (category: AdminContactCategory): InquiryCategoryOption => ({
+  id: category.id,
+  code: category.code,
+  order: category.sort_order,
+  names: Object.fromEntries(
+    Object.entries(category.locales).map(([code, locale]) => [code, locale.name]),
+  ),
+  contactCount: category.contact_count,
+});
+
+const toCategoryLocales = (category: InquiryCategoryOption, previous?: InquiryCategoryOption) =>
+  Object.fromEntries(
+    Object.entries(category.names)
+      .filter(([code, name]) => {
+        const trimmed = name.trim();
+        return trimmed.length > 0 && trimmed !== (previous?.names[code] ?? '').trim();
+      })
+      .map(([code, name]) => [code, { name: name.trim() }]),
+  );
 
 const STATUS_LABELS: Record<string, string> = {
   RECEIVED: '접수',
@@ -111,9 +150,6 @@ const getReplyErrorMessage = (error: unknown) => {
   }
 };
 
-const isContactCategory = (value: string): value is ApiContactCategory =>
-  inquiryCategories.some((category) => category.value === value);
-
 const isContactStatus = (value: string): value is ApiContactStatus =>
   STATUS_OPTIONS.some((status) => status.value === value);
 
@@ -123,7 +159,7 @@ export function InquiryListPage() {
   const search = searchParams.get('q') ?? '';
   const categoryParam = searchParams.get('category');
   const statusParam = searchParams.get('status');
-  const categoryFilter = categoryParam && isContactCategory(categoryParam) ? categoryParam : '';
+  const categoryFilter = categoryParam ?? '';
   const statusFilter = statusParam && isContactStatus(statusParam) ? statusParam : '';
   const currentPage = parsePageParam(searchParams.get('page'));
   const [searchDraft, setSearchDraft] = useState(search);
@@ -131,6 +167,7 @@ export function InquiryListPage() {
   const [replyText, setReplyText] = useState('');
   const [replyError, setReplyError] = useState('');
   const [toast, setToast] = useState<ToastState>(null);
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const selectedInquiryId = selectedInquiry?.id ?? null;
 
   const t = {
@@ -155,6 +192,44 @@ export function InquiryListPage() {
     [categoryFilter, currentPage, search, statusFilter],
   );
   const inquiriesQuery = useContactsQuery(queryParams);
+  const categoriesQuery = useContactCategoriesQuery();
+  const activeLanguagesQuery = useListActiveLanguagesQuery(showCategoryModal);
+  const createCategoryMutation = useCreateContactCategoryMutation();
+  const updateCategoryMutation = useUpdateContactCategoryMutation();
+  const deleteCategoryMutation = useDeleteContactCategoryMutation();
+  const reorderCategoriesMutation = useReorderContactCategoriesMutation();
+  const isCategorySaving =
+    createCategoryMutation.isPending ||
+    updateCategoryMutation.isPending ||
+    deleteCategoryMutation.isPending ||
+    reorderCategoriesMutation.isPending;
+  const supportedLanguages = useMemo(
+    () =>
+      activeLanguagesQuery.data
+        ? toSupportedLanguages(activeLanguagesQuery.data.items)
+        : DEFAULT_LANGUAGES,
+    [activeLanguagesQuery.data],
+  );
+  const categoryOptions = useMemo(
+    () => (categoriesQuery.data ?? []).map(toCategoryOption),
+    [categoriesQuery.data],
+  );
+  const categoryFilterOptions = useMemo(
+    () => [
+      ALL_CATEGORY_OPTION,
+      ...(categoriesQuery.data
+        ? categoriesQuery.data.map((category) => ({ value: category.code, label: category.name }))
+        : DEFAULT_CATEGORY_OPTIONS),
+    ],
+    [categoriesQuery.data],
+  );
+  const categoryLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        categoryFilterOptions.filter((option) => option.value).map((option) => [option.value, option.label]),
+      ) as Record<string, string>,
+    [categoryFilterOptions],
+  );
   const inquiryDetailQuery = useContactQuery(selectedInquiryId);
   const updateDraftMutation = useUpdateContactDraftMutation();
   const sendReplyMutation = useSendContactReplyMutation();
@@ -189,7 +264,11 @@ export function InquiryListPage() {
   useEffect(() => {
     const updates: Record<string, null> = {};
 
-    if (categoryParam && !isContactCategory(categoryParam)) {
+    if (
+      categoryParam &&
+      categoriesQuery.data &&
+      !categoriesQuery.data.some((category) => category.code === categoryParam)
+    ) {
       updates.category = null;
     }
     if (statusParam && !isContactStatus(statusParam)) {
@@ -199,7 +278,7 @@ export function InquiryListPage() {
     if (Object.keys(updates).length > 0) {
       updateParams(updates);
     }
-  }, [categoryParam, statusParam]);
+  }, [categoryParam, categoriesQuery.data, statusParam]);
 
   useEffect(() => {
     if (inquiriesQuery.data && !inquiriesQuery.isPlaceholderData && currentPage !== safeCurrentPage) {
@@ -267,7 +346,10 @@ export function InquiryListPage() {
       },
     };
 
-    return configs[category ?? ''] ?? configs.general;
+    const known = configs[category ?? ''];
+    if (known) return known;
+    const index = categoriesQuery.data?.findIndex((item) => item.code === category) ?? -1;
+    return index >= 0 ? EXTRA_CATEGORY_COLORS[index % EXTRA_CATEGORY_COLORS.length] : configs.general;
   };
 
   const getStatusConfig = (status: AdminContact['status']) => {
@@ -343,13 +425,42 @@ export function InquiryListPage() {
 
   return (
     <div style={{ padding: 32, background: t.pageBg, minHeight: '100vh' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 600, color: t.text, margin: 0, marginBottom: 8 }}>
-          문의하기
-        </h1>
-        <p style={{ fontSize: 13, color: t.textSec, margin: 0 }}>
-          유저 문의를 조회하고 답변합니다. 작성한 답변은 유저가 등록한 이메일로 발송됩니다.
-        </p>
+      <div
+        style={{
+          marginBottom: 24,
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16,
+        }}
+      >
+        <div>
+          <h1 style={{ fontSize: 24, fontWeight: 600, color: t.text, margin: 0, marginBottom: 8 }}>
+            문의하기
+          </h1>
+          <p style={{ fontSize: 13, color: t.textSec, margin: 0 }}>
+            유저 문의를 조회하고 답변합니다. 작성한 답변은 유저가 등록한 이메일로 발송됩니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowCategoryModal(true)}
+          style={{
+            height: 36,
+            padding: '0 16px',
+            borderRadius: 8,
+            border: `1px solid ${t.border}`,
+            background: 'transparent',
+            color: t.text,
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
+          }}
+        >
+          카테고리 관리
+        </button>
       </div>
 
       <TableFilterBar
@@ -365,7 +476,7 @@ export function InquiryListPage() {
           borderColor={t.border}
           textColor={t.text}
           iconColor={t.text}
-          options={inquiryCategories}
+          options={categoryFilterOptions}
         />
 
         <SelectFilter
@@ -435,7 +546,7 @@ export function InquiryListPage() {
         rowRenderer={(inquiry) => {
           const categoryConfig = getCategoryConfig(inquiry.category);
           const statusConfig = getStatusConfig(inquiry.status);
-          const categoryLabel = CATEGORY_LABELS[inquiry.category ?? ''] ?? inquiry.category ?? '-';
+          const categoryLabel = categoryLabels[inquiry.category ?? ''] ?? inquiry.category ?? '-';
           const statusLabel = STATUS_LABELS[inquiry.status] ?? inquiry.status;
 
           return (
@@ -800,6 +911,52 @@ export function InquiryListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {showCategoryModal && (
+        <InquiryCategoryModal
+          dark={dark}
+          categories={categoryOptions}
+          supportedLanguages={supportedLanguages}
+          onClose={() => setShowCategoryModal(false)}
+          onAdd={async (category) =>
+            toCategoryOption(
+              await createCategoryMutation.mutateAsync({
+                name: category.names.en?.trim(),
+                locales: toCategoryLocales(category),
+              }),
+            )
+          }
+          onRename={async (category) =>
+            toCategoryOption(
+              await updateCategoryMutation.mutateAsync({
+                categoryId: category.id,
+                payload: {
+                  name: category.names.en?.trim() ?? '',
+                  locales: toCategoryLocales(
+                    category,
+                    categoryOptions.find((item) => item.id === category.id),
+                  ),
+                },
+              }),
+            )
+          }
+          onDelete={async (categoryId) => {
+            const deleted = categoryOptions.find((item) => item.id === categoryId);
+            await deleteCategoryMutation.mutateAsync(categoryId);
+            if (deleted && categoryFilter === deleted.code) {
+              updateParams({ category: null, page: 1 });
+            }
+          }}
+          onReorder={async (next) => {
+            await reorderCategoriesMutation.mutateAsync(next.map((item) => Number(item.id)));
+          }}
+          onDone={async () => {
+            await categoriesQuery.refetch();
+          }}
+          onToast={(message, type = 'success') => setToast({ message, type })}
+          isSaving={isCategorySaving}
+        />
       )}
 
       {toast && (

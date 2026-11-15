@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.errors import AppError
 from app.models import ContactMessage, User
 from app.schemas.contact import ContactSubmitRequest, InquiryDetailOut, InquiryListItem
+from app.services import contact_category
 from app.services.email import EmailSender
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ ANSWERED = "ANSWERED"
 async def submit(
     session: AsyncSession, sender: EmailSender, body: ContactSubmitRequest, user: User | None, locale: str
 ) -> ContactMessage:
+    await contact_category.ensure_exists(session, body.category)
     contact = ContactMessage(
         user_id=user.id if user else None,
         name=body.name.strip(),
