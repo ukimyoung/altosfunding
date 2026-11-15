@@ -69,6 +69,17 @@ def test_product_create_list_update_status(client, admin):
     assert res.status_code == 200, res.text
     assert res.json()["price_usdt"] == 79 and res.json()["next_product_id"] == "FUNDED_10K"
     assert res.json()["name"] == "Challenge $10K"
+    assert res.json()["discount_price_usdt"] is None
+
+    # 할인가격: 원가격 이하만 허용, null로 보내면 할인 해제
+    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"discount_price_usdt": 59})
+    assert res.status_code == 200 and res.json()["discount_price_usdt"] == 59
+    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"discount_price_usdt": 80})
+    assert res.json()["error_code"] == "invalid_discount_price"
+    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"price_usdt": 50})
+    assert res.json()["error_code"] == "invalid_discount_price"
+    res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"discount_price_usdt": None})
+    assert res.status_code == 200 and res.json()["discount_price_usdt"] is None
 
     res = client.put("/api/v1/catalog/products/CHALLENGE_10K", headers=admin, json={"ruleset_id": "missing"})
     assert res.json()["error_code"] == "ruleset_not_found"

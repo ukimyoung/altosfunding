@@ -26,6 +26,9 @@ import {
 
 const PAGE_SIZE = 20;
 
+const formatUsd = (value: number | null | undefined) =>
+  value == null ? '-' : `$${Number(value).toLocaleString('en-US')}`;
+
 export function FundedProductPage() {
   const { dark } = useAppShell();
   const navigate = useNavigate();
@@ -90,6 +93,11 @@ export function FundedProductPage() {
 
   const handleEditProduct = (product: FundedProduct, e: React.MouseEvent) => {
     e.stopPropagation();
+    setSelectedProduct(product);
+    setIsModalOpen(true);
+  };
+
+  const handleRowClick = (product: FundedProduct) => {
     setSelectedProduct(product);
     setIsModalOpen(true);
   };
@@ -261,6 +269,7 @@ export function FundedProductPage() {
       {/* Product Table */}
       <FundedProductTable
         products={products}
+        onRowClick={handleRowClick}
         onEdit={handleEditProduct}
         onToggleStatus={handleToggleStatus}
         dark={dark}
@@ -319,6 +328,7 @@ export function FundedProductPage() {
 // Funded Product Table Component
 interface FundedProductTableProps {
   products: FundedProduct[];
+  onRowClick: (product: FundedProduct) => void;
   onEdit: (product: FundedProduct, e: React.MouseEvent) => void;
   onToggleStatus: (id: string, e: React.MouseEvent) => void;
   dark: boolean;
@@ -326,6 +336,7 @@ interface FundedProductTableProps {
 
 function FundedProductTable({
   products,
+  onRowClick,
   onEdit,
   onToggleStatus,
   dark,
@@ -352,10 +363,10 @@ function FundedProductTable({
         <thead>
           <tr style={{ background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
             {[
-              '상품 / 티어',
+              // 최신 디자인(Make 1114) 컬럼. 이전 '상품 / 티어', '마진콜', 'Stop Out' 컬럼은 목록에서 숨김(수정 팝업에서 관리)
+              '상품명',
+              '자본금',
               '레버리지',
-              '마진콜',
-              'Stop Out',
               '적용 룰셋',
               '상태',
               '관리',
@@ -384,9 +395,10 @@ function FundedProductTable({
             return (
               <tr
                 key={product.id}
+                onClick={() => onRowClick(product)}
                 style={{
                   borderBottom: `1px solid ${t.border}`,
-                  cursor: 'default',
+                  cursor: 'pointer',
                   background: isSuspended
                     ? dark
                       ? 'rgba(113,113,122,0.07)'
@@ -406,14 +418,16 @@ function FundedProductTable({
                     : 'transparent';
                 }}
               >
-                <td style={{ padding: '14px 16px' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: t.text, lineHeight: 1 }}>
-                    {product.productName || '-'}
-                  </div>
+                <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: t.text }}>
+                  {product.productName || '-'}
+                </td>
+                <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 500, color: t.text }}>
+                  {formatUsd(product.capital)}
                 </td>
                 <td style={{ padding: '14px 16px', fontSize: 13, color: t.text }}>
                   {product.leverage == null ? '-' : `x ${product.leverage}`}
                 </td>
+                {/* 이전 디자인 컬럼(마진콜·Stop Out): 최신 디자인에서 목록 미노출
                 <td
                   style={{
                     padding: '14px 16px',
@@ -432,6 +446,7 @@ function FundedProductTable({
                 >
                   {product.stopOut ? `${product.stopOut}%` : '-'}
                 </td>
+                */}
                 <td style={{ padding: '14px 16px' }}>
                   <span
                     style={{

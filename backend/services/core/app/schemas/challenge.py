@@ -187,6 +187,7 @@ class ChallengeSummaryItem(BaseModel):
     description: str | None
     capital: float
     price_usdt: float
+    discount_price_usdt: float | None = None
     type_code: str | None
     is_recommended: bool
     current_participants: int

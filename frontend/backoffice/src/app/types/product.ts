@@ -3,6 +3,8 @@
 export interface ChallengeProduct {
   id: string;
   amount: number | null;
+  // 할인가격. null이면 할인 없이 원가격(amount)으로 판매
+  discountAmount?: number | null;
   tier: 'STARTER' | 'PROFESSIONAL' | 'ELITE';
   leverage: number | null;
   balance: number | null;

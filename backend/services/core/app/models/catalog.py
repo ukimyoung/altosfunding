@@ -47,6 +47,8 @@ class Product(Base):
     description: Mapped[str | None]
     capital: Mapped[Decimal]
     price_usdt: Mapped[Decimal] = mapped_column(server_default="0")
+    # 할인가격. null이면 할인 없이 원가격(price_usdt)으로 판매한다.
+    discount_price_usdt: Mapped[Decimal | None]
     tier_type: Mapped[str] = mapped_column(server_default="CHALLENGE")
     is_active: Mapped[bool] = mapped_column(server_default="true")
     is_recommended: Mapped[bool] = mapped_column(server_default="false")

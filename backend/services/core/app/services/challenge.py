@@ -263,6 +263,7 @@ async def summary(session: AsyncSession) -> dict:
             "description": p.description,
             "capital": float(p.capital),
             "price_usdt": float(p.price_usdt),
+            "discount_price_usdt": None if p.discount_price_usdt is None else float(p.discount_price_usdt),
             "type_code": p.type_code,
             "is_recommended": p.is_recommended,
             "current_participants": c.current_participants,

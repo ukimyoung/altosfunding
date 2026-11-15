@@ -99,6 +99,7 @@ class ProductCreate(BaseModel):
     description: str | None = None
     capital: float = Field(gt=0)
     price_usdt: float = Field(default=0.0, ge=0)
+    discount_price_usdt: float | None = Field(default=None, ge=0)
     tier_type: TierType = "CHALLENGE"
     is_active: bool = True
     is_recommended: bool = False
@@ -123,6 +124,7 @@ class ProductUpdateRequest(BaseModel):
     description: str | None = None
     capital: float | None = Field(default=None, gt=0)
     price_usdt: float | None = Field(default=None, ge=0)
+    discount_price_usdt: float | None = Field(default=None, ge=0)
     tier_type: TierType | None = None
     is_active: bool | None = None
     is_recommended: bool | None = None
@@ -154,6 +156,7 @@ class ProductOut(BaseModel):
     description: str | None
     capital: float
     price_usdt: float
+    discount_price_usdt: float | None
     tier_type: str
     is_active: bool
     is_recommended: bool
