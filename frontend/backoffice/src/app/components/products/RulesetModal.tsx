@@ -23,7 +23,8 @@ interface RulesetFormData {
   profitTarget: string;
   minTradingDays: string;
   inactivityDays: string;
-  maxTradingContracts: string;
+  maxMiniContracts: string;
+  maxMicroContracts: string;
   consistency: string;
   drawdownMethod: RulesetDrawdownMethod;
   retryPolicy: string;
@@ -43,7 +44,8 @@ const emptyFormData: RulesetFormData = {
   profitTarget: "",
   minTradingDays: "",
   inactivityDays: "",
-  maxTradingContracts: "",
+  maxMiniContracts: "",
+  maxMicroContracts: "",
   consistency: "",
   drawdownMethod: "STATIC",
   retryPolicy: "미설정",
@@ -90,7 +92,8 @@ const toFormData = (ruleset: RulesetDetailResponse | null): RulesetFormData => {
     profitTarget: String(ruleset.profit_target_amt ?? ""),
     minTradingDays: String(ruleset.min_trading_days ?? ""),
     inactivityDays: String(ruleset.inactivity_days ?? ""),
-    maxTradingContracts: String(ruleset.max_trading_contracts ?? ""),
+    maxMiniContracts: String(ruleset.max_mini_contracts ?? ""),
+    maxMicroContracts: String(ruleset.max_micro_contracts ?? ""),
     consistency: String(ruleset.consistency_pct ?? ""),
     drawdownMethod: ruleset.dd_calc_method || "STATIC",
     retryPolicy: retryPolicyFromApi(ruleset.retry_policy),
@@ -115,6 +118,8 @@ const toNumber = (value: string) => Number(value || 0);
 const hasValue = (value: string) => value.trim() !== "";
 // 비워 두면 null(설정 안 함)로 보낸다.
 const toNullableNumber = (value: string) => (hasValue(value) ? Number(value) : null);
+// 계약수 입력: 숫자(0-9)만 남긴다.
+const digitsOnly = (value: string) => value.replace(/\D/g, "");
 
 export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: RulesetModalProps) {
   const [formData, setFormData] = useState<RulesetFormData>(emptyFormData);
@@ -157,7 +162,8 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
       profit_target_amt: toNullableNumber(formData.profitTarget),
       min_trading_days: toNumber(formData.minTradingDays),
       inactivity_days: toNumber(formData.inactivityDays),
-      max_trading_contracts: toNullableNumber(formData.maxTradingContracts),
+      max_mini_contracts: toNullableNumber(formData.maxMiniContracts),
+      max_micro_contracts: toNullableNumber(formData.maxMicroContracts),
       consistency_pct: toNullableNumber(formData.consistency),
       dd_calc_method: formData.drawdownMethod,
       retry_policy: retryPolicyToApi(formData.retryPolicy),
@@ -283,10 +289,10 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <InputField
-                  label="최대 거래 계약수 (Max Trading Contracts)"
-                  type="number"
-                  value={formData.maxTradingContracts}
-                  onChange={(v) => setFormData({ ...formData, maxTradingContracts: v })}
+                  label="최대 Mini 거래 계약수 (Max Mini Trading Contracts)"
+                  inputMode="numeric"
+                  value={formData.maxMiniContracts}
+                  onChange={(v) => setFormData({ ...formData, maxMiniContracts: digitsOnly(v) })}
                   placeholder="1"
                   t={t}
                 />
@@ -297,6 +303,16 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
                   onChange={(v) => setFormData({ ...formData, consistency: v })}
                   placeholder="40"
                   suffix="%"
+                  t={t}
+                />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <InputField
+                  label="최대 Micro 거래 계약수 (Max Micro Trading Contracts)"
+                  inputMode="numeric"
+                  value={formData.maxMicroContracts}
+                  onChange={(v) => setFormData({ ...formData, maxMicroContracts: digitsOnly(v) })}
+                  placeholder="1"
                   t={t}
                 />
               </div>
@@ -494,6 +510,7 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
 interface InputFieldProps {
   label: string;
   type?: string;
+  inputMode?: "numeric" | "decimal" | "text";
   value: string;
   onChange: (value: string) => void;
   suffix?: string;
@@ -503,7 +520,7 @@ interface InputFieldProps {
   t: any;
 }
 
-function InputField({ label, type = "text", value, onChange, suffix, hint, placeholder, error, t }: InputFieldProps) {
+function InputField({ label, type = "text", inputMode, value, onChange, suffix, hint, placeholder, error, t }: InputFieldProps) {
   return (
     <div>
       <label style={{
@@ -515,6 +532,7 @@ function InputField({ label, type = "text", value, onChange, suffix, hint, place
       <div style={{ position: "relative" }}>
         <input
           type={type}
+          inputMode={inputMode}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
