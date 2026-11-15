@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     # 로그인 뒤 돌아갈 수 있는 사용자 웹 주소 (쉼표로 구분). web_base_url은 항상 허용된다.
     frontend_allowed_origins: str = ""
 
+    # 외부 스케줄러가 내부 작업 API(/internal/jobs/...)를 부를 때 X-System-Api-Key 헤더로 보내는 값.
+    # 비어 있으면 내부 작업 API를 막는다.
+    system_api_key: str = ""
+
     # 메일 발송 방식: console(로그로만 출력) | notification_hub
     email_backend: str = "console"
     notification_hub_url: str = "http://localhost:8002"

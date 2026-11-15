@@ -1,4 +1,5 @@
 from app.models.catalog import PlatformConfig, Product, Ruleset
+from app.models.challenge import Challenge, ChallengeSchedule, Holiday
 from app.models.user import (
     EmailVerification,
     LoginHistory,
@@ -10,7 +11,10 @@ from app.models.user import (
 )
 
 __all__ = [
+    "Challenge",
+    "ChallengeSchedule",
     "EmailVerification",
+    "Holiday",
     "LoginHistory",
     "PasswordResetToken",
     "PlatformConfig",

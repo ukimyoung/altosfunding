@@ -67,7 +67,25 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 | GET·PATCH | `/api/v1/admin/rulesets/{id}` | 룰셋 상세·수정 |
 | GET | `/api/v1/demo/options` | 데모 계좌 레버리지·자본금 선택지 (`core.platform_config`의 `DEMO` 값) |
 
+| GET | `/api/v1/challenges/summary` | 모집 중·진행 중 챌린지 회차 (로그인 불필요) |
+| GET·POST | `/api/v1/admin/challenges` | 회차 목록(`status`, `date`, `product_id`, `schedule_id`)·직접 생성 |
+| GET | `/api/v1/admin/challenges/{id}` | 회차 상세 |
+| POST | `/api/v1/admin/challenges/{id}/start`, `/close` | 바로 시작, 종료 (`cancel_reason`을 넣으면 취소) |
+| GET | `/api/v1/admin/challenges/active-dates`, `/grouped` | 회차 시작일 목록, 기간별 묶음 (백오피스 대회 목록) |
+| GET·POST | `/api/v1/admin/schedules` | 자동 생성 스케줄 목록·생성 |
+| GET·PATCH·DELETE | `/api/v1/admin/schedules/{id}` | 스케줄 상세·수정·중지(PAUSED) |
+| POST | `/api/v1/admin/schedules/{id}/trigger` | 다음 회차 지금 만들기 |
+| POST | `/api/v1/admin/schedules/run-due` | 주기 작업 한 번 실행 (관리자, 테스트용) |
+| GET·POST·PATCH·DELETE | `/api/v1/admin/holidays` | 휴장일 관리 |
+| POST | `/api/v1/internal/jobs/challenges` | 주기 작업 (외부 스케줄러용, `X-System-Api-Key` 헤더) |
+
 상품의 MT4 계좌번호 범위는 같은 MT4 서버를 쓰는 상품끼리 겹칠 수 없다 (챌린지·데모 = 데모 서버, 펀디드·라이브 = 실서버).
+
+챌린지 회차 자동 생성 (`app/services/challenge.py`)
+- 주기 작업 한 번 = 시작·종료 시각이 된 회차 상태 변경(PENDING→ACTIVE→CLOSED, 시작 못 하고 끝난 PENDING은 CANCELLED) + 때가 된 스케줄의 다음 회차 생성.
+- 스케줄마다 모집 중 회차는 하나. 그 회차가 시작되면 다음 회차를 만든다. 시작 = 직전 회차 시작일 + `interval_days`의 `start_time`, 종료 = 시작일 + `duration_days`의 `end_time` (모두 UTC, 기본 22:00 / 21:00).
+- `exclude_holiday`이면 주말과 휴장일을 건너뛰고 종료일도 영업일만 센다.
+- 아직 이 작업을 1분마다 불러 줄 스케줄러는 붙이지 않았다. 테스트 서버에서는 `run-due` 또는 `trigger`로 손으로 돌린다.
 
 관리자 API는 `role=ADMIN` 계정만 쓸 수 있다. 첫 관리자는 가입 후 Supabase SQL Editor에서 `update core.users set role = 'ADMIN' where email = '...'`로 지정한다.
 아직 없는 기능: 회원별 파트너 실적(`partner-stats`)은 쿠폰 기능과 함께, 계좌 수·총자산은 트레이딩 계좌 기능과 함께 채운다.
