@@ -12,6 +12,22 @@ jobs:
     strategy:
       matrix:
         service: [core, broker_gateway, notification_hub]
+    services:
+      # Core 테스트는 실제 Postgres에 supabase/migrations를 적용해서 돌린다.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: altos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/altos_test
     defaults:
       run:
         working-directory: backend/services/${{ matrix.service }}
