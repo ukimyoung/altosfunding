@@ -23,6 +23,8 @@ interface RulesetFormData {
   profitTarget: string;
   minTradingDays: string;
   inactivityDays: string;
+  maxTradingContracts: string;
+  consistency: string;
   drawdownMethod: RulesetDrawdownMethod;
   retryPolicy: string;
   normalEvalMethod: string;
@@ -41,6 +43,8 @@ const emptyFormData: RulesetFormData = {
   profitTarget: "",
   minTradingDays: "",
   inactivityDays: "",
+  maxTradingContracts: "",
+  consistency: "",
   drawdownMethod: "STATIC",
   retryPolicy: "미설정",
   normalEvalMethod: "상대평가",
@@ -77,11 +81,17 @@ const toFormData = (ruleset: RulesetDetailResponse | null): RulesetFormData => {
   return {
     id: ruleset.id,
     name: ruleset.name,
-    dailyLoss: String(ruleset.daily_loss_limit_pct ?? ""),
-    maxLoss: String(ruleset.max_dd_normal_pct ?? ""),
-    profitTarget: String(ruleset.profit_target_pct ?? ""),
+    // 손실·수익 조건은 금액($). 예전 비율(%) 값은 화면에 쓰지 않는다.
+    // dailyLoss: String(ruleset.daily_loss_limit_pct ?? ""),
+    // maxLoss: String(ruleset.max_dd_normal_pct ?? ""),
+    // profitTarget: String(ruleset.profit_target_pct ?? ""),
+    dailyLoss: String(ruleset.daily_loss_limit_amt ?? ""),
+    maxLoss: String(ruleset.max_dd_normal_amt ?? ""),
+    profitTarget: String(ruleset.profit_target_amt ?? ""),
     minTradingDays: String(ruleset.min_trading_days ?? ""),
     inactivityDays: String(ruleset.inactivity_days ?? ""),
+    maxTradingContracts: String(ruleset.max_trading_contracts ?? ""),
+    consistency: String(ruleset.consistency_pct ?? ""),
     drawdownMethod: ruleset.dd_calc_method || "STATIC",
     retryPolicy: retryPolicyFromApi(ruleset.retry_policy),
     normalEvalMethod,
@@ -103,6 +113,8 @@ const toFormData = (ruleset: RulesetDetailResponse | null): RulesetFormData => {
 
 const toNumber = (value: string) => Number(value || 0);
 const hasValue = (value: string) => value.trim() !== "";
+// 비워 두면 null(설정 안 함)로 보낸다.
+const toNullableNumber = (value: string) => (hasValue(value) ? Number(value) : null);
 
 export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: RulesetModalProps) {
   const [formData, setFormData] = useState<RulesetFormData>(emptyFormData);
@@ -127,18 +139,26 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
     accentBg: "rgba(124,106,247,0.12)",
   };
 
+  const inactivityError = hasValue(formData.inactivityDays) && Number(formData.inactivityDays) > 30;
+
   const handleSubmit = () => {
+    if (inactivityError) return;
     const normalEvalType = evalMethodToApi(formData.normalEvalMethod);
     const vipEvalType = evalMethodToApi(formData.vipEvalMethod);
 
     onSave({
       id: formData.id || undefined,
       name: formData.name,
-      daily_loss_limit_pct: toNumber(formData.dailyLoss),
-      max_dd_normal_pct: toNumber(formData.maxLoss),
-      profit_target_pct: toNumber(formData.profitTarget),
+      // daily_loss_limit_pct: toNumber(formData.dailyLoss),
+      // max_dd_normal_pct: toNumber(formData.maxLoss),
+      // profit_target_pct: toNumber(formData.profitTarget),
+      daily_loss_limit_amt: toNullableNumber(formData.dailyLoss),
+      max_dd_normal_amt: toNullableNumber(formData.maxLoss),
+      profit_target_amt: toNullableNumber(formData.profitTarget),
       min_trading_days: toNumber(formData.minTradingDays),
       inactivity_days: toNumber(formData.inactivityDays),
+      max_trading_contracts: toNullableNumber(formData.maxTradingContracts),
+      consistency_pct: toNullableNumber(formData.consistency),
       dd_calc_method: formData.drawdownMethod,
       retry_policy: retryPolicyToApi(formData.retryPolicy),
       pass_condition_type: normalEvalType,
@@ -207,28 +227,28 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                   <InputField
-                    label="일일 손실 한도"
+                    label="일일 손실 한도 (Daily Loss Limit)"
                     type="number"
                     value={formData.dailyLoss}
                     onChange={(v) => setFormData({ ...formData, dailyLoss: v })}
-                    suffix="%"
+                    suffix="$"
                     t={t}
                   />
                   <InputField
-                    label="최대 손실 한도"
+                    label="최대 손실 한도 (Max Drawdown)"
                     type="number"
                     value={formData.maxLoss}
                     onChange={(v) => setFormData({ ...formData, maxLoss: v })}
-                    suffix="%"
+                    suffix="$"
                     t={t}
                   />
                 </div>
                 <InputField
-                  label="수익 목표"
+                  label="수익 목표 (Profit Target)"
                   type="number"
                   value={formData.profitTarget}
                   onChange={(v) => setFormData({ ...formData, profitTarget: v })}
-                  suffix="%"
+                  suffix="$"
                   t={t}
                 />
               </div>
@@ -239,9 +259,10 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
               <div style={{ fontSize: 12, fontWeight: 500, color: t.accent, marginBottom: 12 }}>
                 거래 활동 조건
               </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <InputField
-                  label="최소 거래일"
+                  label="최소 거래일 (Min Trading Day)"
                   type="number"
                   value={formData.minTradingDays}
                   onChange={(v) => setFormData({ ...formData, minTradingDays: v })}
@@ -256,8 +277,29 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
                   onChange={(v) => setFormData({ ...formData, inactivityDays: v })}
                   suffix="일"
                   hint="통과 미활동 일수는 30일을 초과할 수 없습니다"
+                  error={inactivityError}
                   t={t}
                 />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <InputField
+                  label="최대 거래 계약수 (Max Trading Contracts)"
+                  type="number"
+                  value={formData.maxTradingContracts}
+                  onChange={(v) => setFormData({ ...formData, maxTradingContracts: v })}
+                  placeholder="1"
+                  t={t}
+                />
+                <InputField
+                  label="일관성 (Consistency)"
+                  type="number"
+                  value={formData.consistency}
+                  onChange={(v) => setFormData({ ...formData, consistency: v })}
+                  placeholder="40"
+                  suffix="%"
+                  t={t}
+                />
+              </div>
               </div>
             </div>
 
@@ -456,10 +498,12 @@ interface InputFieldProps {
   onChange: (value: string) => void;
   suffix?: string;
   hint?: string;
+  placeholder?: string;
+  error?: boolean;
   t: any;
 }
 
-function InputField({ label, type = "text", value, onChange, suffix, hint, t }: InputFieldProps) {
+function InputField({ label, type = "text", value, onChange, suffix, hint, placeholder, error, t }: InputFieldProps) {
   return (
     <div>
       <label style={{
@@ -473,9 +517,10 @@ function InputField({ label, type = "text", value, onChange, suffix, hint, t }: 
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
           style={{
             width: "100%", height: 36, padding: suffix ? "0 32px 0 12px" : "0 12px",
-            borderRadius: 8, border: `1px solid ${t.border}`,
+            borderRadius: 8, border: `1px solid ${error ? "#DC2626" : t.border}`,
             background: t.surface2, color: t.text, fontSize: 13,
           }}
         />
@@ -490,7 +535,7 @@ function InputField({ label, type = "text", value, onChange, suffix, hint, t }: 
         )}
       </div>
       {hint && (
-        <div style={{ fontSize: 11, color: t.textHint, marginTop: 4 }}>
+        <div style={{ fontSize: 11, color: error ? "#DC2626" : t.textHint, marginTop: 4 }}>
           {hint}
         </div>
       )}

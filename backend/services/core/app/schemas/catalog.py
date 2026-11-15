@@ -21,6 +21,7 @@ Pct = Field(default=None, ge=0, le=100)
 class RulesetFields(BaseModel):
     name: str = "Unnamed Ruleset"
     daily_loss_limit_pct: float = Field(default=5.0, ge=0, le=100)
+    daily_loss_limit_amt: float | None = Field(default=None, ge=0)
     max_dd_normal_pct: float = Field(default=10.0, ge=0, le=100)
     max_dd_normal_amt: float | None = Field(default=None, ge=0)
     max_dd_vip_pct: float = Field(default=10.0, ge=0, le=100)
@@ -35,14 +36,19 @@ class RulesetFields(BaseModel):
     pass_condition_vip_pct: float | None = Pct
     pass_condition_vip_amt: float | None = Field(default=None, ge=0)
     profit_target_pct: float | None = Pct
+    profit_target_amt: float | None = Field(default=None, ge=0)
     min_trading_days: int = Field(default=5, ge=0)
     inactivity_days: int = Field(default=30, ge=0)
+    max_trading_contracts: int | None = Field(default=None, gt=0)
+    consistency_pct: float | None = Pct
     retry_policy: RetryPolicy = "NONE"
     is_most_popular: bool = False
     apply_scope: ApplyScope = "NEW"
 
 
 class RulesetCreate(RulesetFields):
+    # 미활동 일수는 30일을 넘길 수 없다.
+    inactivity_days: int = Field(default=30, ge=0, le=30)
     # 비우면 서버가 만든다 (예: RS-7K2M9Q)
     id: str | None = Field(default=None, max_length=50, pattern=r"^[A-Za-z0-9_\-]+$")
 
@@ -50,6 +56,7 @@ class RulesetCreate(RulesetFields):
 class RulesetUpdate(BaseModel):
     name: str | None = None
     daily_loss_limit_pct: float | None = Pct
+    daily_loss_limit_amt: float | None = Field(default=None, ge=0)
     max_dd_normal_pct: float | None = Pct
     max_dd_normal_amt: float | None = Field(default=None, ge=0)
     max_dd_vip_pct: float | None = Pct
@@ -64,8 +71,11 @@ class RulesetUpdate(BaseModel):
     pass_condition_vip_pct: float | None = Pct
     pass_condition_vip_amt: float | None = Field(default=None, ge=0)
     profit_target_pct: float | None = Pct
+    profit_target_amt: float | None = Field(default=None, ge=0)
     min_trading_days: int | None = Field(default=None, ge=0)
-    inactivity_days: int | None = Field(default=None, ge=0)
+    inactivity_days: int | None = Field(default=None, ge=0, le=30)
+    max_trading_contracts: int | None = Field(default=None, gt=0)
+    consistency_pct: float | None = Pct
     retry_policy: RetryPolicy | None = None
     is_most_popular: bool | None = None
     apply_scope: ApplyScope | None = None

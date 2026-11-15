@@ -4,6 +4,7 @@ import type { AdminRuleset, UpsertRulesetPayload } from "@/api/ruleset";
 import { RulesetModal } from "../../components/products/RulesetModal";
 import { useAppShell } from "../../layouts/AppShell";
 import { Toast } from "../../components/shared/Toast";
+import { formatRulesetLimit } from "../../utils/rulesetFormat";
 import {
   useCreateRulesetMutation,
   useGetRulesetDetailQuery,
@@ -11,8 +12,6 @@ import {
   useUpdateRulesetMutation,
 } from "../../queries/rulesets";
 
-const formatPercent = (value: number | null | undefined) =>
-  typeof value === "number" ? `${value}%` : "-";
 const formatDays = (value: number | null | undefined) =>
   typeof value === "number" ? `${value}일` : "-";
 
@@ -158,13 +157,13 @@ export function RulesetManagementPage() {
                     {ruleset.name}
                   </td>
                   <td style={{ padding: "16px", fontSize: 13, color: t.textSec }}>
-                    {formatPercent(ruleset.daily_loss_limit_pct)}
+                    {formatRulesetLimit(ruleset.daily_loss_limit_amt, ruleset.daily_loss_limit_pct)}
                   </td>
                   <td style={{ padding: "16px", fontSize: 13, color: t.textSec }}>
-                    {formatPercent(ruleset.max_dd_normal_pct)}
+                    {formatRulesetLimit(ruleset.max_dd_normal_amt, ruleset.max_dd_normal_pct)}
                   </td>
                   <td style={{ padding: "16px", fontSize: 13, color: t.textSec }}>
-                    {formatPercent(ruleset.profit_target_pct)}
+                    {formatRulesetLimit(ruleset.profit_target_amt, ruleset.profit_target_pct)}
                   </td>
                   <td style={{ padding: "16px", fontSize: 13, color: t.textSec }}>
                     {formatDays(ruleset.min_trading_days)}

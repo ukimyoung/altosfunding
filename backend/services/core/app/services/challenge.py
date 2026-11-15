@@ -285,17 +285,19 @@ def _offer_rules(ruleset: Ruleset | None, capital: Decimal) -> dict | None:
     def amount(pct: Decimal | None) -> float | None:
         return None if pct is None else float((capital * pct / 100).quantize(Decimal("0.01")))
 
-    # 최대 손실 금액이 따로 정해져 있으면 그 값을, 없으면 비율로 계산한 값을 쓴다.
-    max_dd_amt = ruleset.max_dd_normal_amt
+    def amount_or_pct(amt: Decimal | None, pct: Decimal | None) -> float | None:
+        # 룰셋에 금액($)이 정해져 있으면 그 값을, 없으면 비율로 계산한 값을 쓴다.
+        return float(amt) if amt is not None else amount(pct)
+
     return {
         "ruleset_id": ruleset.id,
         "ruleset_name": ruleset.name,
         "profit_target_pct": None if ruleset.profit_target_pct is None else float(ruleset.profit_target_pct),
-        "profit_target_amt": amount(ruleset.profit_target_pct),
+        "profit_target_amt": amount_or_pct(ruleset.profit_target_amt, ruleset.profit_target_pct),
         "max_drawdown_pct": float(ruleset.max_dd_normal_pct),
-        "max_drawdown_amt": float(max_dd_amt) if max_dd_amt is not None else amount(ruleset.max_dd_normal_pct),
+        "max_drawdown_amt": amount_or_pct(ruleset.max_dd_normal_amt, ruleset.max_dd_normal_pct),
         "daily_loss_limit_pct": float(ruleset.daily_loss_limit_pct),
-        "daily_loss_limit_amt": amount(ruleset.daily_loss_limit_pct),
+        "daily_loss_limit_amt": amount_or_pct(ruleset.daily_loss_limit_amt, ruleset.daily_loss_limit_pct),
         "dd_calc_method": ruleset.dd_calc_method,
         "min_trading_days": ruleset.min_trading_days,
         "pass_condition_type": ruleset.pass_condition_type,
