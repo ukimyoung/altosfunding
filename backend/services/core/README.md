@@ -34,5 +34,16 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 | POST | `/api/v1/auth/refresh` | 쿠키로 access token 재발급. refresh token도 매번 새로 바뀌고, 이미 쓴 토큰이 다시 오면 그 회원의 세션을 모두 끊는다 |
 | POST | `/api/v1/auth/logout` | 현재 refresh token 폐기, 쿠키 삭제 |
 | GET | `/api/v1/auth/me` | 내 정보 (Bearer 토큰 필요) |
+| POST | `/api/v1/auth/2fa/login` | 2FA 로그인 2단계. 임시 토큰 쿠키(`2fa_temp_token`, 10분) + TOTP 또는 백업 코드. 5회 틀리면 15분 잠금 |
+| POST | `/api/v1/auth/2fa/setup` | 2FA 설정 시작. 비밀키·QR 주소·백업 코드 10개 반환 (아직 꺼진 상태) |
+| POST | `/api/v1/auth/2fa/verify` | TOTP 코드를 확인하고 2FA 켜기 |
+| POST | `/api/v1/auth/2fa/disable` | TOTP 또는 백업 코드로 2FA 끄기 |
+| POST | `/api/v1/auth/2fa/backup-codes/regenerate` | TOTP 코드로 백업 코드 재발급 (기존 코드 폐기) |
+| PUT | `/api/v1/auth/password` | 비밀번호 변경. 지금 기기를 뺀 다른 기기 로그인은 끊는다 |
+| POST | `/api/v1/auth/password/forgot` | 재설정 링크 메일 발송 (`{WEB_BASE_URL}/reset-password?token=...`, 30분 유효). 가입 여부와 관계없이 같은 응답 |
+| POST | `/api/v1/auth/password/reset` | 토큰으로 비밀번호 재설정. 모든 기기 로그인을 끊는다 |
+| PUT | `/api/v1/auth/profile` | 프로필 수정 (초대 코드는 비어 있을 때 한 번만 등록) |
+| PATCH | `/api/v1/auth/security/withdraw-email` | 출금 시 이메일 인증 사용 여부 |
+| GET | `/api/v1/auth/login-history` | 로그인 이력 (`page`, `size`) |
 
 인증이 필요한 API는 `app/deps.py`의 `CurrentUser`(회원), `AdminUser`(관리자)를 쓴다.
