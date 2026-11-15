@@ -1785,45 +1785,43 @@ export function MyAssetPage() {
         onClose={() => setShowLiveAccountRequiredModal(false)}
       />
 
-      {/* Top Summary Cards */}
-      <div className="relative grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Total Asset Card */}
+      {/* Total Asset (1115 디자인: 가로형 단일 카드) */}
+      <div className="mb-8 w-full">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="bg-gradient-to-br from-[#0052FF] to-[#0041CC] border border-[#0052FF]/30 rounded-xl p-8 relative overflow-hidden"
+          className="relative w-full overflow-hidden rounded-xl border border-[#0052FF]/30 bg-gradient-to-br from-[#0052FF] to-[#0041CC] p-5 sm:p-6"
         >
           <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full blur-3xl -mr-32 -mt-32"></div>
 
-          <div className="relative z-10">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center backdrop-blur-sm">
-                <Wallet size={24} className="text-white" />
+          <div className="relative z-10 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-white/10 backdrop-blur-sm">
+                  <Wallet size={22} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-medium text-white/80">{text.totalAsset}</h3>
+                  <p className="text-xs text-white/60">{text.availableForWithdrawal}</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-white/80 text-sm font-medium">{text.totalAsset}</h3>
-                <p className="text-white/60 text-xs">{text.availableForWithdrawal}</p>
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-white text-4xl font-bold">
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-3xl font-bold text-white sm:text-4xl">
                   $
                   {totalAsset.toLocaleString('en-US', {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
                   })}
                 </span>
-                <span className="text-white/50 text-xl font-normal">USDT</span>
+                <span className="text-lg font-normal text-white/50 sm:text-xl">USDT</span>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto md:shrink-0">
               <button
                 onClick={() => setShowDepositModal(true)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white text-[#0052FF] rounded-lg font-semibold hover:bg-white/90 transition-all"
+                className="flex min-w-36 flex-1 items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-semibold text-[#0052FF] transition-all hover:bg-white/90 md:flex-none"
               >
                 <ArrowDownLeft size={18} />
                 <span>{text.deposit}</span>
@@ -1831,7 +1829,7 @@ export function MyAssetPage() {
               <button
                 onClick={() => void handleOpenWithdrawModal()}
                 disabled={isCheckingKycStatus}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/10 text-white border border-white/20 rounded-lg font-semibold hover:bg-white/20 transition-all backdrop-blur-sm"
+                className="flex min-w-36 flex-1 items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/10 px-5 py-3 font-semibold text-white backdrop-blur-sm transition-all hover:bg-white/20 md:flex-none"
               >
                 <ArrowUpRight size={18} />
                 <span>{isCheckingKycStatus ? text.checking : text.withdraw}</span>
@@ -1839,8 +1837,14 @@ export function MyAssetPage() {
             </div>
           </div>
         </motion.div>
+      </div>
 
-        {/* Live Trading Account Card */}
+      {/*
+        Live 계정 생성 미지원으로 Live Trading Account 카드와 계좌 간 이체 버튼(데스크톱·모바일)을 숨김.
+        추후 다시 표시할 수 있으므로 삭제하지 않는다. 다시 쓸 때는 아래 블록과 하단 Transfer Modal 주석을 해제하고,
+        위 Total Asset 영역을 기존 2열 그리드(relative grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8)로 되돌린다.
+
+        [Live Trading Account Card]
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1888,7 +1892,7 @@ export function MyAssetPage() {
           </div>
         </motion.div>
 
-        {/* Transfer Button - Centered between cards */}
+        [Transfer Button - Centered between cards]
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -1906,9 +1910,8 @@ export function MyAssetPage() {
             />
           </button>
         </motion.div>
-      </div>
 
-      {/* Transfer Button Mobile - Below cards */}
+      [Transfer Button Mobile - Below cards]
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1924,6 +1927,8 @@ export function MyAssetPage() {
           <span>{text.transferBetweenAccounts}</span>
         </button>
       </motion.div>
+
+      */}
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -2595,11 +2600,14 @@ export function MyAssetPage() {
         )}
       </AnimatePresence>
 
-      {/* Transfer Modal - Matching RewardPage style */}
+      {/*
+        Transfer Modal: Live 계정 생성 미지원으로 계좌 간 이체 기능을 숨김. 삭제하지 않고 주석으로 보관한다.
+
+      [Transfer Modal - Matching RewardPage style]
       <AnimatePresence>
         {showTransferModal && (
           <>
-            {/* Backdrop */}
+            [Backdrop]
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2609,7 +2617,7 @@ export function MyAssetPage() {
               onClick={() => setShowTransferModal(false)}
             />
 
-            {/* Modal */}
+            [Modal]
             <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -2619,7 +2627,7 @@ export function MyAssetPage() {
                 className="bg-[#0f0f17] border border-[#1a1a24] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                {/* Header */}
+                [Header]
                 <div className="sticky top-0 bg-[#0f0f17] border-b border-[#1a1a24] px-8 py-6 flex items-center justify-between z-10">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-[#0052FF]/10 flex items-center justify-center">
@@ -2638,15 +2646,15 @@ export function MyAssetPage() {
                   </button>
                 </div>
 
-                {/* Content */}
+                [Content]
                 <div className="px-8 py-6">
-                  {/* Transfer Direction */}
+                  [Transfer Direction]
                   <div className="mb-6">
                     <label className="block text-white text-sm font-semibold mb-3">
                       {text.transferDirection}
                     </label>
                     <div className="bg-[#1a1a24] border border-[#2a2a3a] rounded-xl p-6">
-                      {/* From Section */}
+                      [From Section]
                       <div className="mb-4">
                         <label className="block text-gray-400 text-xs mb-2">{text.transferFrom}</label>
                         <select
@@ -2681,14 +2689,14 @@ export function MyAssetPage() {
                         </div>
                       </div>
 
-                      {/* Arrow Indicator */}
+                      [Arrow Indicator]
                       <div className="flex justify-center -my-2 relative z-10">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0052FF] to-[#0041CC] border-4 border-[#1a1a24] text-white shadow-xl flex items-center justify-center">
                           <ArrowDownUp size={18} />
                         </div>
                       </div>
 
-                      {/* To Section */}
+                      [To Section]
                       <div className="mt-4">
                         <label className="block text-gray-400 text-xs mb-2">{text.transferTo}</label>
                         <select
@@ -2724,7 +2732,7 @@ export function MyAssetPage() {
                     </div>
                   </div>
 
-                  {/* Transfer Amount */}
+                  [Transfer Amount]
                   <div className="mb-6">
                     <label className="block text-white text-sm font-semibold mb-3">
                       {text.transferAmount}
@@ -2768,7 +2776,7 @@ export function MyAssetPage() {
                     </div>
                   </div>
 
-                  {/* Info Alert */}
+                  [Info Alert]
                   <div className="bg-[#0052FF]/5 border border-[#0052FF]/20 rounded-xl p-4">
                     <div className="flex gap-3">
                       <AlertCircle size={20} className="text-[#0052FF] flex-shrink-0 mt-0.5" />
@@ -2794,7 +2802,7 @@ export function MyAssetPage() {
                   </div>
                 )}
 
-                {/* Footer Actions */}
+                [Footer Actions]
                 <div className="sticky bottom-0 bg-[#0f0f17] border-t border-[#1a1a24] px-8 py-6 flex items-center justify-between gap-4">
                   <button
                     className="flex-1 px-6 py-4 bg-[#1a1a24] text-white rounded-xl font-medium hover:bg-[#2a2a3a] transition-colors"
@@ -2822,6 +2830,7 @@ export function MyAssetPage() {
           </>
         )}
       </AnimatePresence>
+      */}
 
       {/* Failed status tooltip (portal) */}
       {hoveredFailureTooltip &&
