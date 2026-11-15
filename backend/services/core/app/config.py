@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     recaptcha_secret_key: str = ""
     recaptcha_min_score: float = 0.5
 
+    # 사용자 웹 주소. 비밀번호 재설정 메일의 링크에 쓴다.
+    web_base_url: str = "http://localhost:5173"
+    password_reset_ttl_minutes: int = 30
+    password_reset_cooldown_seconds: int = 60
+
+    # 2FA 코드를 연속으로 틀리면 잠시 잠근다.
+    two_factor_max_failures: int = 5
+    two_factor_lock_minutes: int = 15
+
     # 메일 발송 방식: console(로그로만 출력) | notification_hub
     email_backend: str = "console"
     notification_hub_url: str = "http://localhost:8002"

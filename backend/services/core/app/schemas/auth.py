@@ -118,3 +118,85 @@ class TwoFactorRequiredResponse(BaseModel):
     requires_2fa: bool = True
     user_id: str
     message: str
+
+
+class TwoFactorLoginRequest(BaseModel):
+    # 웹은 HttpOnly 쿠키(2fa_temp_token)를 쓰고, 백오피스는 body로 보낸다.
+    temp_token: str | None = None
+    code: str = Field(min_length=6, max_length=16)
+
+
+class TwoFactorCodeRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=16)
+
+
+class TwoFactorSetupResponse(BaseModel):
+    secret: str
+    qr_uri: str
+    backup_codes: list[str]
+
+
+class BackupCodesResponse(BaseModel):
+    backup_codes: list[str]
+    message: str = "기존 백업 코드는 모두 폐기되었습니다. 새 코드를 안전하게 보관하세요."
+
+
+class MessageResponse(BaseModel):
+    ok: bool = True
+    message: str
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class PasswordForgotRequest(BaseModel):
+    email: EmailStr
+    recaptcha_token: str | None = None
+
+
+class PasswordResetRequest(BaseModel):
+    token: str = Field(min_length=1)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class ProfileUpdateRequest(BaseModel):
+    first_name: str | None = None
+    last_name: str | None = None
+    country: str | None = None
+    city: str | None = None
+    state_province: str | None = None
+    address_line1: str | None = None
+    address_line2: str | None = None
+    zip_code: str | None = None
+    phone: str | None = None
+    avatar_url: str | None = None
+    # 가입 때 초대 코드를 넣지 않은 회원이 나중에 한 번 등록할 수 있다.
+    referrer_code: str | None = None
+
+
+class WithdrawEmailRequest(BaseModel):
+    enabled: bool
+
+
+class WithdrawEmailResponse(BaseModel):
+    ok: bool = True
+    is_email_enabled: bool
+
+
+class LoginHistoryOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    ip_address: str | None = None
+    user_agent: str | None = None
+    created_at: datetime
+
+
+class LoginHistoryPage(BaseModel):
+    items: list[LoginHistoryOut]
+    total: int
+    page: int
+    size: int
+    pages: int

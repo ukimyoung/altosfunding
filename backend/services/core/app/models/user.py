@@ -44,6 +44,9 @@ class User(Base):
 
     is_2fa_enabled: Mapped[bool] = mapped_column(server_default="false")
     totp_secret_encrypted: Mapped[str | None]
+    totp_last_used_step: Mapped[int | None] = mapped_column(BigInteger)
+    two_factor_failed_count: Mapped[int] = mapped_column(Integer, server_default="0")
+    two_factor_locked_until: Mapped[datetime | None]
     is_email_enabled: Mapped[bool] = mapped_column(server_default="true")
 
     referral_code: Mapped[str] = mapped_column(String, unique=True)
@@ -101,4 +104,29 @@ class LoginHistory(Base):
     )
     ip_address: Mapped[str | None]
     user_agent: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class UserBackupCode(Base):
+    __tablename__ = "user_backup_codes"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.users.id", ondelete="CASCADE")
+    )
+    code_hash: Mapped[str]
+    used_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.users.id", ondelete="CASCADE")
+    )
+    token_hash: Mapped[str] = mapped_column(String, unique=True)
+    expires_at: Mapped[datetime]
+    used_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

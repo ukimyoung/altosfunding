@@ -88,12 +88,16 @@ async def find_refresh_token(session: AsyncSession, token: str) -> RefreshToken 
     )
 
 
-async def revoke_all_for_user(session: AsyncSession, user_id: uuid.UUID) -> None:
-    await session.execute(
-        update(RefreshToken)
-        .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
-        .values(revoked_at=_now())
+async def revoke_all_for_user(
+    session: AsyncSession, user_id: uuid.UUID, keep_token: str | None = None
+) -> None:
+    """회원의 refresh token을 모두 폐기한다. keep_token이 있으면 그 세션만 남긴다."""
+    stmt = update(RefreshToken).where(
+        RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None)
     )
+    if keep_token:
+        stmt = stmt.where(RefreshToken.token_hash != _hash(keep_token))
+    await session.execute(stmt.values(revoked_at=_now()))
 
 
 def refresh_cookie_max_age() -> int:

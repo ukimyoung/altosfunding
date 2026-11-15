@@ -1,12 +1,10 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Cookie, Depends, Request, Response, status
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import get_session
-from app.deps import CurrentUser
 from app.errors import AppError
 from app.models import User
 from app.schemas.auth import (
@@ -17,10 +15,11 @@ from app.schemas.auth import (
     RefreshTokenRequest,
     RegisterRequest,
     TokenResponse,
+    TwoFactorLoginRequest,
     TwoFactorRequiredResponse,
     UserOut,
 )
-from app.services import auth, signup, tokens
+from app.services import auth, signup, tokens, two_factor
 from app.services.email import EmailSender, get_email_sender
 from app.services.recaptcha import verify_recaptcha
 
@@ -180,14 +179,38 @@ async def logout(
     return OkResponse(message_key="auth.logout_success")
 
 
-@router.get("/me", response_model=UserOut, summary="내 정보 조회")
-async def me(user: CurrentUser, session: Session) -> UserOut:
-    referrer_code = None
-    if user.referrer_id:
-        referrer_code = await session.scalar(
-            select(User.referral_code).where(User.id == user.referrer_id)
-        )
-    total_referrals = await session.scalar(
-        select(func.count()).select_from(User).where(User.referrer_id == user.id)
+@router.post("/2fa/login", response_model=TokenResponse, summary="2FA 로그인 (TOTP/백업 코드)")
+async def login_2fa(
+    body: TwoFactorLoginRequest,
+    request: Request,
+    response: Response,
+    session: Session,
+    temp_cookie: Annotated[str | None, Cookie(alias=TWO_FACTOR_COOKIE)] = None,
+) -> TokenResponse:
+    """로그인 2단계: 임시 토큰(쿠키 우선, 없으면 body) + TOTP 또는 백업 코드로 정식 토큰을 받는다."""
+    raw = temp_cookie or body.temp_token
+    if not raw:
+        raise AppError(401, "2fa_session_expired", "2FA 세션이 만료되었습니다. 다시 로그인해 주세요.")
+    try:
+        user_id = tokens.decode_token(raw, tokens.TWO_FACTOR_PENDING)
+    except tokens.InvalidTokenError as exc:
+        raise AppError(401, "2fa_session_expired", "2FA 세션이 만료되었습니다. 다시 로그인해 주세요.") from exc
+
+    user = await session.get(User, user_id, with_for_update=True)
+    if user is None or not user.is_2fa_enabled:
+        raise AppError(401, "2fa_session_expired", "2FA 세션이 만료되었습니다. 다시 로그인해 주세요.")
+    auth.ensure_can_sign_in(user)
+
+    try:
+        await two_factor.verify_code(session, user, body.code)
+    except AppError as exc:
+        if exc.error_code == "invalid_2fa_code":
+            # 기존 서버와 같이 잘못된 코드는 401로 응답한다.
+            raise AppError(401, "invalid_2fa_code", exc.message) from exc
+        raise
+
+    result = await auth.complete_login(
+        session, user, _client_ip(request), request.headers.get("user-agent")
     )
-    return signup.to_user_out(user, referrer_code=referrer_code, total_referrals=total_referrals or 0)
+    _delete_cookie(response, TWO_FACTOR_COOKIE)
+    return _token_response(response, result)
