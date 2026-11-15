@@ -26,6 +26,9 @@ import {
 
 const PAGE_SIZE = 20;
 
+const formatUsd = (value: number | null | undefined) =>
+  value == null ? '-' : `$${Number(value).toLocaleString('en-US')}`;
+
 export function ChallengeProductPage() {
   const { dark } = useAppShell();
   const navigate = useNavigate();
@@ -90,6 +93,11 @@ export function ChallengeProductPage() {
 
   const handleEditProduct = (product: ChallengeProduct, e: React.MouseEvent) => {
     e.stopPropagation();
+    setSelectedProduct(product);
+    setIsModalOpen(true);
+  };
+
+  const handleRowClick = (product: ChallengeProduct) => {
     setSelectedProduct(product);
     setIsModalOpen(true);
   };
@@ -266,6 +274,7 @@ export function ChallengeProductPage() {
       {/* Product Table */}
       <ChallengeProductTable
         products={products}
+        onRowClick={handleRowClick}
         onEdit={handleEditProduct}
         onToggleStatus={handleToggleStatus}
         dark={dark}
@@ -324,6 +333,7 @@ export function ChallengeProductPage() {
 // Challenge Product Table Component
 interface ChallengeProductTableProps {
   products: ChallengeProduct[];
+  onRowClick: (product: ChallengeProduct) => void;
   onEdit: (product: ChallengeProduct, e: React.MouseEvent) => void;
   onToggleStatus: (id: string, e: React.MouseEvent) => void;
   dark: boolean;
@@ -331,6 +341,7 @@ interface ChallengeProductTableProps {
 
 function ChallengeProductTable({
   products,
+  onRowClick,
   onEdit,
   onToggleStatus,
   dark,
@@ -357,11 +368,12 @@ function ChallengeProductTable({
         <thead>
           <tr style={{ background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
             {[
-              '상품 / 티어',
+              // 최신 디자인(Make 1114) 컬럼. 이전 '상품 / 티어', '마진콜', 'Stop Out' 컬럼은 목록에서 숨김(수정 팝업에서 관리)
+              '상품명',
+              '가격',
+              '자본금',
               '레버리지',
               'Trading 기간',
-              '마진콜',
-              'Stop Out',
               '적용 룰셋',
               '상태',
               '관리',
@@ -390,9 +402,10 @@ function ChallengeProductTable({
             return (
               <tr
                 key={product.id}
+                onClick={() => onRowClick(product)}
                 style={{
                   borderBottom: `1px solid ${t.border}`,
-                  cursor: 'default',
+                  cursor: 'pointer',
                   background: isSuspended
                     ? dark
                       ? 'rgba(113,113,122,0.07)'
@@ -412,10 +425,14 @@ function ChallengeProductTable({
                     : 'transparent';
                 }}
               >
-                <td style={{ padding: '14px 16px' }}>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: t.text, lineHeight: 1 }}>
-                    {product.amount == null ? '-' : `$${product.amount}`}
-                  </div>
+                <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 600, color: t.text }}>
+                  {product.productName || '-'}
+                </td>
+                <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 500, color: t.text }}>
+                  {formatUsd(product.amount)}
+                </td>
+                <td style={{ padding: '14px 16px', fontSize: 13, fontWeight: 500, color: t.text }}>
+                  {formatUsd(product.capital)}
                 </td>
                 <td style={{ padding: '14px 16px', fontSize: 13, color: t.text }}>
                   {product.leverage == null ? '-' : `x ${product.leverage}`}
@@ -423,6 +440,7 @@ function ChallengeProductTable({
                 <td style={{ padding: '14px 16px', fontSize: 13, color: t.text }}>
                   {product.tradingPeriod == null ? '-' : `${product.tradingPeriod} 영업일`}
                 </td>
+                {/* 이전 디자인 컬럼(마진콜·Stop Out): 최신 디자인에서 목록 미노출
                 <td
                   style={{
                     padding: '14px 16px',
@@ -441,6 +459,7 @@ function ChallengeProductTable({
                 >
                   {product.stopOut ? `${product.stopOut}%` : '-'}
                 </td>
+                */}
                 <td style={{ padding: '14px 16px' }}>
                   <span
                     style={{
