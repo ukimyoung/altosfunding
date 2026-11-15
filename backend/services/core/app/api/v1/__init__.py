@@ -2,6 +2,8 @@ from fastapi import APIRouter
 
 from app.api.v1.account import router as account_router
 from app.api.v1.admin_users import router as admin_users_router
+from app.api.v1.announcements import admin_router as admin_announcements_router
+from app.api.v1.announcements import public_router as announcements_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.catalog import router as catalog_router
 from app.api.v1.challenges import router as challenges_router
@@ -16,3 +18,5 @@ router.include_router(admin_users_router)
 router.include_router(catalog_router)
 router.include_router(challenges_router)
 router.include_router(kyc_router)
+router.include_router(admin_announcements_router)
+router.include_router(announcements_router)
