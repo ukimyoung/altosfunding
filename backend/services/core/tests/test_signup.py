@@ -65,7 +65,7 @@ def test_full_signup_flow(client, sent_emails):
     assert user["email_verified"] is True
     assert user["auth_provider"] == "LOCAL"
     assert user["can_change_password"] is True
-    assert user["uid"].startswith("AF")
+    assert user["uid"].isdigit() and len(user["uid"]) == 10 and user["uid"][0] != "0"
     assert len(user["referral_code"]) == 8
     assert user["state_province"] is None  # 빈 문자열은 null로 저장
 
@@ -175,3 +175,29 @@ def test_validation_errors(client):
         "/api/v1/auth/email/verify", json={"email": EMAIL, "code": "12ab56", "purpose": "SIGNUP"}
     )
     assert res.status_code == 422
+
+
+def test_generate_uid_skips_existing(client, monkeypatch):
+    """이미 있는 번호가 나오면 다시 뽑는다."""
+    import asyncio
+
+    from app.db import get_session
+    from app.services import signup
+
+    run_sql(
+        "insert into core.users (uid, email, referral_code) values ('1111111111', 'taken@example.com', 'TAKEN001')"
+    )
+    real = signup._random_uid
+    assert all(len(u := real()) == 10 and u.isdigit() and u[0] != "0" for _ in range(200))
+    picks = iter(["1111111111", "1111111111", "2222222222"])
+    monkeypatch.setattr(signup, "_random_uid", lambda: next(picks))
+
+    async def _go():
+        gen = get_session()
+        session = await gen.__anext__()
+        try:
+            return await signup.generate_uid(session)
+        finally:
+            await gen.aclose()
+
+    assert asyncio.run(_go()) == "2222222222"

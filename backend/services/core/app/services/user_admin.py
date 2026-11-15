@@ -13,7 +13,13 @@ from app.models import User, UserStatusHistory
 from app.schemas.auth import UserOut
 from app.security import hash_password
 from app.services import tokens
-from app.services.signup import _clean, _generate_unique, normalize_email, to_user_out
+from app.services.signup import (
+    _clean,
+    _generate_unique,
+    generate_uid,
+    normalize_email,
+    to_user_out,
+)
 
 
 def _now() -> datetime:
@@ -190,7 +196,7 @@ async def create_user(session: AsyncSession, data: dict, admin: User) -> User:
     if exists:
         raise AppError(409, "email_already_exists", "이미 가입된 이메일입니다.")
     user = User(
-        uid=await _generate_unique(session, User.uid, 8, prefix="AF"),
+        uid=await generate_uid(session),
         email=email,
         password_hash=hash_password(data["password"]),
         auth_provider="LOCAL",

@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.errors import AppError
 from app.models import User
-from app.services.signup import _generate_unique, normalize_email
+from app.services.signup import _generate_unique, generate_uid, normalize_email
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,7 @@ async def find_or_create_user(session: AsyncSession, profile: GoogleProfile) -> 
         return user, False
 
     user = User(
-        uid=await _generate_unique(session, User.uid, 8, prefix="AF"),
+        uid=await generate_uid(session),
         email=email,
         password_hash=None,
         auth_provider="GOOGLE",
