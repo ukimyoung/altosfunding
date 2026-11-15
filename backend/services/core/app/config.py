@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     two_factor_max_failures: int = 5
     two_factor_lock_minutes: int = 15
 
+    # Google 로그인 (OAuth 2.0 인가 코드 방식)
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    # Google 콘솔에 등록한 콜백 주소. 예: https://altosfunding-web-sandbox.onrender.com/api/v1/auth/google/callback
+    google_redirect_uri: str = ""
+    # 로그인 뒤 돌아갈 수 있는 사용자 웹 주소 (쉼표로 구분). web_base_url은 항상 허용된다.
+    frontend_allowed_origins: str = ""
+
     # 메일 발송 방식: console(로그로만 출력) | notification_hub
     email_backend: str = "console"
     notification_hub_url: str = "http://localhost:8002"
@@ -44,6 +52,12 @@ class Settings(BaseSettings):
     email_code_max_attempts: int = 5
     # 인증을 마친 뒤 이 시간 안에 가입을 끝내야 한다.
     signup_verification_valid_minutes: int = 30
+
+    @property
+    def allowed_frontend_origins(self) -> set[str]:
+        origins = {o.strip().rstrip("/") for o in self.frontend_allowed_origins.split(",") if o.strip()}
+        origins.add(self.web_base_url.rstrip("/"))
+        return origins
 
     @property
     def is_live(self) -> bool:

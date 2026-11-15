@@ -45,5 +45,13 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 | PUT | `/api/v1/auth/profile` | 프로필 수정 (초대 코드는 비어 있을 때 한 번만 등록) |
 | PATCH | `/api/v1/auth/security/withdraw-email` | 출금 시 이메일 인증 사용 여부 |
 | GET | `/api/v1/auth/login-history` | 로그인 이력 (`page`, `size`) |
+| GET | `/api/v1/auth/google/login` | Google 로그인 화면으로 이동 (`state`=돌아갈 사용자 웹 주소, `prompt`) |
+| GET | `/api/v1/auth/google/callback` | Google 콜백. 성공 시 `{웹}/my-page?login_success=true`(신규 가입이면 `&welcome=true`), 2FA 회원은 `{웹}/login/2fa`, 실패 시 `{웹}/login?error=google_auth_failed&detail=...` |
+| GET | `/api/v1/auth/google/url` | Google 로그인 주소만 반환 |
+
+Google 로그인 참고
+- 같은 이메일로 이메일 가입한 회원은 Google로도 로그인된다 (Google이 인증한 이메일만 허용, 기존 서버와 동일). 처음 쓰는 이메일이면 바로 가입된다.
+- `state`는 서명해서 쓰고 같은 값의 쿠키와 비교해 위조된 콜백을 막는다. 돌아갈 주소는 `WEB_BASE_URL`과 `FRONTEND_ALLOWED_ORIGINS`에 있는 주소만 허용한다.
+- Google Cloud 콘솔의 OAuth 클라이언트에 `GOOGLE_REDIRECT_URI`를 "승인된 리디렉션 URI"로 등록해야 한다.
 
 인증이 필요한 API는 `app/deps.py`의 `CurrentUser`(회원), `AdminUser`(관리자)를 쓴다.
