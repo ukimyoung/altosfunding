@@ -59,6 +59,8 @@ class Product(Base):
     mt4_login_pool_end: Mapped[int] = mapped_column(BigInteger, server_default="199999")
     last_mt4_login: Mapped[int | None] = mapped_column(BigInteger)
     next_product_id: Mapped[str | None] = mapped_column(ForeignKey("core.products.id"))
+    # 펀디드 상품에만: 연관 챌린지 상품 id (예: 1001)
+    related_id: Mapped[str | None] = mapped_column(ForeignKey("core.products.id"))
     funding_start_delay_hours: Mapped[int] = mapped_column(server_default="0")
     duration_days: Mapped[int] = mapped_column(server_default="30")
     margin_call_pct: Mapped[Decimal | None]

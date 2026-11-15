@@ -281,7 +281,7 @@ def test_challenge_offers(client, admin, challenge_product):  # noqa: F811
     assert client.put(f"/api/v1/catalog/products/{challenge_product}", headers=admin,
                       json={"ruleset_id": rs["id"], "discount_price_usdt": 59, "is_recommended": True}).status_code == 200
     funded = _product(client, admin, tier_type="FUNDED", name="Funded $10K", ruleset_id=funded_rs["id"],
-                      payout_ratio=80, leverage=50, mt4_login_pool_start=2000000,
+                      payout_ratio=80, leverage=50, related_id=challenge_product, mt4_login_pool_start=2000000,
                       mt4_login_pool_end=2099999).json()
     other = _product(client, admin, name="Challenge $25K", capital=25000, price_usdt=150,
                      mt4_login_pool_start=1100000, mt4_login_pool_end=1199999).json()
@@ -298,7 +298,7 @@ def test_challenge_offers(client, admin, challenge_product):  # noqa: F811
     assert first["is_recommended"] is True and first["open_challenge"] is None
     assert first["rules"]["profit_target_amt"] == 600 and first["rules"]["max_drawdown_amt"] == 500
     assert first["rules"]["daily_loss_limit_amt"] == 0
-    # 펀디드 단계는 자본금이 같은 펀디드 상품
+    # 펀디드 단계는 이 챌린지 상품을 연관 상품으로 지정한 펀디드 상품
     assert first["funded"]["product_id"] == funded["product_id"] and first["funded"]["payout_ratio"] == 80
     assert first["funded"]["rules"]["max_drawdown_amt"] == 700
     assert first["funded"]["rules"]["daily_loss_limit_amt"] == 200

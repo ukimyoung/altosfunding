@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import type { FundedProduct } from "../../types/product";
 import { ACCOUNT_RANGE_HINTS } from "../../constants/status";
 import { useListRulesetsQuery } from "../../queries/rulesets";
+import { useListCatalogProductsQuery } from "../../queries/catalogProducts";
 
 interface FundedProductModalProps {
   product: FundedProduct | null;
@@ -18,6 +19,9 @@ export function FundedProductModal({ product, isOpen, onClose, onSave, onNavigat
   const [isTimePickerActive, setIsTimePickerActive] = useState(false);
   const { data: rulesetsData } = useListRulesetsQuery({ page: 1, size: 100 }, isOpen);
   const rulesets = rulesetsData?.items ?? [];
+  // 연관 챌린지 상품 선택지. 다른 펀디드 상품에 이미 연결된 챌린지 상품은 고를 수 없다.
+  const { data: challengeProductsData } = useListCatalogProductsQuery({ tier_type: "CHALLENGE", page: 1, size: 100 });
+  const { data: fundedProductsData } = useListCatalogProductsQuery({ tier_type: "FUNDED", page: 1, size: 100 });
 
   const [formData, setFormData] = useState<FundedProduct>(
     product || {
@@ -75,6 +79,27 @@ export function FundedProductModal({ product, isOpen, onClose, onSave, onNavigat
   }, [isOpen, product]);
 
   if (!isOpen) return null;
+
+  const linkedBy = new Map(
+    (fundedProductsData?.items ?? [])
+      .filter((p) => p.related_id && p.product_id !== product?.id)
+      .map((p) => [p.related_id as string, p.product_id]),
+  );
+  const challengeOptions = [
+    { value: "", label: "연결 안 함" },
+    ...(challengeProductsData?.items ?? []).map((p) => {
+      const linked = linkedBy.get(p.product_id);
+      return {
+        value: p.product_id,
+        label: `${p.product_id} · ${p.name ?? ""}${p.is_active ? "" : " (비활성)"}${linked ? ` (연결됨: ${linked})` : ""}`,
+        disabled: Boolean(linked),
+      };
+    }),
+  ];
+  // 목록에 없는 값(예: 100개 넘는 경우)도 현재 값은 보이게 한다.
+  if (formData.relatedChallengeId && !challengeOptions.some((o) => o.value === formData.relatedChallengeId)) {
+    challengeOptions.push({ value: formData.relatedChallengeId, label: formData.relatedChallengeId, disabled: false });
+  }
 
   const t = {
     surface: dark ? "#0F1829" : "#ffffff",
@@ -232,6 +257,16 @@ export function FundedProductModal({ product, isOpen, onClose, onSave, onNavigat
                     value={formData.stopOut}
                     onChange={(v) => setFormData({ ...formData, stopOut: v })}
                     suffix="%"
+                    t={t}
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <SelectField
+                    label="연관 챌린지 상품"
+                    options={challengeOptions}
+                    value={formData.relatedChallengeId ?? ""}
+                    onChange={(v) => setFormData({ ...formData, relatedChallengeId: v })}
                     t={t}
                   />
                 </div>
@@ -440,7 +475,7 @@ function InputField({ label, required, type = "text", value, onChange, suffix, p
 
 interface SelectFieldProps {
   label: string;
-  options: readonly { value: string; label: string }[];
+  options: readonly { value: string; label: string; disabled?: boolean }[];
   value: string;
   onChange: (value: string) => void;
   t: any;
@@ -467,7 +502,7 @@ function SelectField({ label, options, value, onChange, t }: SelectFieldProps) {
         }}
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
+          <option key={opt.value} value={opt.value} disabled={opt.disabled}>{opt.label}</option>
         ))}
       </select>
     </div>

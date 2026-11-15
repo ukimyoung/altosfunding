@@ -66,4 +66,6 @@ export interface FundedProduct {
   accountRangeStart: number | null;
   accountRangeEnd: number | null;
   creationDelayHours: number | null;
+  /** 연관 챌린지 상품 id (예: 1001). 빈 문자열이면 연결 없음 */
+  relatedChallengeId?: string;
 }

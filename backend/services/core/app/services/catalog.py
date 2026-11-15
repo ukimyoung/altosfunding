@@ -157,6 +157,8 @@ async def _check_product(session: AsyncSession, product: Product) -> None:
             raise AppError(400, "invalid_next_product", "다음 단계 상품으로 자기 자신을 지정할 수 없습니다.")
         if not await session.get(Product, product.next_product_id):
             raise AppError(400, "next_product_not_found", "존재하지 않는 다음 단계 상품입니다.")
+    if product.related_id:
+        await _check_related(session, product)
 
     same_server = [t for t, s in MT4_SERVER_OF_TIER.items() if s == MT4_SERVER_OF_TIER[product.tier_type]]
     overlap = await session.scalar(
@@ -174,6 +176,27 @@ async def _check_product(session: AsyncSession, product: Product) -> None:
         )
 
 
+async def _check_related(session: AsyncSession, product: Product) -> None:
+    """펀디드 상품의 연관 챌린지 상품. 챌린지 상품 하나에는 펀디드 상품 하나만 연결한다."""
+    if product.tier_type != "FUNDED":
+        raise AppError(400, "invalid_related_product", "연관 챌린지 상품은 펀디드 상품에만 지정할 수 있습니다.")
+    related = await session.get(Product, product.related_id)
+    if related is None:
+        raise AppError(400, "related_product_not_found", "존재하지 않는 챌린지 상품입니다.")
+    if related.tier_type != "CHALLENGE":
+        raise AppError(400, "invalid_related_product", "연관 상품은 챌린지 상품이어야 합니다.")
+    linked = await session.scalar(
+        select(Product.product_id).where(
+            Product.related_id == product.related_id, Product.product_id != product.product_id
+        ).limit(1)
+    )
+    if linked:
+        raise AppError(
+            409, "related_product_taken",
+            f"챌린지 상품 {product.related_id}에는 이미 펀디드 상품({linked})이 연결되어 있습니다.",
+        )
+
+
 async def create_product(session: AsyncSession, data: dict) -> Product:
     product_id = await _generate_product_id(session, data["tier_type"])
     product = Product(product_id=product_id, **data)
@@ -185,6 +208,7 @@ async def create_product(session: AsyncSession, data: dict) -> Product:
 
 _NULLABLE_PRODUCT_FIELDS = {
     "type_code", "description", "ruleset_id", "next_product_id", "margin_call_pct", "stop_out_pct", "discount_price_usdt",
+    "related_id",
 }
 
 

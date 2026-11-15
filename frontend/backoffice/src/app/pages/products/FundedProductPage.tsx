@@ -29,6 +29,12 @@ const PAGE_SIZE = 20;
 const formatUsd = (value: number | null | undefined) =>
   value == null ? '-' : `$${Number(value).toLocaleString('en-US')}`;
 
+// 서버가 보낸 이유(예: 이미 다른 펀디드 상품이 연결된 챌린지 상품)를 그대로 보여준다.
+const getSaveErrorMessage = (error: unknown, fallback: string) => {
+  const data = (error as { response?: { data?: { message?: string } } })?.response?.data;
+  return data?.message || fallback;
+};
+
 export function FundedProductPage() {
   const { dark } = useAppShell();
   const navigate = useNavigate();
@@ -164,6 +170,10 @@ export function FundedProductPage() {
               exists.accountRangeEnd,
             ),
             ruleset_id: getCatalogProductUpdateValue(product.ruleset ?? '', exists.ruleset ?? ''),
+            related_id: getCatalogProductUpdateValue(
+              product.relatedChallengeId ?? '',
+              exists.relatedChallengeId ?? '',
+            ),
           },
         },
         {
@@ -172,7 +182,8 @@ export function FundedProductPage() {
             setToast({ message: '수정이 완료되었습니다.', type: 'success' });
             void refetchProducts();
           },
-          onError: () => setToast({ message: '상품 수정에 실패했습니다.', type: 'warning' }),
+          onError: (error) =>
+            setToast({ message: getSaveErrorMessage(error, '상품 수정에 실패했습니다.'), type: 'warning' }),
         },
       );
     } else {
@@ -190,6 +201,7 @@ export function FundedProductPage() {
           mt4_login_pool_start: product.accountRangeStart,
           mt4_login_pool_end: product.accountRangeEnd,
           ruleset_id: product.ruleset ?? '',
+          related_id: product.relatedChallengeId || null,
         },
         {
           onSuccess: () => {
@@ -197,7 +209,8 @@ export function FundedProductPage() {
             setToast({ message: '상품이 추가되었습니다', type: 'success' });
             void refetchProducts();
           },
-          onError: () => setToast({ message: '상품 추가에 실패했습니다', type: 'warning' }),
+          onError: (error) =>
+            setToast({ message: getSaveErrorMessage(error, '상품 추가에 실패했습니다'), type: 'warning' }),
         },
       );
     }
