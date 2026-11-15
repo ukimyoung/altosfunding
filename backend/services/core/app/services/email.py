@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 class EmailSender(Protocol):
     async def send_verification_code(self, email: str, code: str, purpose: str, locale: str) -> None: ...
 
+    async def send_password_reset(self, email: str, reset_url: str, locale: str) -> None: ...
+
 
 class ConsoleEmailSender:
     """메일을 보내지 않고 로그에 남긴다. local/sandbox 전용."""
@@ -21,6 +23,10 @@ class ConsoleEmailSender:
     async def send_verification_code(self, email: str, code: str, purpose: str, locale: str) -> None:
         self.sent.append({"email": email, "code": code, "purpose": purpose, "locale": locale})
         logger.warning("[console email] %s 인증코드 → %s: %s", purpose, email, code)
+
+    async def send_password_reset(self, email: str, reset_url: str, locale: str) -> None:
+        self.sent.append({"email": email, "reset_url": reset_url, "purpose": "PASSWORD_RESET", "locale": locale})
+        logger.warning("[console email] 비밀번호 재설정 링크 → %s: %s", email, reset_url)
 
 
 _console_sender = ConsoleEmailSender()

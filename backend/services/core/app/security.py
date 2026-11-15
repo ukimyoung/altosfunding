@@ -1,9 +1,11 @@
+import base64
 import hashlib
 import hmac
 import secrets
 import string
 
 from argon2 import PasswordHasher
+from cryptography.fernet import Fernet
 from argon2.exceptions import InvalidHashError, VerificationError
 
 from app.config import settings
@@ -41,3 +43,22 @@ _HUMAN_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 def generate_human_code(length: int) -> str:
     return "".join(secrets.choice(_HUMAN_ALPHABET) for _ in range(length))
+
+
+def sha256_hex(value: str) -> str:
+    """긴 무작위 토큰(재설정 링크, refresh token 등) 저장용 해시."""
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def _fernet() -> Fernet:
+    key = hashlib.sha256(f"{settings.secret_key}:field-encryption".encode()).digest()
+    return Fernet(base64.urlsafe_b64encode(key))
+
+
+def encrypt_text(value: str) -> str:
+    """TOTP 비밀키처럼 원문을 다시 꺼내 써야 하는 값을 DB에 암호화해 저장한다."""
+    return _fernet().encrypt(value.encode()).decode()
+
+
+def decrypt_text(value: str) -> str:
+    return _fernet().decrypt(value.encode()).decode()
