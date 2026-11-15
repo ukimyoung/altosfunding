@@ -444,7 +444,7 @@ export function MyAccountPage() {
               <div className="flex-1">
                 <p className="text-gray-400 text-xs mb-1">{text.referrerCode}</p>
                 <p className="text-white text-sm font-medium font-mono">
-                  {accountData.referrerCode}
+                  {displayValue(accountData.referrerCode)}
                 </p>
               </div>
             </div>
