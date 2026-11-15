@@ -38,6 +38,26 @@ async def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+async def get_optional_user(
+    session: Session,
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> User | None:
+    """로그인하지 않아도 되는 API용. 토큰이 없거나 맞지 않으면 None (기존 서버와 같음)."""
+    if creds is None:
+        return None
+    try:
+        user_id = tokens.decode_token(creds.credentials, tokens.ACCESS)
+    except tokens.InvalidTokenError:
+        return None
+    user = await session.get(User, user_id)
+    if user is None or user.status != "ACTIVE":
+        return None
+    return user
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
+
 async def require_admin(user: CurrentUser) -> User:
     if user.role != "ADMIN":
         raise AppError(403, "forbidden", "Permission denied")
