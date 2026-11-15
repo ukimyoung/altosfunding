@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     # 비어 있으면 내부 작업 API를 막는다.
     system_api_key: str = ""
 
+    # Sumsub KYC. 비어 있으면 본인 인증 시작(토큰 발급)과 웹훅을 막는다. 상태 조회는 된다.
+    sumsub_app_token: str = ""
+    sumsub_secret_key: str = ""
+    sumsub_webhook_secret: str = ""
+    sumsub_base_url: str = "https://api.sumsub.com"
+    sumsub_level_name: str = "id-and-liveness"
+
     # 메일 발송 방식: console(로그로만 출력) | notification_hub
     email_backend: str = "console"
     notification_hub_url: str = "http://localhost:8002"

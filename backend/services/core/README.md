@@ -78,6 +78,9 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 | POST | `/api/v1/admin/schedules/run-due` | 주기 작업 한 번 실행 (관리자, 테스트용) |
 | GET·POST·PATCH·DELETE | `/api/v1/admin/holidays` | 휴장일 관리 |
 | POST | `/api/v1/internal/jobs/challenges` | 주기 작업 (외부 스케줄러용, `X-System-Api-Key` 헤더) |
+| GET | `/api/v1/auth/kyc/status` | 내 KYC 상태 (NONE/PENDING/APPROVED/REJECTED, 반려 사유) |
+| GET | `/api/v1/auth/kyc/sumsub/token` | Sumsub WebSDK 접근 토큰 (`SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY` 필요) |
+| POST | `/api/v1/webhooks/sumsub` | Sumsub 심사 결과 웹훅 (`X-Payload-Digest` 서명 확인, `SUMSUB_WEBHOOK_SECRET` 필요) |
 
 상품의 MT4 계좌번호 범위는 같은 MT4 서버를 쓰는 상품끼리 겹칠 수 없다 (챌린지·데모 = 데모 서버, 펀디드·라이브 = 실서버).
 
