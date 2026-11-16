@@ -7,9 +7,9 @@ import pytest
 from app.services import email_templates
 from app.services.email import EmailSendError, SesEmailSender, get_email_sender
 from tests.conftest import run_sql
-from tests.test_wallets import TRADER, trader  # noqa: F401
 from tests.test_admin_users import admin_headers  # noqa: F401
 from tests.test_login import member  # noqa: F401
+from tests.test_wallets import TRADER, trader  # noqa: F401
 
 
 class FakeSes:
