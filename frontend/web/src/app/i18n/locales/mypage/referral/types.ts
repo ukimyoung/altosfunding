@@ -17,8 +17,13 @@ export interface ReferralTranslations {
 
   // How it works box
   howItWorks: string;
-  howItWorksBody: string; // contains inline $50 highlight — rendered as JSX in component
+  // {condition}, {reward} placeholders — rendered as JSX in component
+  howItWorksBody: string;
+  howItWorksConditionFirstPurchase: string;
+  howItWorksConditionFundedUpgrade: string;
+  // {amount} = referral reward amount from the reward policy (e.g. $40)
   howItWorksRewardHighlight: string;
+  howItWorksRewardHighlightNoAmount: string;
 
   // Referral list table
   referralList: string;

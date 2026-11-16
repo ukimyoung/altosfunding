@@ -952,7 +952,8 @@ export function RewardReferralPage() {
 
     setPolicyCondition(policy.referral_reward_condition);
     setPolicyAmount(String(policy.referral_reward_amount ?? ''));
-    setPolicyBonusRate(String(Number(policy.trading_bonus_rate ?? 0) * 100));
+    // 0.07 * 100 = 7.000000000000001 같은 부동소수 오차를 정리해서 보여준다.
+    setPolicyBonusRate(String(Number((Number(policy.trading_bonus_rate ?? 0) * 100).toFixed(4))));
   };
 
   useEffect(() => {
@@ -1089,12 +1090,15 @@ export function RewardReferralPage() {
   const handleSaveReferralPolicy = () => {
     const referral_reward_amount = Number(policyAmount);
 
+    if (policyAmount.trim() === '' || !Number.isFinite(referral_reward_amount) || referral_reward_amount < 0) {
+      onToast('지급액을 0 이상의 숫자로 입력해 주세요', 'warning');
+      return;
+    }
+
     updatePolicyMutation.mutate(
       {
         referral_reward_condition: policyCondition,
-        referral_reward_amount: Number.isFinite(referral_reward_amount)
-          ? referral_reward_amount
-          : undefined,
+        referral_reward_amount,
       },
       {
         onSuccess: () => {
@@ -1108,11 +1112,21 @@ export function RewardReferralPage() {
   };
 
   const handleSaveTradingBonusPolicy = () => {
-    const trading_bonus_rate = Number(policyBonusRate) / 100;
+    const bonusRatePoint = Number(policyBonusRate);
+
+    if (
+      policyBonusRate.trim() === '' ||
+      !Number.isFinite(bonusRatePoint) ||
+      bonusRatePoint < 0 ||
+      bonusRatePoint > 100
+    ) {
+      onToast('보너스 추가율을 0~100 사이의 숫자로 입력해 주세요', 'warning');
+      return;
+    }
 
     updatePolicyMutation.mutate(
       {
-        trading_bonus_rate: Number.isFinite(trading_bonus_rate) ? trading_bonus_rate : undefined,
+        trading_bonus_rate: bonusRatePoint / 100,
       },
       {
         onSuccess: () => {

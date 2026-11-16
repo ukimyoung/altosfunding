@@ -47,6 +47,13 @@ def _contact_category_seed() -> str:
     return sql[start : sql.index(";", start) + 1]
 
 
+def _reward_policy_seed() -> str:
+    """마이그레이션이 넣는 리워드 정책 기본값을 테스트마다 다시 넣는다."""
+    sql = next(MIGRATIONS_DIR.glob("*_core_reward_policy.sql")).read_text(encoding="utf-8")
+    start = sql.index("insert into core.platform_config")
+    return "delete from core.platform_config where scope = 'REWARD';\n" + sql[start : sql.index(";", start) + 1]
+
+
 _CONTACT_CATEGORY_RESET = (
     "truncate core.contact_messages, core.contact_categories restart identity cascade;\n" + _contact_category_seed()
 )
@@ -58,6 +65,7 @@ async def _truncate() -> None:
     conn = await asyncpg.connect(_asyncpg_dsn(TEST_DATABASE_URL))
     try:
         await conn.execute(_CONTACT_CATEGORY_RESET)
+        await conn.execute(_reward_policy_seed())
         await conn.execute("truncate core.contact_messages, core.announcements, core.announcement_categories, core.email_verifications, core.users, core.challenges, core.challenge_schedules, core.holidays, core.products, core.rulesets restart identity cascade")
     finally:
         await conn.close()
