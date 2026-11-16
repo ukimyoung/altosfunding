@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     # AWS SES. 키는 SES 발송 권한(ses:SendEmail)만 있는 IAM 사용자 것을 쓴다.
     aws_access_key_id: str = ""
     aws_secret_access_key: str = ""
-    aws_region: str = "ap-northeast-2"
+    aws_region: str = "ap-southeast-1"
     # SES에서 인증(verify)된 발신 주소 또는 도메인의 주소. 예: noreply@altosfunding.com
     email_from_address: str = ""
     email_from_name: str = "Altos Funding"

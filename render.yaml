@@ -125,7 +125,7 @@ services:
       - key: AWS_SECRET_ACCESS_KEY
         sync: false
       - key: AWS_REGION
-        value: ap-northeast-2
+        value: ap-southeast-1
       # SES에서 인증된 발신 주소 (예: noreply@altosfunding.com)
       - key: EMAIL_FROM_ADDRESS
         sync: false
