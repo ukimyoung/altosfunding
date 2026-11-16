@@ -279,7 +279,7 @@ def test_challenge_offers(client, admin, challenge_product):  # noqa: F811
     rs = _ruleset(client, admin, profit_target_pct=6, max_dd_normal_pct=5, daily_loss_limit_pct=0)
     funded_rs = _ruleset(client, admin, max_dd_normal_amt=700, daily_loss_limit_pct=2)
     assert client.put(f"/api/v1/catalog/products/{challenge_product}", headers=admin,
-                      json={"ruleset_id": rs["id"], "discount_price_usdt": 59, "is_recommended": True}).status_code == 200
+                      json={"ruleset_id": rs["id"], "discount_price_usdt": 59, "is_most_popular": True}).status_code == 200
     funded = _product(client, admin, tier_type="FUNDED", name="Funded $10K", ruleset_id=funded_rs["id"],
                       payout_ratio=80, leverage=50, related_id=challenge_product, mt4_login_pool_start=2000000,
                       mt4_login_pool_end=2099999).json()
@@ -295,7 +295,7 @@ def test_challenge_offers(client, admin, challenge_product):  # noqa: F811
     assert [i["product_id"] for i in items] == [challenge_product, other["product_id"]]
     first = items[0]
     assert (first["price_usdt"], first["discount_price_usdt"], first["final_price_usdt"]) == (99, 59, 59)
-    assert first["is_recommended"] is True and first["open_challenge"] is None
+    assert first["is_most_popular"] is True and first["open_challenge"] is None
     assert first["rules"]["profit_target_amt"] == 600 and first["rules"]["max_drawdown_amt"] == 500
     assert first["rules"]["daily_loss_limit_amt"] == 0
     # 펀디드 단계는 이 챌린지 상품을 연관 상품으로 지정한 펀디드 상품

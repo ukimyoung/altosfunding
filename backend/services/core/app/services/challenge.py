@@ -266,7 +266,7 @@ async def summary(session: AsyncSession) -> dict:
             "price_usdt": float(p.price_usdt),
             "discount_price_usdt": None if p.discount_price_usdt is None else float(p.discount_price_usdt),
             "type_code": p.type_code,
-            "is_recommended": p.is_recommended,
+            "is_most_popular": p.is_most_popular,
             "current_participants": c.current_participants,
             "group_size": c.group_size,
             "start_at": c.start_at,
@@ -303,6 +303,9 @@ def _offer_rules(ruleset: Ruleset | None, capital: Decimal) -> dict | None:
         "pass_condition_type": ruleset.pass_condition_type,
         "pass_condition_pct": None if ruleset.pass_condition_pct is None else float(ruleset.pass_condition_pct),
         "pass_condition_amt": None if ruleset.pass_condition_amt is None else float(ruleset.pass_condition_amt),
+        "max_mini_contracts": ruleset.max_mini_contracts,
+        "max_micro_contracts": ruleset.max_micro_contracts,
+        "consistency_pct": None if ruleset.consistency_pct is None else float(ruleset.consistency_pct),
     }
 
 
@@ -366,7 +369,7 @@ async def offers(session: AsyncSession) -> list[dict]:
                 "price_usdt": float(p.price_usdt),
                 "discount_price_usdt": None if p.discount_price_usdt is None else float(p.discount_price_usdt),
                 "final_price_usdt": float(price),
-                "is_recommended": p.is_recommended,
+                "is_most_popular": p.is_most_popular,
                 "leverage": p.leverage,
                 "duration_days": p.duration_days,
                 "rules": _offer_rules(rulesets.get(p.ruleset_id), p.capital),

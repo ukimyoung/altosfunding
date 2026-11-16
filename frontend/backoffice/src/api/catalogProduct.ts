@@ -11,7 +11,7 @@ export interface CatalogProduct {
   discount_price_usdt?: number | null;
   tier_type: CatalogProductTierType;
   is_active: boolean;
-  is_recommended?: boolean;
+  is_most_popular?: boolean;
   mt4_group: string | null;
   mt4_login_pool_start: number | null;
   mt4_login_pool_end: number | null;
@@ -48,7 +48,7 @@ export interface CreateCatalogProductRequest {
   name?: string | null;
   price_usdt?: number | null;
   discount_price_usdt?: number | null;
-  is_recommended?: boolean | null;
+  is_most_popular?: boolean | null;
   tier_type?: CatalogProductTierType | null;
   mt4_group?: string | null;
   capital?: number | null;

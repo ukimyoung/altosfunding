@@ -42,7 +42,8 @@ type AccountType = {
   durationDays: number;
   rules: ChallengeOfferRules | null;
   funded: ChallengeOfferFunded | null;
-  isRecommended: boolean;
+  /** MOST POPULAR 뱃지 (백오피스 챌린지 상품 팝업에서 체크) */
+  isMostPopular: boolean;
   isAvailable: boolean;
 };
 
@@ -68,7 +69,7 @@ const toAccountType = (offer: ChallengeOffer): AccountType => ({
   durationDays: offer.duration_days,
   rules: offer.rules,
   funded: offer.funded,
-  isRecommended: offer.is_recommended,
+  isMostPopular: offer.is_most_popular,
   isAvailable: Boolean(offer.open_challenge),
 });
 
@@ -174,9 +175,9 @@ export function StartNewChallengePage() {
     const hasSelectedChallenge = available.some((challenge) => challenge.id === selectedAccount);
 
     if (!hasSelectedChallenge) {
-      // 추천 상품을 먼저, 없으면 신청할 수 있는 첫 상품을 고른다.
+      // MOST POPULAR 상품을 먼저, 없으면 신청할 수 있는 첫 상품을 고른다.
       setSelectedAccount(
-        available.find((challenge) => challenge.isRecommended)?.id ?? available[0]?.id ?? '',
+        available.find((challenge) => challenge.isMostPopular)?.id ?? available[0]?.id ?? '',
       );
     }
   }, [selectedAccount, sortedChallenges]);
@@ -789,7 +790,7 @@ export function StartNewChallengePage() {
                             : 'border-[#2a2a3a]'
                       }`}
                     >
-                      {account.isRecommended && (
+                      {account.isMostPopular && (
                         <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                           <div className="whitespace-nowrap rounded-full bg-gradient-to-r from-[#0052FF] to-[#00FF94] px-4 py-1 text-xs font-bold text-white">
                             {text.mostPopular}

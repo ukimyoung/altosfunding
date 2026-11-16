@@ -5,10 +5,11 @@ import { SCHEDULE_STATUS, ASSIGNMENT_METHOD, ACCOUNT_RANGE_HINTS } from "../../c
 import { useListRulesetsQuery } from "../../queries/rulesets";
 import { formatRulesetLimit } from "../../utils/rulesetFormat";
 
-const RECOMMEND_OPTIONS = [
-  { value: "N", label: "비추천 (기본)" },
-  { value: "Y", label: "추천" },
-] as const;
+// '추천' 선택은 'MOST POPULAR' 체크박스로 합침 (2026-11-16)
+// const RECOMMEND_OPTIONS = [
+//   { value: "N", label: "비추천 (기본)" },
+//   { value: "Y", label: "추천" },
+// ] as const;
 
 interface ChallengeProductModalProps {
   product: ChallengeProduct | null;
@@ -237,6 +238,7 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
                         <div style={{ fontSize: 11, color: "#DC2626", marginTop: 4 }}>{discountError}</div>
                       )}
                     </div>
+                    {/* '추천' 선택은 아래 'MOST POPULAR' 체크박스로 합침 (2026-11-16)
                     <SelectField
                       label="추천"
                       options={RECOMMEND_OPTIONS}
@@ -244,6 +246,7 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
                       onChange={(v) => setFormData({ ...formData, mostPopular: v === "Y" })}
                       t={t}
                     />
+                    */}
                   </div>
 
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
@@ -377,6 +380,43 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
                 <div style={{ fontSize: 11, color: t.textHint, marginTop: 8 }}>
                   ※ 레인지 참고: $100 → {ACCOUNT_RANGE_HINTS[100]} / $300 → {ACCOUNT_RANGE_HINTS[300]} / $500 → {ACCOUNT_RANGE_HINTS[500]}
                 </div>
+              </div>
+
+              {/* MOST POPULAR */}
+              <div style={{
+                padding: 16, borderRadius: 8, background: t.accentBg,
+                border: `1px solid ${t.border}`,
+              }}>
+                <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.mostPopular}
+                    onChange={(e) => setFormData({ ...formData, mostPopular: e.target.checked })}
+                    style={{ marginTop: 2 }}
+                  />
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
+                        MOST POPULAR
+                      </span>
+                      <span style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        padding: "2px 8px",
+                        borderRadius: 9999,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        background: t.accent,
+                        color: "#fff",
+                      }}>
+                        MOST POPULAR
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: t.textSec }}>
+                      체크 시 이 상품에 'MOST POPULAR' 뱃지가 랜딩페이지 Account Size와 Start New Challenge 카드에 표시됩니다.
+                    </div>
+                  </div>
+                </label>
               </div>
 
               {/* 룰셋 선택 Section */}

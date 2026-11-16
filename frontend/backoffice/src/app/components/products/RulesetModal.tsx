@@ -32,7 +32,6 @@ interface RulesetFormData {
   normalEvalValue: string;
   vipEvalMethod: string;
   vipEvalValue: string;
-  mostPopular: boolean;
   applyScope: string;
 }
 
@@ -53,7 +52,6 @@ const emptyFormData: RulesetFormData = {
   normalEvalValue: "",
   vipEvalMethod: "절대평가",
   vipEvalValue: "",
-  mostPopular: false,
   applyScope: "new-only",
 };
 
@@ -109,7 +107,6 @@ const toFormData = (ruleset: RulesetDetailResponse | null): RulesetFormData => {
         ? ruleset.pass_condition_vip_amt ?? ""
         : ruleset.pass_condition_vip_pct ?? "",
     ),
-    mostPopular: Boolean(ruleset.is_most_popular),
     applyScope: ruleset.apply_scope === "NEW" ? "new-only" : ruleset.apply_scope || "new-only",
   };
 };
@@ -181,7 +178,6 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
       ...(vipEvalType === "ABSOLUTE" && hasValue(formData.vipEvalValue)
         ? { pass_condition_vip_amt: toNumber(formData.vipEvalValue) }
         : {}),
-      is_most_popular: formData.mostPopular,
       apply_scope: formData.applyScope === "new-only" ? "NEW" : formData.applyScope,
     });
   };
@@ -428,42 +424,43 @@ export function RulesetModal({ ruleset, isOpen, onClose, onSave, dark }: Ruleset
               </div>
             </div>
 
-            {/* MOST POPULAR */}
-            <div style={{
-              padding: 16, borderRadius: 8, background: t.accentBg,
-              border: `1px solid ${t.border}`,
-            }}>
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
-                <input
-                  type="checkbox"
-                  checked={formData.mostPopular}
-                  onChange={(e) => setFormData({ ...formData, mostPopular: e.target.checked })}
-                  style={{ marginTop: 2 }}
-                />
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
-                      MOST POPULAR
-                    </span>
-                    <span style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      padding: "2px 8px",
-                      borderRadius: 9999,
-                      fontSize: 10,
-                      fontWeight: 600,
-                      background: t.accent,
-                      color: "#fff",
-                    }}>
-                      MOST POPULAR
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 12, color: t.textSec }}>
-                    체크 시 이 룰셋이 적용된 상품에 'MOST POPULAR' 뱃지가 랜딩페이지에 표시됩니다.
-                  </div>
-                </div>
-              </label>
-            </div>
+            {/* MOST POPULAR: 상품 단위로 옮김 → 챌린지 상품 팝업 '룰셋 선택' 위 (2026-11-16)
+            // <div style={{
+            //   padding: 16, borderRadius: 8, background: t.accentBg,
+            //   border: `1px solid ${t.border}`,
+            // }}>
+            //   <label style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: "pointer" }}>
+            //     <input
+            //       type="checkbox"
+            //       checked={formData.mostPopular}
+            //       onChange={(e) => setFormData({ ...formData, mostPopular: e.target.checked })}
+            //       style={{ marginTop: 2 }}
+            //     />
+            //     <div>
+            //       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+            //         <span style={{ fontSize: 13, fontWeight: 600, color: t.text }}>
+            //           MOST POPULAR
+            //         </span>
+            //         <span style={{
+            //           display: "inline-flex",
+            //           alignItems: "center",
+            //           padding: "2px 8px",
+            //           borderRadius: 9999,
+            //           fontSize: 10,
+            //           fontWeight: 600,
+            //           background: t.accent,
+            //           color: "#fff",
+            //         }}>
+            //           MOST POPULAR
+            //         </span>
+            //       </div>
+            //       <div style={{ fontSize: 12, color: t.textSec }}>
+            //         체크 시 이 룰셋이 적용된 상품에 'MOST POPULAR' 뱃지가 랜딩페이지에 표시됩니다.
+            //       </div>
+            //     </div>
+            //   </label>
+            // </div>
+            */}
 
             {/* 적용 범위 */}
             <div>

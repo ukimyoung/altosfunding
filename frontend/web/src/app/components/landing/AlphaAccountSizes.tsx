@@ -2,12 +2,106 @@ import { ArrowRight, Sparkles } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Link } from 'react-router';
 import { useOptionalMeQuery } from '@/app/queries/profile';
+import { useListChallengeOffersQuery } from '@/app/queries/products';
+import type { ChallengeOffer, ChallengeOfferRules } from '@/api/products';
+import type { AccountLabels } from '../../i18n/locales/landing/types';
 import { useLocale } from '../../i18n/LocaleContext';
 import { InfoTooltip } from '../shared/InfoTooltip';
 
+type BadgeKey = null | 'mostPopular' | 'bestValue';
+
+/** 카드 한 장에 보여줄 값. null은 '없음'(labels.none)으로 표시한다. */
+type TierCard = {
+  key: string;
+  /** 상품명. 없으면 locale의 tierNames[index] */
+  name?: string;
+  size: string;
+  /** 할인 중일 때만 원가격 (취소선) */
+  originalFee: string | null;
+  discountedFee: string;
+  challengeStage: {
+    profitTarget: string | null;
+    maxDrawdown: string | null;
+    dailyLossLimit: string | null;
+    maxContracts: string | null;
+    consistency: string | null;
+    tradingPeriod: string | null;
+  };
+  fundedStage: {
+    profitTarget: string | null;
+    maxDrawdown: string | null;
+    dailyLossLimit: string | null;
+    maxContracts: string | null;
+    consistency: string | null;
+  };
+  popular: boolean;
+  badgeKey: BadgeKey;
+};
+
+const formatMoney = (amount: number) =>
+  `$${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+
+// 10000 → $10K, 그 외 → $12,500
+const formatCapital = (capital: number) =>
+  capital >= 1000 && capital % 1000 === 0
+    ? `$${(capital / 1000).toLocaleString('en-US')}K`
+    : formatMoney(capital);
+
+// 0이거나 없으면 '없음'
+const moneyOrNull = (amount: number | null | undefined) => (amount ? formatMoney(amount) : null);
+
+const formatContracts = (rules: ChallengeOfferRules | null | undefined) => {
+  const mini = rules?.max_mini_contracts;
+  const micro = rules?.max_micro_contracts;
+  if (mini && micro) return `${mini} Mini (${micro} Micro)`;
+  if (mini) return `${mini} Mini`;
+  if (micro) return `${micro} Micro`;
+  return null;
+};
+
+const formatPct = (pct: number | null | undefined) =>
+  pct ? `${pct.toLocaleString('en-US', { maximumFractionDigits: 2 })}%` : null;
+
+/** Core GET /challenges/products 상품 → 랜딩 카드. MOST POPULAR 뱃지는 상품의 is_most_popular. */
+const offerToTier = (offer: ChallengeOffer, labels: AccountLabels): TierCard => {
+  const rules = offer.rules;
+  const fundedRules = offer.funded?.rules;
+  const discounted =
+    offer.discount_price_usdt != null && offer.discount_price_usdt < offer.price_usdt;
+
+  return {
+    key: offer.product_id,
+    name: offer.name,
+    size: formatCapital(offer.capital),
+    originalFee: discounted ? formatMoney(offer.price_usdt) : null,
+    discountedFee: formatMoney(offer.final_price_usdt),
+    challengeStage: {
+      profitTarget: moneyOrNull(rules?.profit_target_amt),
+      maxDrawdown: moneyOrNull(rules?.max_drawdown_amt),
+      dailyLossLimit: moneyOrNull(rules?.daily_loss_limit_amt),
+      maxContracts: formatContracts(rules),
+      consistency: formatPct(rules?.consistency_pct),
+      tradingPeriod: offer.duration_days
+        ? labels.daysFormat.replace('{n}', String(offer.duration_days))
+        : null,
+    },
+    fundedStage: {
+      profitTarget: moneyOrNull(fundedRules?.profit_target_amt),
+      maxDrawdown: moneyOrNull(fundedRules?.max_drawdown_amt),
+      dailyLossLimit: moneyOrNull(fundedRules?.daily_loss_limit_amt),
+      maxContracts: formatContracts(fundedRules),
+      consistency: formatPct(fundedRules?.consistency_pct),
+    },
+    popular: offer.is_most_popular,
+    badgeKey: offer.is_most_popular ? 'mostPopular' : null,
+  };
+};
+
+// 상품 API를 쓸 수 없을 때(기존 서버 연결 등) 보여주는 고정 카드
 // Static tier data — only values that don't change with locale
-const TIERS = [
+const TIERS: TierCard[] = [
   {
+    key: 'static-0',
     size: '$10K',
     originalFee: '$80',
     discountedFee: '$48',
@@ -27,9 +121,10 @@ const TIERS = [
       consistency: null,
     },
     popular: false,
-    badgeKey: null as null | 'mostPopular' | 'bestValue',
+    badgeKey: null,
   },
   {
+    key: 'static-1',
     size: '$25K',
     originalFee: '$131',
     discountedFee: '$79',
@@ -49,9 +144,10 @@ const TIERS = [
       consistency: null,
     },
     popular: false,
-    badgeKey: null as null | 'mostPopular' | 'bestValue',
+    badgeKey: null,
   },
   {
+    key: 'static-2',
     size: '$50K',
     originalFee: '$188',
     discountedFee: '$113',
@@ -71,9 +167,10 @@ const TIERS = [
       consistency: null,
     },
     popular: true,
-    badgeKey: 'mostPopular' as const,
+    badgeKey: 'mostPopular',
   },
   {
+    key: 'static-3',
     size: '$100K',
     originalFee: '$320',
     discountedFee: '$192',
@@ -93,7 +190,7 @@ const TIERS = [
       consistency: null,
     },
     popular: false,
-    badgeKey: 'bestValue' as const,
+    badgeKey: 'bestValue',
   },
 ];
 
@@ -104,6 +201,13 @@ export function AlphaAccountSizes() {
   const TT = L.tooltips;
   const { data: me } = useOptionalMeQuery();
   const startChallengePath = me ? '/my-page/start-new-challenge' : '/login';
+  const { data: offers, isLoading: isOffersLoading } = useListChallengeOffersQuery();
+  // 판매 중인 챌린지 상품이 있으면 그 값으로, 불러오는 중이면 비워 두고, 없거나 실패하면 고정 카드
+  const tiers: TierCard[] = offers?.items?.length
+    ? offers.items.map((offer) => offerToTier(offer, L))
+    : isOffersLoading
+      ? []
+      : TIERS;
 
   return (
     <section
@@ -130,13 +234,13 @@ export function AlphaAccountSizes() {
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
-          {TIERS.map((tier, index) => {
-            const tierName = section.tierNames[index];
+          {tiers.map((tier, index) => {
+            const tierName = tier.name ?? section.tierNames[index];
             const badgeLabel = tier.badgeKey ? L[tier.badgeKey] : null;
 
             return (
               <motion.div
-                key={index}
+                key={tier.key}
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
@@ -174,7 +278,9 @@ export function AlphaAccountSizes() {
                       {/* One-time fee */}
                       <div className="text-right">
                         <div className="flex items-baseline justify-end gap-1.5">
-                          <span className="text-xs text-gray-500 line-through">{tier.originalFee}</span>
+                          {tier.originalFee && (
+                            <span className="text-xs text-gray-500 line-through">{tier.originalFee}</span>
+                          )}
                           <span className="text-2xl font-bold text-white leading-tight">{tier.discountedFee}</span>
                         </div>
                         <div className="text-xs text-gray-400 mt-0.5">{L.oneTimeFee}</div>
@@ -193,14 +299,14 @@ export function AlphaAccountSizes() {
                             <InfoTooltip content={TT.profitTarget} />
                             {L.profitTarget}
                           </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.profitTarget}</span>
+                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.profitTarget ?? L.none}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
                             <InfoTooltip content={TT.maxDrawdownEod} />
                             {L.maxDrawdownEod}
                           </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.maxDrawdown}</span>
+                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.maxDrawdown ?? L.none}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
@@ -216,21 +322,21 @@ export function AlphaAccountSizes() {
                             <InfoTooltip content={TT.maxContracts} />
                             {L.maxContracts}
                           </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.maxContracts}</span>
+                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.maxContracts ?? L.none}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
                             <InfoTooltip content={TT.consistency} />
                             {L.consistency}
                           </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.consistency}</span>
+                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.consistency ?? L.none}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
                             <InfoTooltip content={TT.tradingPeriod} />
                             {L.tradingPeriod}
                           </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.tradingPeriod}</span>
+                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.tradingPeriod ?? L.none}</span>
                         </div>
                       </div>
                     </div>
@@ -253,21 +359,21 @@ export function AlphaAccountSizes() {
                             <InfoTooltip content={TT.maxDrawdownEod} />
                             {L.maxDrawdownEod}
                           </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.fundedStage.maxDrawdown}</span>
+                          <span className="text-white text-sm font-bold text-right">{tier.fundedStage.maxDrawdown ?? L.none}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
                             <InfoTooltip content={TT.dailyLossLimit} />
                             {L.dailyLossLimit}
                           </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.fundedStage.dailyLossLimit}</span>
+                          <span className="text-white text-sm font-bold text-right">{tier.fundedStage.dailyLossLimit ?? L.none}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
                             <InfoTooltip content={TT.maxContracts} />
                             {L.maxContracts}
                           </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.fundedStage.maxContracts}</span>
+                          <span className="text-white text-sm font-bold text-right">{tier.fundedStage.maxContracts ?? L.none}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
