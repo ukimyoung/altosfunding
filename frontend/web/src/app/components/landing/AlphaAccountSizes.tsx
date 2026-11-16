@@ -279,7 +279,7 @@ export function AlphaAccountSizes() {
                       <div className="text-right">
                         <div className="flex items-baseline justify-end gap-1.5">
                           {tier.originalFee && (
-                            <span className="text-xs text-gray-500 line-through">{tier.originalFee}</span>
+                            <span className="text-base font-semibold text-gray-400 line-through">{tier.originalFee}</span>
                           )}
                           <span className="text-2xl font-bold text-white leading-tight">{tier.discountedFee}</span>
                         </div>
