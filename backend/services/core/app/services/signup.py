@@ -18,7 +18,7 @@ from app.security import (
     hash_code,
     hash_password,
 )
-from app.services.email import EmailSender
+from app.services.email import EmailSender, EmailSendError
 
 
 def _now() -> datetime:
@@ -58,6 +58,33 @@ async def _latest_verification(
     )
 
 
+async def _issue_code(
+    session: AsyncSession, sender: EmailSender, email: str, purpose: VerificationPurpose, locale: str
+) -> None:
+    """6자리 코드를 만들어 저장하고 메일로 보낸다. 메일 발송에 실패하면 코드를 지워 바로 다시 요청할 수 있게 한다."""
+    now = _now()
+    latest = await _latest_verification(session, email, purpose)
+    cooldown = timedelta(seconds=settings.email_code_resend_cooldown_seconds)
+    if latest and latest.created_at > now - cooldown:
+        raise AppError(429, "rate_limit_exceeded", "잠시 후 다시 요청해 주세요.")
+
+    code = generate_numeric_code()
+    verification = EmailVerification(
+        email=email,
+        purpose=purpose.value,
+        code_hash=hash_code(code),
+        expires_at=now + timedelta(minutes=settings.email_code_ttl_minutes),
+    )
+    session.add(verification)
+    await session.commit()
+    try:
+        await sender.send_verification_code(email, code, purpose.value, locale)
+    except EmailSendError as exc:
+        await session.delete(verification)
+        await session.commit()
+        raise AppError(502, "email_send_failed", "인증 메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.") from exc
+
+
 async def send_verification_code(
     session: AsyncSession,
     sender: EmailSender,
@@ -74,23 +101,7 @@ async def send_verification_code(
     if await _find_active_user_by_email(session, email):
         raise AppError(409, "email_already_exists", "이미 가입된 이메일입니다.")
 
-    now = _now()
-    latest = await _latest_verification(session, email, purpose)
-    cooldown = timedelta(seconds=settings.email_code_resend_cooldown_seconds)
-    if latest and latest.created_at > now - cooldown:
-        raise AppError(429, "rate_limit_exceeded", "잠시 후 다시 요청해 주세요.")
-
-    code = generate_numeric_code()
-    session.add(
-        EmailVerification(
-            email=email,
-            purpose=purpose.value,
-            code_hash=hash_code(code),
-            expires_at=now + timedelta(minutes=settings.email_code_ttl_minutes),
-        )
-    )
-    await session.commit()
-    await sender.send_verification_code(email, code, purpose.value, locale)
+    await _issue_code(session, sender, email, purpose, locale)
 
 
 async def send_withdraw_code(
@@ -100,24 +111,7 @@ async def send_withdraw_code(
     if normalize_email(email) != user.email:
         raise AppError(400, "email_mismatch", "본인 이메일로만 인증코드를 받을 수 있습니다.")
 
-    purpose = VerificationPurpose.WITHDRAW_REQUEST
-    now = _now()
-    latest = await _latest_verification(session, user.email, purpose)
-    cooldown = timedelta(seconds=settings.email_code_resend_cooldown_seconds)
-    if latest and latest.created_at > now - cooldown:
-        raise AppError(429, "rate_limit_exceeded", "잠시 후 다시 요청해 주세요.")
-
-    code = generate_numeric_code()
-    session.add(
-        EmailVerification(
-            email=user.email,
-            purpose=purpose.value,
-            code_hash=hash_code(code),
-            expires_at=now + timedelta(minutes=settings.email_code_ttl_minutes),
-        )
-    )
-    await session.commit()
-    await sender.send_verification_code(user.email, code, purpose.value, locale)
+    await _issue_code(session, sender, user.email, VerificationPurpose.WITHDRAW_REQUEST, locale)
 
 
 async def consume_withdraw_code(session: AsyncSession, user: User, code: str) -> None:
