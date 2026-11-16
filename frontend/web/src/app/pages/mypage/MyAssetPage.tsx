@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router';
 import { createPortal } from 'react-dom';
+import axios from 'axios';
 import {
   Wallet,
   TrendingUp,
@@ -215,6 +216,21 @@ const formatAssetTranslation = (
     (result, [key, value]) => result.replaceAll(`{${key}}`, String(value)),
     template,
   );
+
+// 서버 오류(error_code)를 화면 언어의 안내 문구로 바꾼다. 모르는 코드는 기본 실패 문구.
+const getAssetApiErrorMessage = (
+  error: unknown,
+  translations: MyAssetTranslations,
+  fallbackMessage: string,
+) => {
+  if (!axios.isAxiosError<{ error_code?: string }>(error)) {
+    return fallbackMessage;
+  }
+
+  const errorCode = error.response?.data?.error_code;
+
+  return (errorCode && translations.apiErrorMessages[errorCode]) || fallbackMessage;
+};
 
 const getCategoryFilterLabel = (
   value: TransactionCategoryFilter,
@@ -831,8 +847,7 @@ export function MyAssetPage() {
       }, 4000);
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : text.depositRequestFailed;
-      setDepositRequestError(message);
+      setDepositRequestError(getAssetApiErrorMessage(error, text, text.depositRequestFailed));
     },
   });
 
@@ -848,8 +863,7 @@ export function MyAssetPage() {
       }
     },
     onError: (error) => {
-      const message = error instanceof Error ? error.message : text.withdrawRequestFailed;
-      setWithdrawRequestError(message);
+      setWithdrawRequestError(getAssetApiErrorMessage(error, text, text.withdrawRequestFailed));
     },
   });
 
@@ -884,8 +898,7 @@ export function MyAssetPage() {
   const sendWithdrawEmailCodeMutation = useMutation({
     mutationFn: sendVerificationEmail,
     onError: (error) => {
-      const message = error instanceof Error ? error.message : text.sendEmailCodeFailed;
-      setWithdrawRequestError(message);
+      setWithdrawRequestError(getAssetApiErrorMessage(error, text, text.sendEmailCodeFailed));
     },
   });
 

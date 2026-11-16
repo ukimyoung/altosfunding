@@ -93,6 +93,47 @@ async def send_verification_code(
     await sender.send_verification_code(email, code, purpose.value, locale)
 
 
+async def send_withdraw_code(
+    session: AsyncSession, sender: EmailSender, user: User, email: str, locale: str
+) -> None:
+    """출금 신청용 이메일 인증코드. 로그인한 회원 본인 이메일로만 보낸다."""
+    if normalize_email(email) != user.email:
+        raise AppError(400, "email_mismatch", "본인 이메일로만 인증코드를 받을 수 있습니다.")
+
+    purpose = VerificationPurpose.WITHDRAW_REQUEST
+    now = _now()
+    latest = await _latest_verification(session, user.email, purpose)
+    cooldown = timedelta(seconds=settings.email_code_resend_cooldown_seconds)
+    if latest and latest.created_at > now - cooldown:
+        raise AppError(429, "rate_limit_exceeded", "잠시 후 다시 요청해 주세요.")
+
+    code = generate_numeric_code()
+    session.add(
+        EmailVerification(
+            email=user.email,
+            purpose=purpose.value,
+            code_hash=hash_code(code),
+            expires_at=now + timedelta(minutes=settings.email_code_ttl_minutes),
+        )
+    )
+    await session.commit()
+    await sender.send_verification_code(user.email, code, purpose.value, locale)
+
+
+async def consume_withdraw_code(session: AsyncSession, user: User, code: str) -> None:
+    """출금 신청 시 받은 이메일 코드를 확인하고 바로 사용 처리한다 (한 번만 쓸 수 있음). 커밋은 호출한 쪽에서 한다."""
+    verification = await _latest_verification(session, user.email, VerificationPurpose.WITHDRAW_REQUEST)
+    if verification is None or verification.expires_at <= _now():
+        raise AppError(400, "verification_code_expired", "인증코드가 없거나 만료되었습니다. 코드를 다시 받아 주세요.")
+    if verification.attempts >= settings.email_code_max_attempts:
+        raise AppError(429, "verification_too_many_attempts", "입력 횟수를 초과했습니다. 코드를 다시 받아 주세요.")
+    if not codes_match(code, verification.code_hash):
+        verification.attempts += 1
+        await session.commit()
+        raise AppError(400, "invalid_verification_code", "인증코드가 올바르지 않습니다.")
+    verification.verified_at = verification.consumed_at = _now()
+
+
 async def verify_code(
     session: AsyncSession, email: str, code: str, purpose: VerificationPurpose
 ) -> None:

@@ -54,6 +54,16 @@ def _reward_policy_seed() -> str:
     return "delete from core.platform_config where scope = 'REWARD';\n" + sql[start : sql.index(";", start) + 1]
 
 
+def _wallet_config_seed() -> str:
+    """마이그레이션이 넣는 입출금 네트워크·최소 금액 기본값을 테스트마다 다시 넣는다."""
+    sql = next(MIGRATIONS_DIR.glob("*_core_wallet_ledger.sql")).read_text(encoding="utf-8")
+    start = sql.index("insert into core.platform_config")
+    return (
+        "delete from core.platform_config where scope in ('PAYOUT', 'WALLET');\n"
+        + sql[start : sql.index(";", start) + 1]
+    )
+
+
 _CONTACT_CATEGORY_RESET = (
     "truncate core.contact_messages, core.contact_categories restart identity cascade;\n" + _contact_category_seed()
 )
@@ -66,7 +76,9 @@ async def _truncate() -> None:
     try:
         await conn.execute(_CONTACT_CATEGORY_RESET)
         await conn.execute(_reward_policy_seed())
-        await conn.execute("truncate core.contact_messages, core.announcements, core.announcement_categories, core.email_verifications, core.users, core.challenges, core.challenge_schedules, core.holidays, core.products, core.rulesets restart identity cascade")
+        await conn.execute(_wallet_config_seed())
+        await conn.execute("truncate core.contact_messages, core.announcements, core.announcement_categories, core.email_verifications, core.users, core.challenges, core.challenge_schedules, core.holidays, core.products, core.rulesets, core.platform_config_history restart identity cascade")
+        await conn.execute("alter sequence core.wallet_request_id_seq restart")
     finally:
         await conn.close()
 

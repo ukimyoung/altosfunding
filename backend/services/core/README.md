@@ -83,6 +83,16 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 | GET | `/api/v1/auth/kyc/sumsub/token` | Sumsub WebSDK 접근 토큰 (`SUMSUB_APP_TOKEN`, `SUMSUB_SECRET_KEY` 필요) |
 | POST | `/api/v1/webhooks/sumsub` | Sumsub 심사 결과 웹훅 (`X-Payload-Digest` 서명 확인, `SUMSUB_WEBHOOK_SECRET` 필요) |
 
+| GET | `/api/v1/accounts/my-asset` | My Asset Total Asset (통합 지갑 잔고). Live 계좌는 지원하지 않아 `live_accounts`는 빈 목록 |
+| GET | `/api/v1/payouts/config/networks` | 입금·출금 팝업 네트워크 목록과 출금 수수료 (사용 중인 것만) |
+| GET | `/api/v1/wallets/me`, `/wallets/me/transactions` | 내 지갑, 입출금 내역 (`category`, `status`, `start_date`·`end_date` YYYYMMDD KST) |
+| POST | `/api/v1/wallets/me/deposit` | 입금 확인 요청 (USDT 송금 후 TX hash, 최소 10 USDT, 같은 hash 중복 불가) |
+| POST | `/api/v1/wallets/me/withdraw` | 출금 신청 (KYC 승인 필요, 2FA·출금 이메일 인증, 잔고에서 바로 차감, 받는 금액 = 금액 - 수수료) |
+| GET | `/api/v1/admin/wallets/requests/pending`, `/history`, `/summary` | 입출금 승인 대기(오래된 순)·처리 이력·대기 건수 |
+| POST | `/api/v1/admin/wallets/deposits/{id}/approve`, `/reject` | 입금 승인(잔고 반영)·반려(`reason`) |
+| POST | `/api/v1/admin/wallets/withdrawals/{id}/approve`, `/reject` | 출금 승인(송금 `tx_hash`)·반려(`note`, 잔고 되돌림) |
+| GET·PUT | `/api/v1/admin/payout-settings/network-fees`, `/profit-split` | 네트워크별 출금 수수료, 기본 수익 분배 비율 (`/profit-split/history` 변경 이력) |
+
 상품의 MT4 계좌번호 범위는 같은 MT4 서버를 쓰는 상품끼리 겹칠 수 없다 (챌린지·데모 = 데모 서버, 펀디드·라이브 = 실서버).
 
 챌린지 회차 자동 생성 (`app/services/challenge.py`)
@@ -103,5 +113,10 @@ Google 로그인 참고
 - 같은 이메일로 이메일 가입한 회원은 Google로도 로그인된다 (Google이 인증한 이메일만 허용, 기존 서버와 동일). 처음 쓰는 이메일이면 바로 가입된다.
 - `state`는 서명해서 쓰고 같은 값의 쿠키와 비교해 위조된 콜백을 막는다. 돌아갈 주소는 `WEB_BASE_URL`과 `FRONTEND_ALLOWED_ORIGINS`에 있는 주소만 허용한다.
 - Google Cloud 콘솔의 OAuth 클라이언트에 `GOOGLE_REDIRECT_URI`를 "승인된 리디렉션 URI"로 등록해야 한다.
+
+지갑·원장 (`app/services/wallet.py`)
+- 잔고(`core.wallets`)는 이 모듈 함수로만 바꾸고, 바꿀 때마다 `wallet_transactions` 1건과 복식부기 분개(`journal_entries`/`journal_lines`)를 같은 트랜잭션에서 만든다. 이력·분개는 DB 트리거로 수정·삭제를 막는다.
+- 분개: 입금 승인 차)현금/대)회원지갑, 출금 신청 차)회원지갑/대)출금대기, 출금 승인 차)출금대기/대)현금+수수료수입, 출금 반려 차)출금대기/대)회원지갑.
+- 출금 이메일 코드는 `POST /auth/email/send-verification` (`purpose=WITHDRAW_REQUEST`, 로그인 필요, 본인 이메일만)로 받는다.
 
 인증이 필요한 API는 `app/deps.py`의 `CurrentUser`(회원), `AdminUser`(관리자)를 쓴다.

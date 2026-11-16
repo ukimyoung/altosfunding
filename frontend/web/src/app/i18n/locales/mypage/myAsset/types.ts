@@ -81,6 +81,8 @@ export interface MyAssetTranslations {
   withdrawRequestFailed: string;
   transferRequestFailed: string;
   sendEmailCodeFailed: string;
+  // 서버 error_code별 안내 문구 (없는 코드는 기본 실패 문구)
+  apiErrorMessages: Record<string, string>;
   emailMissing: string;
   liveAccountInfoMissing: string;
 

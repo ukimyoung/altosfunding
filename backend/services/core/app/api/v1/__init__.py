@@ -13,6 +13,8 @@ from app.api.v1.google import router as google_router
 from app.api.v1.kyc import router as kyc_router
 from app.api.v1.rewards import admin_router as admin_rewards_router
 from app.api.v1.rewards import router as rewards_router
+from app.api.v1.wallets import admin_router as admin_wallets_router
+from app.api.v1.wallets import router as wallets_router
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(auth_router)
@@ -28,3 +30,5 @@ router.include_router(rewards_router)
 router.include_router(admin_rewards_router)
 router.include_router(support_router)
 router.include_router(admin_contacts_router)
+router.include_router(wallets_router)
+router.include_router(admin_wallets_router)
