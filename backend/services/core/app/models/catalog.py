@@ -36,7 +36,6 @@ class Ruleset(Base):
     max_micro_contracts: Mapped[int | None]
     consistency_pct: Mapped[Decimal | None]
     retry_policy: Mapped[str] = mapped_column(server_default="NONE")
-    is_most_popular: Mapped[bool] = mapped_column(server_default="false")
     apply_scope: Mapped[str] = mapped_column(server_default="NEW")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
@@ -56,7 +55,8 @@ class Product(Base):
     discount_price_usdt: Mapped[Decimal | None]
     tier_type: Mapped[str] = mapped_column(server_default="CHALLENGE")
     is_active: Mapped[bool] = mapped_column(server_default="true")
-    is_recommended: Mapped[bool] = mapped_column(server_default="false")
+    # MOST POPULAR 뱃지 (랜딩 Account Size, Start New Challenge 카드)
+    is_most_popular: Mapped[bool] = mapped_column(server_default="false")
     ruleset_id: Mapped[str | None] = mapped_column(ForeignKey("core.rulesets.id"))
     mt4_group: Mapped[str] = mapped_column(server_default="default")
     leverage: Mapped[int] = mapped_column(server_default="100")

@@ -30,7 +30,6 @@ export interface AdminRuleset {
   pass_condition_vip_type: string;
   pass_condition_vip_pct: number | null;
   pass_condition_vip_amt: number | null;
-  is_most_popular: boolean;
   apply_scope: string;
 }
 
@@ -58,7 +57,6 @@ export interface RulesetRequestBody {
   max_micro_contracts?: number | null;
   consistency_pct?: number | null;
   retry_policy: RulesetRetryPolicy;
-  is_most_popular: boolean;
   apply_scope: string;
 }
 

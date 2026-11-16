@@ -92,6 +92,7 @@ export const landingKo: LandingTranslations = {
       activationFee: '활성화 비용',
       consistencyRule: '일관성 규칙',
       none: '없음',
+      daysFormat: '{n}일',
       getStarted: '시작하기',
       mostPopular: '가장 인기',
       bestValue: '최고 가성비',

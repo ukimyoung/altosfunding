@@ -39,6 +39,8 @@ export interface AccountLabels {
   activationFee: string;
   consistencyRule: string;
   none: string;
+  /** "{n} Days" */
+  daysFormat: string;
   getStarted: string;
   mostPopular: string;
   bestValue: string;

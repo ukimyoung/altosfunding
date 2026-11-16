@@ -96,8 +96,8 @@ def test_product_create_list_update_status(client, admin):
     # 상품코드 앞자리가 티어라 티어는 바꿀 수 없다. 추천 여부는 바꿀 수 있다.
     res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"tier_type": "FUNDED"})
     assert res.json()["error_code"] == "tier_type_immutable"
-    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"is_recommended": True})
-    assert res.status_code == 200 and res.json()["is_recommended"] is True
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"is_most_popular": True})
+    assert res.status_code == 200 and res.json()["is_most_popular"] is True
 
     res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"ruleset_id": "missing"})
     assert res.json()["error_code"] == "ruleset_not_found"

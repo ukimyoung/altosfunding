@@ -189,7 +189,7 @@ class ChallengeSummaryItem(BaseModel):
     price_usdt: float
     discount_price_usdt: float | None = None
     type_code: str | None
-    is_recommended: bool
+    is_most_popular: bool
     current_participants: int
     group_size: int
     start_at: datetime
@@ -216,6 +216,10 @@ class OfferRules(BaseModel):
     pass_condition_type: str
     pass_condition_pct: float | None
     pass_condition_amt: float | None
+    # 최대 Mini·Micro 거래 계약수, 일관성(%). null이면 제한 없음.
+    max_mini_contracts: int | None = None
+    max_micro_contracts: int | None = None
+    consistency_pct: float | None = None
 
 
 class OfferFunded(BaseModel):
@@ -244,7 +248,7 @@ class ChallengeOffer(BaseModel):
     price_usdt: float
     discount_price_usdt: float | None
     final_price_usdt: float
-    is_recommended: bool
+    is_most_popular: bool
     leverage: int
     duration_days: int
     rules: OfferRules | None

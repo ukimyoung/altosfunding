@@ -8,7 +8,8 @@ export interface Product {
   description: string;
   price_usdt: number;
   capital: number;
-  is_recommended: boolean;
+  /** MOST POPULAR 뱃지 표시 */
+  is_most_popular: boolean;
   current_participants: number;
   group_size: number;
   start_at: string;
@@ -40,6 +41,11 @@ export interface ChallengeOfferRules {
   pass_condition_type: 'RELATIVE' | 'ABSOLUTE' | string;
   pass_condition_pct: number | null;
   pass_condition_amt: number | null;
+  /** 최대 Mini·Micro 거래 계약수. null이면 제한 없음 */
+  max_mini_contracts?: number | null;
+  max_micro_contracts?: number | null;
+  /** 일관성(%). null이면 검사 안 함 */
+  consistency_pct?: number | null;
 }
 
 export interface ChallengeOfferFunded {
@@ -71,7 +77,8 @@ export interface ChallengeOffer {
   discount_price_usdt: number | null;
   /** 실제 결제 금액 (할인가격이 있으면 할인가격) */
   final_price_usdt: number;
-  is_recommended: boolean;
+  /** MOST POPULAR 뱃지 표시 */
+  is_most_popular: boolean;
   leverage: number;
   duration_days: number;
   rules: ChallengeOfferRules | null;

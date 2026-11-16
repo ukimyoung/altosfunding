@@ -43,7 +43,6 @@ class RulesetFields(BaseModel):
     max_micro_contracts: int | None = Field(default=None, gt=0)
     consistency_pct: float | None = Pct
     retry_policy: RetryPolicy = "NONE"
-    is_most_popular: bool = False
     apply_scope: ApplyScope = "NEW"
 
 
@@ -79,7 +78,6 @@ class RulesetUpdate(BaseModel):
     max_micro_contracts: int | None = Field(default=None, gt=0)
     consistency_pct: float | None = Pct
     retry_policy: RetryPolicy | None = None
-    is_most_popular: bool | None = None
     apply_scope: ApplyScope | None = None
 
 
@@ -113,7 +111,7 @@ class ProductCreate(BaseModel):
     discount_price_usdt: float | None = Field(default=None, ge=0)
     tier_type: TierType = "CHALLENGE"
     is_active: bool = True
-    is_recommended: bool = False
+    is_most_popular: bool = False
     ruleset_id: str | None = None
     mt4_group: str = "default"
     leverage: int = Field(default=100, gt=0)
@@ -140,7 +138,7 @@ class ProductUpdateRequest(BaseModel):
     discount_price_usdt: float | None = Field(default=None, ge=0)
     tier_type: TierType | None = None
     is_active: bool | None = None
-    is_recommended: bool | None = None
+    is_most_popular: bool | None = None
     ruleset_id: str | None = None
     mt4_group: str | None = None
     leverage: int | None = Field(default=None, gt=0)
@@ -173,7 +171,7 @@ class ProductOut(BaseModel):
     discount_price_usdt: float | None
     tier_type: str
     is_active: bool
-    is_recommended: bool
+    is_most_popular: bool
     ruleset_id: str | None
     ruleset_name: str | None = None
     mt4_group: str

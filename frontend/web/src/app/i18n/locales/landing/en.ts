@@ -93,6 +93,7 @@ export const landingEn: LandingTranslations = {
       activationFee: 'Activation Fee',
       consistencyRule: 'Consistency Rule',
       none: 'None',
+      daysFormat: '{n} Days',
       getStarted: 'Get Started',
       mostPopular: 'MOST POPULAR',
       bestValue: 'BEST VALUE',
