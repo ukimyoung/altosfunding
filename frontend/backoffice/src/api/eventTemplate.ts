@@ -4,10 +4,13 @@ export type EventTemplateChannel = 'email' | 'telegram' | 'push' | string;
 export type EventTemplatePriority = 'low' | 'normal' | 'high' | 'critical' | string;
 export type EventTemplateSendMode = 'instant' | 'delay' | 'delayed' | string;
 
+export type EventTemplateLocale = 'en' | 'ko';
+
 export interface EventTemplate {
   template_id: string;
   template_name: string;
   description: string | null;
+  is_system?: boolean;
   rule: {
     event_type: string;
   };
@@ -46,7 +49,21 @@ export interface EventTemplateDetailResponse {
   template_id: string;
   template_name: string;
   description: string | null;
+  is_system?: boolean;
+  variables?: string[];
   rule: EventTemplateDetailRule;
+  locales: Record<string, EventTemplateLocaleContent>;
+}
+
+export interface CreateEventTemplatePayload {
+  template_id: string;
+  template_name: string;
+  description: string;
+  rule: {
+    send_mode: EventTemplateSendMode;
+    delay_minutes: number;
+  };
+  variables?: string[];
   locales: Record<string, EventTemplateLocaleContent>;
 }
 
@@ -94,14 +111,14 @@ export interface ListNotificationLogsResponse {
 }
 
 export interface PreviewEventTemplatePayload {
-  subtitle: string;
   content_html: string;
+  subject?: string;
+  locale?: string;
 }
 
 export interface PreviewEventTemplateResponse {
   html: string;
-  layout_name: string;
-  subtitle: string;
+  subject: string | null;
 }
 
 export const listEventTemplates = async (): Promise<EventTemplateListResponse> => {
@@ -132,6 +149,13 @@ export const updateEventTemplate = async (
   return response.data;
 };
 
+export const createEventTemplate = async (
+  payload: CreateEventTemplatePayload,
+): Promise<EventTemplateDetailResponse> => {
+  const response = await api.post<EventTemplateDetailResponse>('/v1/admin/templates', payload);
+  return response.data;
+};
+
 export const listNotificationLogs = async (
   params: ListNotificationLogsParams,
 ): Promise<ListNotificationLogsResponse> => {
@@ -144,9 +168,6 @@ export const listNotificationLogs = async (
 export const previewEventTemplate = async (
   payload: PreviewEventTemplatePayload,
 ): Promise<string> => {
-  const response = await api.post<PreviewEventTemplateResponse>(
-    '/v1/admin/base-layouts/file/altos_modern/preview2',
-    payload,
-  );
+  const response = await api.post<PreviewEventTemplateResponse>('/v1/admin/templates/preview', payload);
   return response.data.html;
 };

@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.errors import AppError
 from app.models import ContactMessage, User
 from app.schemas.contact import ContactSubmitRequest, InquiryDetailOut, InquiryListItem
-from app.services import contact_category
+from app.services import contact_category, email_template
 from app.services.email import EmailSender
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,10 @@ async def submit(
     await session.commit()
     await session.refresh(contact)
     try:
-        await sender.send_contact_received(contact.email, contact.name, contact.subject, contact.id, locale)
+        variables = {"name": contact.name, "inquiry_subject": contact.subject, "contact_id": contact.id}
+        mail = await email_template.render(session, "contact_received", locale, variables)
+        if mail is not None:
+            await sender.send(contact.email, mail, "contact_received", {"contact_id": str(contact.id), "locale": locale})
     except Exception:  # 메일 실패로 문의 접수를 실패시키지 않는다.
         logger.exception("문의 접수 메일 발송 실패 (#%s)", contact.id)
     return contact
@@ -156,9 +159,18 @@ async def reply(
     await session.refresh(contact)
 
     try:
-        await sender.send_contact_replied(
-            contact.email, contact.name, contact.subject, contact.message, body, contact.id, contact.locale
-        )
+        variables = {
+            "name": contact.name,
+            "inquiry_subject": contact.subject,
+            "inquiry": contact.message,
+            "reply": body,
+            "contact_id": contact.id,
+        }
+        mail = await email_template.render(session, "contact_replied", contact.locale, variables)
+        if mail is not None:
+            await sender.send(
+                contact.email, mail, "contact_replied", {"contact_id": str(contact.id), "locale": contact.locale}
+            )
     except Exception:  # 답변은 저장됐으므로 메일 실패는 로그만 남긴다.
         logger.exception("문의 답변 메일 발송 실패 (#%s)", contact.id)
     return await _detail(session, contact)

@@ -64,6 +64,12 @@ def _wallet_config_seed() -> str:
     )
 
 
+def _email_template_seed() -> str:
+    """마이그레이션이 넣는 기본 메일 템플릿을 테스트마다 다시 넣는다 (users truncate cascade로 지워지므로)."""
+    sql = next(MIGRATIONS_DIR.glob("*_core_email_templates.sql")).read_text(encoding="utf-8")
+    return "truncate core.email_templates cascade;\n" + sql[sql.index("insert into core.email_templates") :]
+
+
 _CONTACT_CATEGORY_RESET = (
     "truncate core.contact_messages, core.contact_categories restart identity cascade;\n" + _contact_category_seed()
 )
@@ -79,6 +85,7 @@ async def _truncate() -> None:
         await conn.execute(_wallet_config_seed())
         await conn.execute("truncate core.contact_messages, core.announcements, core.announcement_categories, core.email_verifications, core.users, core.challenges, core.challenge_schedules, core.holidays, core.products, core.rulesets, core.platform_config_history restart identity cascade")
         await conn.execute("alter sequence core.wallet_request_id_seq restart")
+        await conn.execute(_email_template_seed())
     finally:
         await conn.close()
 

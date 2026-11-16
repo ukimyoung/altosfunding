@@ -11,6 +11,7 @@ from app.errors import AppError
 from app.models import PasswordResetToken, User
 from app.security import hash_password, sha256_hex, verify_password
 from app.services import tokens
+from app.services import email_template
 from app.services.email import EmailSender, EmailSendError
 from app.services.signup import normalize_email
 
@@ -69,8 +70,11 @@ async def request_reset(session: AsyncSession, sender: EmailSender, email: str, 
     )
     await session.commit()
     reset_url = f"{settings.web_base_url.rstrip('/')}/reset-password?token={token}"
+    variables = {"reset_url": reset_url, "expiry_minutes": settings.password_reset_ttl_minutes}
+    mail = await email_template.render(session, "password_reset", locale, variables)
     try:
-        await sender.send_password_reset(user.email, reset_url, locale)
+        if mail is not None:
+            await sender.send(user.email, mail, "password_reset", {"reset_url": reset_url, "locale": locale})
     except EmailSendError:
         # 가입 여부를 드러내지 않도록 응답은 같게 두고 로그만 남긴다 (발송기에서 이미 기록).
         pass

@@ -18,6 +18,7 @@ from app.security import (
     hash_code,
     hash_password,
 )
+from app.services import email_template, email_templates
 from app.services.email import EmailSender, EmailSendError
 
 
@@ -77,8 +78,13 @@ async def _issue_code(
     )
     session.add(verification)
     await session.commit()
+    template_id = email_templates.VERIFICATION_TEMPLATE_IDS[purpose.value]
+    variables = {"verification_code": code, "expiry_minutes": settings.email_code_ttl_minutes}
+    mail = await email_template.render(session, template_id, locale, variables)
     try:
-        await sender.send_verification_code(email, code, purpose.value, locale)
+        if mail is None:  # 인증 메일은 항상 만들어지지만, 만약을 위해 실패로 처리한다.
+            raise EmailSendError(f"템플릿 없음: {template_id}")
+        await sender.send(email, mail, template_id, {"code": code, "purpose": purpose.value, "locale": locale})
     except EmailSendError as exc:
         await session.delete(verification)
         await session.commit()

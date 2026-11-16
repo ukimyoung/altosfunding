@@ -1,4 +1,5 @@
 ﻿import { useEffect, useState, useRef } from 'react';
+import axios from 'axios';
 import { Eye } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 import {
@@ -8,6 +9,7 @@ import {
 import { Toast } from '../../components/shared/Toast';
 import { useAppShell } from '../../layouts/AppShell';
 import {
+  useCreateEventTemplateMutation,
   useGetEventTemplateDetailQuery,
   useListEventTemplatesQuery,
   useListEventTypesQuery,
@@ -32,6 +34,23 @@ type TabType = 'templates' | 'history' | 'dispatch' | 'unsub';
 const HISTORY_PAGE_SIZE = 20;
 const UNSUBSCRIBE_PAGE_SIZE = 20;
 type SendTiming = '즉시 발송' | '지연 발송';
+type EditLocale = 'en' | 'ko';
+type LocaleDrafts = Record<EditLocale, { subject: string; html: string }>;
+const EDIT_LOCALES: { value: EditLocale; label: string }[] = [
+  { value: 'en', label: 'EN (영어)' },
+  { value: 'ko', label: 'KO (한국어)' },
+];
+const EMPTY_DRAFTS: LocaleDrafts = { en: { subject: '', html: '' }, ko: { subject: '', html: '' } };
+
+const isBlankHtml = (html: string) => html.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() === '';
+
+const getTemplateApiErrorMessage = (error: unknown, fallback: string) => {
+  if (!axios.isAxiosError<{ message?: string; error_code?: string }>(error)) return fallback;
+  const code = error.response?.data?.error_code;
+  if (code === 'template_id_exists') return '이미 있는 템플릿 코드입니다.';
+  if (code === 'validation_error' || error.response?.status === 422) return '입력값을 확인해 주세요.';
+  return error.response?.data?.message || fallback;
+};
 
 const parsePageParam = (value: string | null) => {
   const page = Number(value ?? '1');
@@ -374,7 +393,7 @@ function UnsubscribeTab({ t }: { t: Record<string, string> }) {
 export function EmailNotificationPage() {
   const { dark } = useAppShell();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: eventTemplateList } = useListEventTemplatesQuery();
+  const { data: eventTemplateList, refetch: refetchEventTemplates } = useListEventTemplatesQuery();
   const editorRef = useRef<EmailTemplateEditorHandle>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
   const tabParam = searchParams.get('tab');
@@ -387,6 +406,8 @@ export function EmailNotificationPage() {
   const [delayMinutes, setDelayMinutes] = useState(120);
   const [subject, setSubject] = useState('');
   const [bodyContent, setBodyContent] = useState('');
+  const [editLocale, setEditLocale] = useState<EditLocale>('en');
+  const [localeDrafts, setLocaleDrafts] = useState<LocaleDrafts>(EMPTY_DRAFTS);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -415,8 +436,28 @@ export function EmailNotificationPage() {
     setToast({ message, type });
   };
 
-  const saveAddedTemplate = (_template: AddTemplateDraft) => {
-    onToast('템플릿 추가 API 연동 전입니다', 'warning');
+  const createEventTemplateMutation = useCreateEventTemplateMutation();
+
+  const saveAddedTemplate = async (template: AddTemplateDraft): Promise<string | null> => {
+    try {
+      const created = await createEventTemplateMutation.mutateAsync({
+        template_id: template.templateId,
+        template_name: template.templateName,
+        description: template.eventType,
+        rule: {
+          send_mode: template.sendTiming === '지연 발송' ? 'delay' : 'instant',
+          delay_minutes: template.delayMinutes,
+        },
+        locales: { en: { subject: template.subject, html_content: template.htmlContent } },
+      });
+      // 목록을 먼저 새로 받아야 새 템플릿이 선택된다.
+      await refetchEventTemplates();
+      onToast('템플릿이 등록되었습니다', 'success');
+      updateParams({ template_id: created.template_id });
+      return null;
+    } catch (error) {
+      return getTemplateApiErrorMessage(error, '템플릿 등록에 실패했습니다.');
+    }
   };
 
   const eventTemplates = eventTemplateList?.items ?? [];
@@ -478,8 +519,15 @@ export function EmailNotificationPage() {
   useEffect(() => {
     if (!selectedEventTemplateDetail) return;
 
-    const nextSubject = selectedEventTemplateDetail.locales.en?.subject ?? '';
-    const nextBody = selectedEventTemplateDetail.locales.en?.html_content ?? '';
+    const { locales } = selectedEventTemplateDetail;
+    const drafts: LocaleDrafts = {
+      en: { subject: locales.en?.subject ?? '', html: locales.en?.html_content ?? '' },
+      ko: { subject: locales.ko?.subject ?? '', html: locales.ko?.html_content ?? '' },
+    };
+    const nextSubject = drafts.en.subject;
+    const nextBody = drafts.en.html;
+    setLocaleDrafts(drafts);
+    setEditLocale('en');
 
     setSendTiming(
       selectedEventTemplateDetail.rule.send_mode === 'instant' ? '즉시 발송' : '지연 발송',
@@ -512,6 +560,18 @@ export function EmailNotificationPage() {
     setPreviewHtml('');
   };
 
+  const switchEditLocale = (next: EditLocale) => {
+    if (next === editLocale) return;
+    const html = editorRef.current?.getHTML() ?? bodyContent;
+    const updated: LocaleDrafts = { ...localeDrafts, [editLocale]: { subject, html } };
+    setLocaleDrafts(updated);
+    setEditLocale(next);
+    setSubject(updated[next].subject);
+    setBodyContent(updated[next].html);
+    setShowPreview(false);
+    setPreviewHtml('');
+  };
+
   const fetchPreviewHtml = async () => {
     if (!selectedEventTemplateId) {
       onToast('미리볼 템플릿을 선택하세요', 'warning');
@@ -522,8 +582,9 @@ export function EmailNotificationPage() {
       const editorHtml = editorRef.current?.getHTML() ?? bodyContent;
 
       return await previewTemplateMutation.mutateAsync({
-        subtitle: '',
         content_html: editorHtml,
+        subject,
+        locale: editLocale,
       });
     } catch {
       onToast('미리보기를 불러오지 못했습니다', 'warning');
@@ -538,6 +599,23 @@ export function EmailNotificationPage() {
     }
 
     const editorHtml = editorRef.current?.getHTML() ?? bodyContent;
+    const allDrafts: LocaleDrafts = { ...localeDrafts, [editLocale]: { subject, html: editorHtml } };
+    const locales: Record<string, { subject: string; html_content: string }> = {};
+    for (const { value, label } of EDIT_LOCALES) {
+      const draft = allDrafts[value];
+      const hasSubject = draft.subject.trim() !== '';
+      const hasBody = !isBlankHtml(draft.html);
+      if (!hasSubject && !hasBody) continue;
+      if (!hasSubject || !hasBody) {
+        onToast(`${label} 제목과 본문을 모두 입력하세요`, 'warning');
+        return;
+      }
+      locales[value] = { subject: draft.subject.trim(), html_content: draft.html };
+    }
+    if (!locales.en) {
+      onToast('EN (영어) 제목과 본문은 필수입니다', 'warning');
+      return;
+    }
     const sendMode = sendTiming === '즉시 발송' ? 'instant' : 'delay';
     const nextDelayMinutes = sendMode === 'delay' ? Math.round(delayMinutes) : 0;
 
@@ -554,19 +632,15 @@ export function EmailNotificationPage() {
             delay_minutes: nextDelayMinutes,
             event_name: selectedEventTemplateDetail.rule.event_name ?? '',
           },
-          locales: {
-            en: {
-              subject,
-              html_content: editorHtml,
-            },
-          },
+          locales,
         },
       });
 
+      setLocaleDrafts(allDrafts);
       setBodyContent(editorHtml);
       onToast('템플릿이 수정되었습니다', 'success');
-    } catch {
-      onToast('템플릿 수정에 실패했습니다', 'warning');
+    } catch (error) {
+      onToast(getTemplateApiErrorMessage(error, '템플릿 수정에 실패했습니다'), 'warning');
     }
   };
 
@@ -789,7 +863,6 @@ export function EmailNotificationPage() {
                 }}
               >
                 <span style={{ fontSize: 13, fontWeight: 600, color: t.text }}>이메일 템플릿</span>
-                {/*
                 <button
                   type="button"
                   onClick={() => setShowAddModal(true)}
@@ -807,9 +880,8 @@ export function EmailNotificationPage() {
                     gap: 4,
                   }}
                 >
-                  추가
+                  + 신규 등록
                 </button>
-                */}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {eventTemplates.map((template, index) => (
@@ -920,6 +992,44 @@ export function EmailNotificationPage() {
                 </div>
               </div>
 
+              {/* 편집 언어 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: t.textSec, marginRight: 4 }}>
+                  편집 언어
+                </span>
+                {EDIT_LOCALES.map(({ value, label }) => {
+                  const active = editLocale === value;
+                  const empty =
+                    value !== editLocale &&
+                    !localeDrafts[value].subject.trim() &&
+                    isBlankHtml(localeDrafts[value].html);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => switchEditLocale(value)}
+                      style={{
+                        height: 30,
+                        padding: '0 14px',
+                        borderRadius: 8,
+                        border: `1px solid ${active ? t.accent : t.border2}`,
+                        background: active ? t.accentBg : 'transparent',
+                        color: active ? t.accent : t.textSec,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {label}
+                      {empty ? ' · 미작성' : ''}
+                    </button>
+                  );
+                })}
+                <span style={{ fontSize: 11, color: t.textHint, marginLeft: 4 }}>
+                  회원 언어가 한국어면 KO, 그 외에는 EN 내용으로 발송됩니다. KO가 비어 있으면 EN으로 보냅니다.
+                </span>
+              </div>
+
               {/* Section B: 제목 */}
               <div
                 style={{
@@ -972,11 +1082,19 @@ export function EmailNotificationPage() {
 
                 {/* Editor area */}
                 <EmailTemplateEditor
-                  key={selectedEventTemplateId ?? 'empty-template'}
+                  key={`${selectedEventTemplateId ?? 'empty-template'}-${editLocale}`}
                   ref={editorRef}
                   initialValue={bodyContent}
                   dark={dark}
                 />
+                {(selectedEventTemplateDetail?.variables?.length ?? 0) > 0 && (
+                  <div style={{ fontSize: 11, color: t.textHint, marginTop: 10, lineHeight: 1.6 }}>
+                    사용 가능한 변수:{' '}
+                    {selectedEventTemplateDetail?.variables
+                      ?.map((name) => `{{ ${name} }}`)
+                      .join(', ')}
+                  </div>
+                )}
               </div>
 
               {/* Section F: 이메일 미리보기 */}

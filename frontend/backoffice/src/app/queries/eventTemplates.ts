@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  createEventTemplate,
   getEventTemplateDetail,
   listEventTemplates,
   listEventTypes,
@@ -8,6 +9,7 @@ import {
   updateEventTemplate,
 } from '@/api/eventTemplate';
 import type {
+  CreateEventTemplatePayload,
   ListNotificationLogsParams,
   PreviewEventTemplatePayload,
   UpdateEventTemplatePayload,
@@ -77,6 +79,18 @@ export function useUpdateEventTemplateMutation() {
       queryClient.invalidateQueries({
         queryKey: eventTemplatesQueryKeys.detail(variables.templateId),
       });
+      queryClient.invalidateQueries({ queryKey: eventTemplatesQueryKeys.list() });
+    },
+  });
+}
+
+export function useCreateEventTemplateMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateEventTemplatePayload) => createEventTemplate(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: eventTemplatesQueryKeys.list() });
     },
   });
 }
