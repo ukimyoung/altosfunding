@@ -11,6 +11,16 @@ from app.models.user import (
     UserBackupCode,
     UserStatusHistory,
 )
+from app.models.wallet import (
+    DepositRequest,
+    JournalEntry,
+    JournalLine,
+    LedgerAccount,
+    PlatformConfigHistory,
+    Wallet,
+    WalletTransaction,
+    WithdrawalRequest,
+)
 
 __all__ = [
     "Announcement",
@@ -19,15 +29,23 @@ __all__ = [
     "ChallengeSchedule",
     "ContactCategory",
     "ContactMessage",
+    "DepositRequest",
     "EmailVerification",
     "Holiday",
+    "JournalEntry",
+    "JournalLine",
+    "LedgerAccount",
     "LoginHistory",
     "PasswordResetToken",
     "PlatformConfig",
+    "PlatformConfigHistory",
     "Product",
     "RefreshToken",
     "Ruleset",
     "User",
     "UserBackupCode",
     "UserStatusHistory",
+    "Wallet",
+    "WalletTransaction",
+    "WithdrawalRequest",
 ]

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.db import get_session
+from app.deps import OptionalUser
 from app.errors import AppError
 from app.models import User
 from app.schemas.auth import (
@@ -18,6 +19,7 @@ from app.schemas.auth import (
     TwoFactorLoginRequest,
     TwoFactorRequiredResponse,
     UserOut,
+    VerificationPurpose,
 )
 from app.services import auth, signup, tokens, two_factor
 from app.services.email import EmailSender, get_email_sender
@@ -93,8 +95,18 @@ async def send_verification(
     request: Request,
     session: Session,
     sender: Annotated[EmailSender, Depends(get_email_sender)],
+    user: OptionalUser,
 ) -> OkResponse:
-    """6자리 코드를 이메일로 보낸다 (30분 유효, 60초 안에는 다시 보낼 수 없음)."""
+    """6자리 코드를 이메일로 보낸다 (30분 유효, 60초 안에는 다시 보낼 수 없음).
+
+    - SIGNUP: 로그인 없이, reCAPTCHA 확인 후 미가입 이메일로 보낸다.
+    - WITHDRAW_REQUEST: 로그인한 회원 본인 이메일로만 보낸다 (출금 신청 화면, reCAPTCHA 없음).
+    """
+    if body.purpose is VerificationPurpose.WITHDRAW_REQUEST:
+        if user is None:
+            raise AppError(401, "not_authenticated", "로그인이 필요합니다.")
+        await signup.send_withdraw_code(session, sender, user, body.email, _locale(request))
+        return OkResponse(message_key="auth.email.verification_sent")
     await verify_recaptcha(body.recaptcha_token, request.client.host if request.client else None)
     await signup.send_verification_code(session, sender, body.email, body.purpose, _locale(request))
     return OkResponse(message_key="auth.email.verification_sent")
