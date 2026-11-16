@@ -32,7 +32,7 @@ export function Sidebar({ activeId, onSelect, dark }: { activeId: string; onSele
   const t = tok(dark);
   const productActive = activeId === "challenge-product" || activeId === "funded-product" || activeId === "live-product" || activeId === "demo-product" || activeId === "ruleset-management";
   const accountActive = activeId === "challenge-account" || activeId === "funded-account" || activeId === "live-account" || activeId === "demo-account";
-  const systemSettingsActive = activeId === "profit-split-settings";
+  const systemSettingsActive = activeId === "supported-languages";
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     "product-template": productActive,
     "account-mgmt": accountActive,
