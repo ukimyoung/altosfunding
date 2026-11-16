@@ -15,8 +15,11 @@ export const referralEn: ReferralTranslations = {
     copyCode: 'Copy Code',
 
     howItWorks: 'How it works',
-    howItWorksBody: "Share your unique referral link or code with friends. When they sign up and purchase their first challenge, you'll earn $50 in rewards! The more friends you refer, the more you earn.",
-    howItWorksRewardHighlight: '$50 in rewards',
+    howItWorksBody: "Share your unique referral link or code with friends. When they {condition}, you'll earn {reward}! The more friends you refer, the more you earn.",
+    howItWorksConditionFirstPurchase: 'sign up and purchase their first challenge',
+    howItWorksConditionFundedUpgrade: 'sign up and get promoted to a funded account',
+    howItWorksRewardHighlight: '{amount} in rewards',
+    howItWorksRewardHighlightNoAmount: 'rewards',
 
     referralList: 'Referral List',
     referralListSubtitle: 'Direct referrals and their engagement metrics',

@@ -10,6 +10,7 @@ from app.errors import AppError
 from app.models import PlatformConfig, Product, Ruleset
 from app.schemas.catalog import ConfigItemOut, DemoOptionsResponse, ProductOut, RulesetOut
 from app.security import generate_human_code
+from app.services import reward_policy
 
 # 같은 MT4 서버를 쓰는 상품끼리는 계좌번호 범위가 겹치면 안 된다.
 # 챌린지·데모는 데모 서버, 펀디드·라이브는 실서버를 쓴다.
@@ -348,6 +349,8 @@ async def upsert_config(
     value = _coerce(value, value_type)
     if scope == "DEMO":
         value = _validate_demo_value(key, value)
+    elif scope == reward_policy.SCOPE:
+        value = reward_policy.validate_value(key, value)
     config = await session.get(PlatformConfig, (scope, key), with_for_update=True)
     if config is None:
         config = PlatformConfig(scope=scope, key=key, value=value, description=description)

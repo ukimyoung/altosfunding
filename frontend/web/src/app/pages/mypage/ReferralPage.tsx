@@ -51,10 +51,6 @@ const getInitials = (value: string) => {
   return initials || '-';
 };
 
-const getHowItWorksParts = (body: string, highlight: string) => {
-  const [prefix, suffix = ''] = body.split(highlight);
-  return { prefix, suffix };
-};
 
 export function ReferralPage() {
   const { T } = useLocale();
@@ -92,7 +88,16 @@ export function ReferralPage() {
   const showingStart = totalReferrals === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1;
   const showingEnd = Math.min(currentPage * itemsPerPage, totalReferrals);
   const isReferralListLoading = isLoadingReferrals || isFetchingReferrals;
-  const howItWorksParts = getHowItWorksParts(text.howItWorksBody, text.howItWorksRewardHighlight);
+  // 지급액·지급 조건은 백오피스 '리워드 정책 설정' 값 (추천인 통계 응답에 포함).
+  const referralRewardAmount = referralStats?.referral_reward_amount;
+  const howItWorksCondition =
+    referralStats?.referral_reward_condition === 'FUNDED_UPGRADE'
+      ? text.howItWorksConditionFundedUpgrade
+      : text.howItWorksConditionFirstPurchase;
+  const howItWorksReward =
+    typeof referralRewardAmount === 'number'
+      ? text.howItWorksRewardHighlight.replace('{amount}', formatCurrency(referralRewardAmount))
+      : text.howItWorksRewardHighlightNoAmount;
   const referralCountValues = {
     from: String(showingStart),
     to: String(showingEnd),
@@ -306,9 +311,17 @@ export function ReferralPage() {
             <div>
               <h4 className="text-white text-sm font-medium mb-1">{text.howItWorks}</h4>
               <p className="text-gray-400 text-sm leading-relaxed">
-                {howItWorksParts.prefix}
-                <span className="text-[#00FF94] font-medium">{text.howItWorksRewardHighlight}</span>
-                {howItWorksParts.suffix}
+                {text.howItWorksBody.split(/(\{condition\}|\{reward\})/g).map((part, index) => {
+                  if (part === '{condition}') return howItWorksCondition;
+                  if (part === '{reward}') {
+                    return (
+                      <span key={`${part}-${index}`} className="text-[#00FF94] font-medium">
+                        {howItWorksReward}
+                      </span>
+                    );
+                  }
+                  return part;
+                })}
               </p>
             </div>
           </div>

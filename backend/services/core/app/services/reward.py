@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.models import User
 from app.schemas.reward import ReferralCodeOut, ReferralItemOut, ReferralPage, ReferralStatsOut
+from app.services import reward_policy
 
 
 def referral_link(code: str) -> str:
@@ -32,12 +33,15 @@ async def _count_invited(session: AsyncSession, user: User) -> int:
 
 async def referral_stats(session: AsyncSession, user: User) -> ReferralStatsOut:
     total_invited = await _count_invited(session, user)
+    policy = await reward_policy.get_policy(session)
     return ReferralStatsOut(
         total_invited=total_invited,
         pending_referrals=total_invited,
         total_earned=0.0,
         referral_link=referral_link(user.referral_code),
         referral_code=user.referral_code,
+        referral_reward_amount=policy.referral_reward_amount,
+        referral_reward_condition=policy.referral_reward_condition,
     )
 
 

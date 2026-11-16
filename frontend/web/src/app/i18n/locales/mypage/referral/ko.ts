@@ -15,8 +15,11 @@ export const referralKo: ReferralTranslations = {
     copyCode: '코드 복사',
 
     howItWorks: '이용 방법',
-    howItWorksBody: '회원님만의 고유한 추천인 링크나 코드를 친구들과 공유해 보세요. 친구가 가입 후 첫 챌린지를 구매하면 회원님께 $50의 보상이 지급됩니다! 더 많은 친구를 추천할수록 더 많은 보상을 얻을 수 있습니다.',
-    howItWorksRewardHighlight: '$50의 보상',
+    howItWorksBody: '회원님만의 고유한 추천인 링크나 코드를 친구들과 공유해 보세요. 친구가 {condition} 회원님께 {reward}이 지급됩니다! 더 많은 친구를 추천할수록 더 많은 보상을 얻을 수 있습니다.',
+    howItWorksConditionFirstPurchase: '가입 후 첫 챌린지를 구매하면',
+    howItWorksConditionFundedUpgrade: '가입 후 펀디드 계좌로 승급하면',
+    howItWorksRewardHighlight: '{amount}의 보상',
+    howItWorksRewardHighlightNoAmount: '보상',
 
     referralList: '추천인 목록',
     referralListSubtitle: '직접 추천한 트레이더 및 활동 지표',

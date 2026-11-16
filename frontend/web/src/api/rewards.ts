@@ -11,7 +11,13 @@ export interface ReferralStatsResponse {
   total_earned: number;
   referral_link: string;
   referral_code: string;
+  /** 백오피스 '리워드 정책 설정'의 추천인 리워드 지급액 (USD). 기존 서버 응답에는 없다. */
+  referral_reward_amount?: number;
+  /** 추천인 리워드 지급 조건. 기존 서버 응답에는 없다. */
+  referral_reward_condition?: ReferralRewardCondition;
 }
+
+export type ReferralRewardCondition = 'FIRST_PURCHASE' | 'FUNDED_UPGRADE';
 
 export type ReferralStatus = 'Active' | 'Pending';
 
