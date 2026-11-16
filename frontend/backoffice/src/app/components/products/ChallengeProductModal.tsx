@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import type { ChallengeProduct } from "../../types/product";
 import { SCHEDULE_STATUS, ASSIGNMENT_METHOD, ACCOUNT_RANGE_HINTS } from "../../constants/status";
 import { useListRulesetsQuery } from "../../queries/rulesets";
+import { formatRulesetLimit } from "../../utils/rulesetFormat";
 
 const RECOMMEND_OPTIONS = [
   { value: "N", label: "비추천 (기본)" },
@@ -450,9 +451,9 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
                   if (!selectedRuleset) return null;
 
                   const previewItems = [
-                    `일일 손실 ${selectedRuleset.daily_loss_limit_pct}%`,
-                    `최대 손실 ${selectedRuleset.max_dd_normal_pct}%`,
-                    selectedRuleset.profit_target_pct != null && `수익 목표 ${selectedRuleset.profit_target_pct}%`,
+                    `일일 손실 ${formatRulesetLimit(selectedRuleset.daily_loss_limit_amt, selectedRuleset.daily_loss_limit_pct)}`,
+                    `최대 손실 ${formatRulesetLimit(selectedRuleset.max_dd_normal_amt, selectedRuleset.max_dd_normal_pct)}`,
+                    (selectedRuleset.profit_target_amt != null || selectedRuleset.profit_target_pct != null) && `수익 목표 ${formatRulesetLimit(selectedRuleset.profit_target_amt, selectedRuleset.profit_target_pct)}`,
                     `최소 거래일 ${selectedRuleset.min_trading_days}일`,
                     `미활동 ${selectedRuleset.inactivity_days}일`,
                   ].filter(Boolean).join(" · ");

@@ -302,6 +302,11 @@ def test_challenge_offers(client, admin, challenge_product):  # noqa: F811
     assert first["funded"]["product_id"] == funded["product_id"] and first["funded"]["payout_ratio"] == 80
     assert first["funded"]["rules"]["max_drawdown_amt"] == 700
     assert first["funded"]["rules"]["daily_loss_limit_amt"] == 200
+    # 룰셋에 금액($)이 정해져 있으면 비율 대신 그 금액을 쓴다.
+    client.patch(f"/api/v1/admin/rulesets/{rs['id']}", headers=admin,
+                 json={"profit_target_amt": 800, "daily_loss_limit_amt": 300})
+    rules = client.get("/api/v1/challenges/products").json()["items"][0]["rules"]
+    assert (rules["profit_target_amt"], rules["daily_loss_limit_amt"]) == (800, 300)
     assert items[1]["final_price_usdt"] == 150 and items[1]["rules"] is None and items[1]["funded"] is None
 
     # 모집 중 회차가 생기면 그 회차를 신청 대상으로 준다. 정원이 차면 빠진다.

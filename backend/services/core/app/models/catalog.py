@@ -14,6 +14,7 @@ class Ruleset(Base):
     id: Mapped[str] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(server_default="Unnamed Ruleset")
     daily_loss_limit_pct: Mapped[Decimal] = mapped_column(server_default="5")
+    daily_loss_limit_amt: Mapped[Decimal | None]
     max_dd_normal_pct: Mapped[Decimal] = mapped_column(server_default="10")
     max_dd_normal_amt: Mapped[Decimal | None]
     max_dd_vip_pct: Mapped[Decimal] = mapped_column(server_default="10")
@@ -28,8 +29,12 @@ class Ruleset(Base):
     pass_condition_vip_pct: Mapped[Decimal | None]
     pass_condition_vip_amt: Mapped[Decimal | None]
     profit_target_pct: Mapped[Decimal | None]
+    profit_target_amt: Mapped[Decimal | None]
     min_trading_days: Mapped[int] = mapped_column(server_default="5")
     inactivity_days: Mapped[int] = mapped_column(server_default="30")
+    max_mini_contracts: Mapped[int | None]
+    max_micro_contracts: Mapped[int | None]
+    consistency_pct: Mapped[Decimal | None]
     retry_policy: Mapped[str] = mapped_column(server_default="NONE")
     is_most_popular: Mapped[bool] = mapped_column(server_default="false")
     apply_scope: Mapped[str] = mapped_column(server_default="NEW")

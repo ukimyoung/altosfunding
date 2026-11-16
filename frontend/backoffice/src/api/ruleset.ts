@@ -7,6 +7,7 @@ export interface AdminRuleset {
   id: string;
   name: string;
   daily_loss_limit_pct: number;
+  daily_loss_limit_amt?: number | null;
   max_dd_normal_pct: number;
   max_dd_normal_amt: number | null;
   max_dd_vip_pct: number;
@@ -15,8 +16,12 @@ export interface AdminRuleset {
   dd_calc_method: RulesetDrawdownMethod;
   stop_out_pct: number | null;
   profit_target_pct: number | null;
+  profit_target_amt?: number | null;
   min_trading_days: number;
   inactivity_days: number;
+  max_mini_contracts?: number | null;
+  max_micro_contracts?: number | null;
+  consistency_pct?: number | null;
   connected_products_count: number;
   retry_policy: RulesetRetryPolicy;
   pass_condition_type: string;
@@ -33,8 +38,11 @@ export interface RulesetDetailResponse extends AdminRuleset {}
 
 export interface RulesetRequestBody {
   name: string;
-  daily_loss_limit_pct: number;
-  max_dd_normal_pct: number;
+  // 손실·수익 조건은 금액($)으로 관리한다. 예전 비율(%) 값은 보내지 않는다.
+  daily_loss_limit_pct?: number;
+  max_dd_normal_pct?: number;
+  daily_loss_limit_amt?: number | null;
+  max_dd_normal_amt?: number | null;
   dd_calc_method: RulesetDrawdownMethod;
   pass_condition_type: string;
   pass_condition_pct?: number;
@@ -42,9 +50,13 @@ export interface RulesetRequestBody {
   pass_condition_vip_type: string;
   pass_condition_vip_pct?: number;
   pass_condition_vip_amt?: number;
-  profit_target_pct: number;
+  profit_target_pct?: number;
+  profit_target_amt?: number | null;
   min_trading_days: number;
   inactivity_days: number;
+  max_mini_contracts?: number | null;
+  max_micro_contracts?: number | null;
+  consistency_pct?: number | null;
   retry_policy: RulesetRetryPolicy;
   is_most_popular: boolean;
   apply_scope: string;
