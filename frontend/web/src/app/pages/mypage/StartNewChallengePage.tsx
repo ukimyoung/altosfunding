@@ -117,11 +117,26 @@ export function StartNewChallengePage() {
   const text = T.startNewChallenge;
   const tooltips = text.tooltips;
   const getAccountDisplayName = (account: AccountType) => account.name;
+  // 디자인대로 카드 제목은 상품명에서 'Challenge ' 접두어를 뺀 등급명만 (예: Challenge Elite → ELITE)
+  const getCardTitle = (account: AccountType) =>
+    account.name.replace(/^challenge\s+/i, '') || account.name;
   const formatDays = (days: number) => text.daysFormat.replace('{n}', String(days));
   // 금액이 0이거나 없으면 '없음'
   const formatLimit = (amount: number | null | undefined) =>
     amount ? formatMoney(amount) : text.none;
   const formatLeverage = (leverage: number) => `1:${leverage}`;
+  // 최대 Mini·Micro 계약 수 (예: 1 Mini (10 Micro)). 둘 다 없으면 '없음'
+  const formatContracts = (rules: ChallengeOfferRules | null | undefined) => {
+    const mini = rules?.max_mini_contracts;
+    const micro = rules?.max_micro_contracts;
+    if (mini && micro) return `${mini} Mini (${micro} Micro)`;
+    if (mini) return `${mini} Mini`;
+    if (micro) return `${micro} Micro`;
+    return text.none;
+  };
+  // 일관성(%). 0이거나 없으면 '없음'
+  const formatPct = (pct: number | null | undefined) =>
+    pct ? `${pct.toLocaleString('en-US', { maximumFractionDigits: 2 })}%` : text.none;
   const formatProfitSplit = (payoutRatio: number) =>
     `${formatPrice(payoutRatio)}/${formatPrice(100 - payoutRatio)}`;
   const profitSplitTooltip = (payoutRatio: number) =>
@@ -802,7 +817,7 @@ export function StartNewChallengePage() {
                       <div className="mb-4 border-b border-[#2a2a3a] pb-4">
                         <div className="mb-2 flex items-center justify-between gap-2">
                           <span className="truncate text-xs uppercase tracking-wider text-gray-500">
-                            {getAccountDisplayName(account)}
+                            {getCardTitle(account)}
                           </span>
                           {isSelected && (
                             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#0052FF]">
@@ -871,6 +886,7 @@ export function StartNewChallengePage() {
                                 {formatLimit(account.rules?.daily_loss_limit_amt)}
                               </span>
                             </div>
+                            {/* 레버리지는 디자인에 없어 숨김
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.leverage} />
@@ -880,22 +896,25 @@ export function StartNewChallengePage() {
                                 {formatLeverage(account.leverage)}
                               </span>
                             </div>
-                            {/* 최대 계약 수·일관성은 상품/룰셋에 값이 없어 숨김 (데이터가 생기면 다시 표시)
+                            */}
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.maxContracts} />
                                 {text.maxContracts}
                               </span>
-                              <span className="text-right text-sm font-bold text-white">-</span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {formatContracts(account.rules)}
+                              </span>
                             </div>
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.consistency} />
                                 {text.consistency}
                               </span>
-                              <span className="text-right text-sm font-bold text-white">-</span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {formatPct(account.rules?.consistency_pct)}
+                              </span>
                             </div>
-                            */}
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.tradingPeriod} />
@@ -942,6 +961,7 @@ export function StartNewChallengePage() {
                                 {formatLimit(funded.rules?.daily_loss_limit_amt)}
                               </span>
                             </div>
+                            {/* 레버리지는 디자인에 없어 숨김
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.leverage} />
@@ -951,22 +971,25 @@ export function StartNewChallengePage() {
                                 {formatLeverage(funded.leverage)}
                               </span>
                             </div>
-                            {/* 최대 계약 수·일관성은 상품/룰셋에 값이 없어 숨김 (데이터가 생기면 다시 표시)
+                            */}
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.maxContracts} />
                                 {text.maxContracts}
                               </span>
-                              <span className="text-right text-sm font-bold text-white">-</span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {formatContracts(funded.rules)}
+                              </span>
                             </div>
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.consistency} />
                                 {text.consistency}
                               </span>
-                              <span className="text-right text-sm font-bold text-white">-</span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {formatPct(funded.rules?.consistency_pct)}
+                              </span>
                             </div>
-                            */}
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={profitSplitTooltip(funded.payout_ratio)} />
