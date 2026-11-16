@@ -30,7 +30,10 @@ def test_ses_sender_builds_message(monkeypatch):
     monkeypatch.setattr(settings, "email_from_address", "noreply@altosfunding.com")
     fake = FakeSes()
     sender = SesEmailSender(client=fake)
-    asyncio.run(sender.send_verification_code("user@example.com", "123456", "WITHDRAW_REQUEST", "ko"))
+    mail = email_templates.render_default(
+        "withdraw_verification_code", "ko", {"verification_code": "123456", "expiry_minutes": 30}
+    )
+    asyncio.run(sender.send("user@example.com", mail, "withdraw_verification_code"))
 
     params = fake.calls[0]
     assert params["Source"] == "Altos Funding <noreply@altosfunding.com>"
@@ -38,27 +41,44 @@ def test_ses_sender_builds_message(monkeypatch):
     assert params["Message"]["Subject"]["Data"] == "[Altos Funding] 출금 신청 인증코드"
     assert "123456" in params["Message"]["Body"]["Html"]["Data"]
     assert "123456" in params["Message"]["Body"]["Text"]["Data"]
-    assert params["Tags"] == [{"Name": "kind", "Value": "WITHDRAW_REQUEST"}]
+    assert "30분" in params["Message"]["Body"]["Text"]["Data"]
+    assert params["Tags"] == [{"Name": "kind", "Value": "withdraw_verification_code"}]
     assert "ConfigurationSetName" not in params
 
 
 def test_ses_sender_failure_raises():
     sender = SesEmailSender(client=FakeSes(fail=True))
+    mail = email_templates.render_default("password_reset", "en", {"reset_url": "https://x/r?t=1", "expiry_minutes": 30})
     with pytest.raises(EmailSendError):
-        asyncio.run(sender.send_password_reset("user@example.com", "https://x/reset?token=t", "en"))
+        asyncio.run(sender.send("user@example.com", mail, "password_reset"))
 
 
 def test_templates_escape_and_locale():
-    mail = email_templates.verification_code("654321", "WITHDRAW_REQUEST", "en-US", 30)
+    mail = email_templates.render_default(
+        "withdraw_verification_code", "en-US", {"verification_code": "654321", "expiry_minutes": 30}
+    )
     assert mail.subject == "[Altos Funding] Withdrawal verification code"
     assert "30 minutes" in mail.html and "did not request a withdrawal" in mail.html
 
-    signup = email_templates.verification_code("111111", "SIGNUP", "ko", 30)
+    signup = email_templates.render_default("email_verification_requested", "ko", {"verification_code": "1", "expiry_minutes": 30})
     assert signup.subject == "[Altos Funding] 회원가입 인증코드"
 
-    replied = email_templates.contact_replied("<b>Kim</b>", "s", "q\nline", "<script>x</script>", 7, "en")
+    replied = email_templates.render_default(
+        "contact_replied",
+        "en",
+        {"name": "<b>Kim</b>", "inquiry_subject": "s", "inquiry": "q\nline", "reply": "<script>x</script>", "contact_id": 7},
+    )
     assert "<script>" not in replied.html and "&lt;script&gt;" in replied.html
+    assert "&lt;b&gt;Kim&lt;/b&gt;" in replied.html
     assert "q<br>line" in replied.html
+    assert replied.subject == "[Altos Funding] Reply to your inquiry (#7)"
+
+
+def test_sandbox_blocks_unsafe_template():
+    from jinja2.exceptions import SecurityError
+
+    with pytest.raises(SecurityError):
+        email_templates.render_html("{{ ''.__class__.__mro__[1].__subclasses__() }}", {})
 
 
 def test_ses_backend_requires_from_address(monkeypatch):
@@ -92,3 +112,24 @@ def test_withdraw_code_send_failure_allows_retry(client, trader, monkeypatch):  
         assert run_sql("select count(*) n from core.email_verifications where purpose = 'WITHDRAW_REQUEST'")[0]["n"] == 1
     finally:
         app.dependency_overrides.pop(get_email_sender, None)
+
+
+def test_all_default_templates_render():
+    """기존 서버에서 옮겨 온 템플릿까지 모두 en·ko로 렌더링되고, 한국어 본문에 영문 안내 문장이 남지 않는다."""
+    assert len(email_templates.DEFAULT_TEMPLATES) == 38
+    for tid, t in email_templates.DEFAULT_TEMPLATES.items():
+        sample = {v: f"<{v}>" for v in t["variables"]}
+        for loc in ("en", "ko"):
+            mail = email_templates.render_default(tid, loc, sample)
+            assert mail.subject and mail.html and mail.text, tid
+        ko = email_templates.render_default(tid, "ko", sample).text
+        assert "Dear " not in ko and "Please " not in ko, tid
+
+    issued = email_templates.render_default(
+        "challenge_account_issued", "ko", {"user_name": "Kim", "mt4_login": "123", "mt4_password": "pw"}
+    )
+    assert "챌린지 계좌 발급" in issued.html and "MexnLimited-Demo" in issued.html
+    broadcast = email_templates.render_default(
+        "manual_broadcast", "en", {"subject": "News", "body_html": "<b>Hi</b>", "is_marketing": True, "unsubscribe_url": "https://x/u"}
+    )
+    assert broadcast.subject == "News" and "<b>Hi</b>" in broadcast.html and "https://x/u" in broadcast.html

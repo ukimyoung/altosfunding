@@ -18,6 +18,7 @@ import {
 type SendMode = '즉시 발송' | '지연 발송';
 
 export interface AddTemplateDraft {
+  templateId: string;
   templateName: string;
   eventType: string;
   sendTiming: string;
@@ -200,8 +201,11 @@ function HtmlBodyEditor({
 interface AddTemplateModalProps {
   dark: boolean;
   onClose: () => void;
-  onSave: (template: AddTemplateDraft) => void;
+  /** 저장에 성공하면 null, 실패하면 화면에 보여 줄 오류 문구를 돌려준다. */
+  onSave: (template: AddTemplateDraft) => Promise<string | null>;
 }
+
+const TEMPLATE_ID_RE = /^[a-z][a-z0-9_]{2,63}$/;
 
 export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProps) {
   const t = {
@@ -217,7 +221,9 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
     error: '#DC2626',
   };
 
+  const [templateId, setTemplateId] = useState('');
   const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
   const [sendTiming, setSendTiming] = useState('');
   const [sendMode, setSendMode] = useState<SendMode>('즉시 발송');
   const [delayMinutes, setDelayMinutes] = useState(120);
@@ -251,6 +257,8 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
+    if (!TEMPLATE_ID_RE.test(templateId.trim()))
+      nextErrors.templateId = '영문 소문자로 시작하는 영문 소문자·숫자·_ 3~64자로 입력하세요.';
     if (!name.trim()) nextErrors.name = '템플릿 명을 입력하세요.';
     if (!sendTiming.trim()) nextErrors.sendTiming = '발송 시점 설명을 입력하세요.';
     if (!emailSubject.trim()) nextErrors.emailSubject = '이메일 제목을 입력하세요.';
@@ -258,14 +266,17 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
     return nextErrors;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (saving) return;
     const nextErrors = validate();
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
       return;
     }
 
-    onSave({
+    setSaving(true);
+    const errorMessage = await onSave({
+      templateId: templateId.trim(),
       templateName: name.trim(),
       eventType: sendTiming.trim(),
       sendTiming: sendMode,
@@ -273,6 +284,11 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
       subject: emailSubject.trim(),
       htmlContent: body,
     });
+    setSaving(false);
+    if (errorMessage) {
+      setErrors({ form: errorMessage });
+      return;
+    }
     onClose();
   };
 
@@ -315,7 +331,7 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 16, fontWeight: 700, color: t.text }}>이메일 템플릿 추가</span>
+          <span style={{ fontSize: 16, fontWeight: 700, color: t.text }}>이메일 템플릿 신규 등록</span>
           <button
             type="button"
             onClick={onClose}
@@ -345,6 +361,30 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
             gap: 18,
           }}
         >
+          <div>
+            <label style={labelStyle}>
+              템플릿 코드 <span style={{ color: t.error }}>*</span>
+            </label>
+            <input
+              type="text"
+              value={templateId}
+              onChange={(event) => {
+                setTemplateId(event.target.value.toLowerCase());
+                setErrors((prev) => ({ ...prev, templateId: '', form: '' }));
+              }}
+              placeholder="예: withdrawal_completed"
+              style={{
+                ...inputStyle,
+                fontFamily: "'DM Mono',monospace",
+                border: `1px solid ${errors.templateId ? t.error : t.border2}`,
+              }}
+            />
+            {errors.templateId && <div style={errorStyle}>{errors.templateId}</div>}
+            <div style={hintStyle}>
+              서버가 메일을 보낼 때 이 코드로 템플릿을 찾습니다. 등록 후에는 바꿀 수 없으며, 실제 발송은 개발에서 이 코드를 연결해야 시작됩니다.
+            </div>
+          </div>
+
           <div>
             <label style={labelStyle}>
               템플릿 명 <span style={{ color: t.error }}>*</span>
@@ -467,7 +507,7 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
             />
             {errors.body && <div style={errorStyle}>{errors.body}</div>}
             <div style={hintStyle}>
-              헤더와 푸터는 모든 이메일에 자동 적용됩니다. 본문 내용만 작성해 주세요.
+              헤더와 푸터는 모든 이메일에 자동 적용됩니다. 본문 내용만 작성해 주세요. 변수는 {'{{ 변수명 }}'} 형식으로 넣고, 영문(EN) 내용으로 등록한 뒤 편집 화면의 KO 탭에서 한국어를 추가할 수 있습니다.
             </div>
           </div>
         </div>
@@ -478,10 +518,14 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
             borderTop: `1px solid ${t.border}`,
             display: 'flex',
             justifyContent: 'flex-end',
+            alignItems: 'center',
             gap: 8,
             flexShrink: 0,
           }}
         >
+          {errors.form && (
+            <div style={{ ...errorStyle, fontSize: 12, marginTop: 0, marginRight: 'auto' }}>{errors.form}</div>
+          )}
           <button
             type="button"
             onClick={onClose}
@@ -502,6 +546,7 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
           <button
             type="button"
             onClick={handleSave}
+            disabled={saving}
             style={{
               height: 36,
               padding: '0 22px',
@@ -514,7 +559,7 @@ export function AddTemplateModal({ dark, onClose, onSave }: AddTemplateModalProp
               cursor: 'pointer',
             }}
           >
-            저장
+            {saving ? '저장 중…' : '저장'}
           </button>
         </div>
       </div>

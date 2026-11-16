@@ -25,7 +25,7 @@ def test_submit_without_login(client, sent_emails):
     assert res.json()["message_key"] == "support.message_received"
     row = run_sql("select user_id, status, locale from core.contact_messages where id = $1", res.json()["id"])[0]
     assert row["user_id"] is None and row["status"] == "RECEIVED" and row["locale"] == "ko"
-    assert sent_emails[-1]["purpose"] == "CONTACT_RECEIVED"
+    assert sent_emails[-1]["purpose"] == "contact_received"
 
     # 잘못된 토큰은 비로그인으로 취급한다.
     assert _submit(client, headers={"Authorization": "Bearer nope"}).status_code == 201
@@ -68,7 +68,7 @@ def test_admin_flow(client, admin, sent_emails):  # noqa: F811
     out = res.json()
     assert out["status"] == "ANSWERED" and out["reply_draft"] is None and out["replied_at"]
     assert out["replied_by"] and out["replied_by_name"]
-    assert sent_emails[-1]["purpose"] == "CONTACT_REPLIED" and sent_emails[-1]["email"] == "jane@example.com"
+    assert sent_emails[-1]["purpose"] == "contact_replied" and sent_emails[-1]["email"] == "jane@example.com"
 
     again = client.post(f"{ADMIN}/{a}/reply", headers=admin, json={"reply_body": "again"})
     assert again.status_code == 409 and again.json()["error_code"] == "contact_already_answered"

@@ -12,22 +12,15 @@ from functools import lru_cache
 from typing import Any, Protocol
 
 from app.config import settings
-from app.services import email_templates
 from app.services.email_templates import RenderedEmail
 
 logger = logging.getLogger(__name__)
 
 
 class EmailSender(Protocol):
-    async def send_verification_code(self, email: str, code: str, purpose: str, locale: str) -> None: ...
-
-    async def send_password_reset(self, email: str, reset_url: str, locale: str) -> None: ...
-
-    async def send_contact_received(self, email: str, name: str, subject: str, contact_id: int, locale: str) -> None: ...
-
-    async def send_contact_replied(
-        self, email: str, name: str, subject: str, inquiry: str, reply: str, contact_id: int, locale: str
-    ) -> None: ...
+    async def send(self, to: str, mail: RenderedEmail, kind: str, meta: dict[str, str] | None = None) -> None:
+        """mail: 템플릿으로 만든 제목·본문. kind: 템플릿 코드나 목적(로그·태그용). meta: 로그·테스트용 부가 정보."""
+        ...
 
 
 class ConsoleEmailSender:
@@ -36,25 +29,11 @@ class ConsoleEmailSender:
     def __init__(self) -> None:
         self.sent: list[dict[str, str]] = []
 
-    async def send_verification_code(self, email: str, code: str, purpose: str, locale: str) -> None:
-        self.sent.append({"email": email, "code": code, "purpose": purpose, "locale": locale})
-        logger.warning("[console email] %s 인증코드 → %s: %s", purpose, email, code)
-
-    async def send_password_reset(self, email: str, reset_url: str, locale: str) -> None:
-        self.sent.append({"email": email, "reset_url": reset_url, "purpose": "PASSWORD_RESET", "locale": locale})
-        logger.warning("[console email] 비밀번호 재설정 링크 → %s: %s", email, reset_url)
-
-    async def send_contact_received(self, email: str, name: str, subject: str, contact_id: int, locale: str) -> None:
-        self.sent.append({"email": email, "purpose": "CONTACT_RECEIVED", "contact_id": str(contact_id), "locale": locale})
-        logger.warning("[console email] 문의 접수 안내 → %s: #%s %s", email, contact_id, subject)
-
-    async def send_contact_replied(
-        self, email: str, name: str, subject: str, inquiry: str, reply: str, contact_id: int, locale: str
-    ) -> None:
-        self.sent.append(
-            {"email": email, "purpose": "CONTACT_REPLIED", "contact_id": str(contact_id), "reply": reply, "locale": locale}
-        )
-        logger.warning("[console email] 문의 답변 → %s: #%s %s", email, contact_id, subject)
+    async def send(self, to: str, mail: RenderedEmail, kind: str, meta: dict[str, str] | None = None) -> None:
+        record = {"email": to, "purpose": kind, "subject": mail.subject, **(meta or {})}
+        self.sent.append(record)
+        extra = " ".join(f"{k}={v}" for k, v in (meta or {}).items())
+        logger.warning("[console email] %s → %s: %s %s", kind, to, mail.subject, extra)
 
 
 class EmailSendError(Exception):
@@ -108,22 +87,8 @@ class SesEmailSender:
             raise EmailSendError(str(exc)) from exc
         logger.info("SES 메일 발송 (%s → %s, id=%s)", kind, to, response.get("MessageId"))
 
-    async def send_verification_code(self, email: str, code: str, purpose: str, locale: str) -> None:
-        mail = email_templates.verification_code(code, purpose, locale, settings.email_code_ttl_minutes)
-        await self._send(email, mail, purpose)
-
-    async def send_password_reset(self, email: str, reset_url: str, locale: str) -> None:
-        mail = email_templates.password_reset(reset_url, locale, settings.password_reset_ttl_minutes)
-        await self._send(email, mail, "PASSWORD_RESET")
-
-    async def send_contact_received(self, email: str, name: str, subject: str, contact_id: int, locale: str) -> None:
-        await self._send(email, email_templates.contact_received(name, subject, contact_id, locale), "CONTACT_RECEIVED")
-
-    async def send_contact_replied(
-        self, email: str, name: str, subject: str, inquiry: str, reply: str, contact_id: int, locale: str
-    ) -> None:
-        mail = email_templates.contact_replied(name, subject, inquiry, reply, contact_id, locale)
-        await self._send(email, mail, "CONTACT_REPLIED")
+    async def send(self, to: str, mail: RenderedEmail, kind: str, meta: dict[str, str] | None = None) -> None:
+        await self._send(to, mail, kind)
 
 
 _console_sender = ConsoleEmailSender()
