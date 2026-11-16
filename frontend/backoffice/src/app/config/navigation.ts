@@ -21,6 +21,7 @@ import {
   Bell,
   Ticket,
   MonitorSmartphone,
+  Percent,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -106,6 +107,7 @@ export const NAV: NavSection[] = [
       { id: 'inquiry', label: '문의하기', icon: MessageCircle },
       { id: 'faq', label: 'FAQ', icon: HelpCircle },
       { id: 'email-notification', label: '이메일/알림 관리', icon: Mail },
+      { id: 'profit-split-settings', label: '수익 분배 / 출금 수수료 설정', icon: Percent },
     ],
   },
   // 출시 시점 제외 faq, inquiry, review, promotions
@@ -125,7 +127,8 @@ export const NAV: NavSection[] = [
         expandable: true,
         children: [
           { id: 'supported-languages', label: '지원 언어 관리' },
-          { id: 'profit-split-settings', label: '수익 분배 / 출금 수수료 설정' },
+          // '수익 분배 / 출금 수수료 설정'은 '운영 관리 > 이메일/알림 관리' 아래로 이동
+          // { id: 'profit-split-settings', label: '수익 분배 / 출금 수수료 설정' },
         ],
       },
     ],
@@ -163,6 +166,7 @@ export const BC: Record<string, { parts: string[] }> = {
   inquiry: { parts: ['운영 관리', '문의하기'] },
   faq: { parts: ['운영 관리', 'FAQ'] },
   'email-notification': { parts: ['운영 관리', '이메일/알림 관리'] },
+  'profit-split-settings': { parts: ['운영 관리', '수익 분배 / 출금 수수료 설정'] },
   // 출시 시점 제외 faq, inquiry, review, promotions
   // faq: { parts: ['지원', 'FAQ'] },
   // inquiry: { parts: ['지원', '1:1 문의'] },
@@ -170,7 +174,6 @@ export const BC: Record<string, { parts: string[] }> = {
   // promotions: { parts: ['지원', '프로모션/쿠폰 관리'] },
   'system-settings': { parts: ['시스템', '시스템 설정'] },
   'supported-languages': { parts: ['시스템', '시스템 설정', '지원 언어 관리'] },
-  'profit-split-settings': { parts: ['시스템', '시스템 설정', '수익 분배 / 출금 수수료 설정'] },
 };
 
 export const ROUTE_BY_PAGE_ID: Record<string, string> = {
@@ -203,6 +206,7 @@ export const ROUTE_BY_PAGE_ID: Record<string, string> = {
   inquiry: '/inquiry',
   faq: '/faq',
   'email-notification': '/email-notification',
+  'profit-split-settings': '/profit-split-settings',
   // 출시 시점 제외 faq, inquiry, review, promotions
   // faq: '/faq',
   // inquiry: '/inquiry',
@@ -210,7 +214,6 @@ export const ROUTE_BY_PAGE_ID: Record<string, string> = {
   // promotions: '/promotions',
   'system-settings': '/system-settings',
   'supported-languages': '/system-settings/supported-languages',
-  'profit-split-settings': '/system-settings/profit-split',
 };
 
 export type PageId = keyof typeof ROUTE_BY_PAGE_ID;
