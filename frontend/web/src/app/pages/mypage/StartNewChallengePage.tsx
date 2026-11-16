@@ -835,7 +835,7 @@ export function StartNewChallengePage() {
                           <div className="text-right">
                             <div className="flex items-baseline justify-end gap-1.5">
                               {account.originalPrice != null && (
-                                <span className="text-xs text-gray-500 line-through">
+                                <span className="text-base font-semibold text-gray-400 line-through">
                                   ${formatPrice(account.originalPrice)}
                                 </span>
                               )}
