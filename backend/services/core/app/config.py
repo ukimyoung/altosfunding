@@ -54,9 +54,19 @@ class Settings(BaseSettings):
     sumsub_base_url: str = "https://api.sumsub.com"
     sumsub_level_name: str = "id-and-liveness"
 
-    # 메일 발송 방식: console(로그로만 출력) | notification_hub
+    # 메일 발송 방식: console(로그로만 출력) | ses(AWS SES로 실제 발송)
     email_backend: str = "console"
-    notification_hub_url: str = "http://localhost:8002"
+    # AWS SES. 키는 SES 발송 권한(ses:SendEmail)만 있는 IAM 사용자 것을 쓴다.
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    aws_region: str = "ap-northeast-2"
+    # SES에서 인증(verify)된 발신 주소 또는 도메인의 주소. 예: noreply@altosfunding.com
+    email_from_address: str = ""
+    email_from_name: str = "Altos Funding"
+    # 발송 추적용 SES Configuration Set 이름 (없으면 비워 둔다)
+    ses_configuration_set: str = ""
+    # 메일 하단에 안내하는 고객센터 주소
+    email_support_address: str = "support@altosfunding.com"
 
     # 이메일 인증코드 정책
     email_code_ttl_minutes: int = 30

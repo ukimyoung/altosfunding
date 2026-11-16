@@ -116,9 +116,21 @@ services:
       # 비어 있으면 sandbox에서는 reCAPTCHA 검증을 건너뛴다.
       - key: RECAPTCHA_SECRET_KEY
         sync: false
-      # 메일 서비스(Notification Hub)를 붙이기 전까지는 인증코드·재설정 링크를 Render 로그로만 출력한다.
+      # 메일 발송 방식. console: Render 로그로만 출력 / ses: AWS SES로 실제 발송.
+      # ses로 바꾸려면 아래 AWS_ACCESS_KEY_ID·AWS_SECRET_ACCESS_KEY·EMAIL_FROM_ADDRESS를 먼저 넣고 대시보드에서 값을 ses로 바꾼다.
       - key: EMAIL_BACKEND
-        value: console
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: ap-northeast-2
+      # SES에서 인증된 발신 주소 (예: noreply@altosfunding.com)
+      - key: EMAIL_FROM_ADDRESS
+        sync: false
+      - key: EMAIL_FROM_NAME
+        value: Altos Funding
       - key: COOKIE_SECURE
         value: "true"
       # 비밀번호 재설정 메일 링크와 Google 로그인 뒤 돌아갈 기본 주소
