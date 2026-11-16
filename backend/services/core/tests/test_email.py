@@ -112,3 +112,24 @@ def test_withdraw_code_send_failure_allows_retry(client, trader, monkeypatch):  
         assert run_sql("select count(*) n from core.email_verifications where purpose = 'WITHDRAW_REQUEST'")[0]["n"] == 1
     finally:
         app.dependency_overrides.pop(get_email_sender, None)
+
+
+def test_all_default_templates_render():
+    """기존 서버에서 옮겨 온 템플릿까지 모두 en·ko로 렌더링되고, 한국어 본문에 영문 안내 문장이 남지 않는다."""
+    assert len(email_templates.DEFAULT_TEMPLATES) == 38
+    for tid, t in email_templates.DEFAULT_TEMPLATES.items():
+        sample = {v: f"<{v}>" for v in t["variables"]}
+        for loc in ("en", "ko"):
+            mail = email_templates.render_default(tid, loc, sample)
+            assert mail.subject and mail.html and mail.text, tid
+        ko = email_templates.render_default(tid, "ko", sample).text
+        assert "Dear " not in ko and "Please " not in ko, tid
+
+    issued = email_templates.render_default(
+        "challenge_account_issued", "ko", {"user_name": "Kim", "mt4_login": "123", "mt4_password": "pw"}
+    )
+    assert "챌린지 계좌 발급" in issued.html and "MexnLimited-Demo" in issued.html
+    broadcast = email_templates.render_default(
+        "manual_broadcast", "en", {"subject": "News", "body_html": "<b>Hi</b>", "is_marketing": True, "unsubscribe_url": "https://x/u"}
+    )
+    assert broadcast.subject == "News" and "<b>Hi</b>" in broadcast.html and "https://x/u" in broadcast.html

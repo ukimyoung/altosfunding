@@ -17,6 +17,7 @@ from jinja2.sandbox import ImmutableSandboxedEnvironment
 from markupsafe import Markup
 
 from app.config import settings
+from app.services.email_templates_legacy import LEGACY_TEMPLATES
 
 SUPPORTED_LOCALES = ("en", "ko")
 DEFAULT_LOCALE = "en"
@@ -193,6 +194,9 @@ DEFAULT_TEMPLATES: dict[str, dict[str, Any]] = {
         },
     },
 }
+
+# 기존 서버에서 옮겨 온 템플릿(입출금·챌린지·KYC 등). 각 기능을 Core로 옮길 때 연결한다.
+DEFAULT_TEMPLATES.update(LEGACY_TEMPLATES)
 
 # 인증코드 목적 → 템플릿
 VERIFICATION_TEMPLATE_IDS = {
