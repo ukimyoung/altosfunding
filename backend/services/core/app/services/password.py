@@ -1,5 +1,6 @@
 """비밀번호 변경(로그인 상태)과 비밀번호 찾기·재설정(비로그인)."""
 
+import logging
 import secrets
 from datetime import UTC, datetime, timedelta
 
@@ -14,6 +15,8 @@ from app.services import tokens
 from app.services import email_template
 from app.services.email import EmailSender, EmailSendError
 from app.services.signup import normalize_email
+
+logger = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -37,12 +40,38 @@ async def change_password(
     await session.commit()
 
 
-async def request_reset(session: AsyncSession, sender: EmailSender, email: str, locale: str) -> None:
-    """재설정 링크를 보낸다. 가입되지 않았거나 Google 가입 이메일이면 조용히 넘어간다 (이메일 존재 여부 노출 방지)."""
-    user = await session.scalar(
-        select(User).where(User.email == normalize_email(email), User.status != "WITHDRAWN")
-    )
-    if user is None or user.auth_provider != "LOCAL":
+def _mask(email: str) -> str:
+    name, _, domain = email.partition("@")
+    return f"{name[:2]}***@{domain}"
+
+
+def reset_base_url(origin: str | None) -> str:
+    """재설정 링크가 열릴 사용자 웹 주소.
+
+    요청을 보낸 화면의 주소(Origin)가 허용 목록(WEB_BASE_URL, FRONTEND_ALLOWED_ORIGINS)에 있으면 그 주소를 쓴다.
+    로컬 웹에서 요청했는데 링크가 다른 사이트로 가면 그 사이트의 /api가 다른 서버로 연결돼 재설정이 실패하기 때문이다.
+    """
+    if origin:
+        candidate = origin.strip().rstrip("/")
+        if candidate in settings.allowed_frontend_origins:
+            return candidate
+    return settings.web_base_url.rstrip("/")
+
+
+async def request_reset(
+    session: AsyncSession, sender: EmailSender, email: str, locale: str, origin: str | None = None
+) -> None:
+    """재설정 링크를 보낸다. 가입되지 않았거나 Google 가입 이메일이면 조용히 넘어간다 (이메일 존재 여부 노출 방지).
+
+    조용히 넘어간 이유는 서버 로그에만 남긴다 (발송 이력에는 보낸 메일만 남는다).
+    """
+    normalized = normalize_email(email)
+    user = await session.scalar(select(User).where(User.email == normalized, User.status != "WITHDRAWN"))
+    if user is None:
+        logger.info("비밀번호 재설정 메일 미발송: 가입되지 않았거나 탈퇴한 이메일 (%s)", _mask(normalized))
+        return
+    if user.auth_provider != "LOCAL":
+        logger.info("비밀번호 재설정 메일 미발송: %s 가입 계정 (%s)", user.auth_provider, _mask(normalized))
         return
 
     latest = await session.scalar(
@@ -69,12 +98,12 @@ async def request_reset(session: AsyncSession, sender: EmailSender, email: str, 
         )
     )
     await session.commit()
-    reset_url = f"{settings.web_base_url.rstrip('/')}/reset-password?token={token}"
+    reset_url = f"{reset_base_url(origin)}/reset-password?token={token}"
     variables = {"reset_url": reset_url, "expiry_minutes": settings.password_reset_ttl_minutes}
     mail = await email_template.render(session, "password_reset", locale, variables)
     try:
         if mail is not None:
-            await sender.send(user.email, mail, "password_reset", {"reset_url": reset_url, "locale": locale})
+            await sender.send(user.email, mail, "password_reset", {"reset_url": reset_url, "locale": locale, "user_id": str(user.id)})
     except EmailSendError:
         # 가입 여부를 드러내지 않도록 응답은 같게 두고 로그만 남긴다 (발송기에서 이미 기록).
         pass
