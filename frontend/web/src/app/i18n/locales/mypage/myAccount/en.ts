@@ -106,7 +106,7 @@ export const myAccountEn: MyAccountTranslations = {
     registrationDate: 'Registration Date',
     addressInformation: 'Address Information',
     country: 'Country',
-    countryPlaceholder: 'Enter country',
+    countryPlaceholder: 'Select country',
     city: 'City',
     cityPlaceholder: 'Enter city',
     stateProvince: 'State / Province',

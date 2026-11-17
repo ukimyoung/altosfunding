@@ -14,25 +14,13 @@ import { Toast } from '../../components/shared/Toast';
 import { type MeResponse, type UpdateProfileRequest } from '@/api/user';
 import { useLocale } from '@/app/i18n/LocaleContext';
 import { clearAccessToken } from '@altosfunding/shared/auth/tokenStore';
-import {
-  getCountries,
-  getCountryCallingCode,
-  parsePhoneNumber,
-  type Country,
-} from 'react-phone-number-input';
-import labelsEn from 'react-phone-number-input/locale/en';
+import { getCountryCallingCode, parsePhoneNumber, type Country } from 'react-phone-number-input';
+import { COUNTRY_OPTIONS, toCountryLabel } from '@/app/utils/countries';
 
-const COUNTRY_LABELS = labelsEn as Record<string, string>;
-// 회원가입 화면과 같은 순서: 자주 쓰는 국가를 위에 두고 나머지는 이름순
-const PRIORITY_PHONE_COUNTRIES: Country[] = ['US', 'CA', 'GB'];
-const PHONE_COUNTRY_OPTIONS = [
-  ...PRIORITY_PHONE_COUNTRIES,
-  ...getCountries()
-    .filter((code) => !PRIORITY_PHONE_COUNTRIES.includes(code))
-    .sort((a, b) => (COUNTRY_LABELS[a] ?? a).localeCompare(COUNTRY_LABELS[b] ?? b)),
-].map((code) => ({
-  code,
-  label: `+${getCountryCallingCode(code)} ${COUNTRY_LABELS[code] ?? code}`,
+// 회원가입 화면과 같은 국가 목록·순서: 자주 쓰는 국가를 위에 두고 나머지는 이름순
+const PHONE_COUNTRY_OPTIONS = COUNTRY_OPTIONS.map((option) => ({
+  code: option.code,
+  label: `${option.callingCode} ${option.label}`,
 }));
 const DEFAULT_PHONE_COUNTRY: Country = 'US';
 const PHONE_MAX_DIGITS = 15;
@@ -103,7 +91,8 @@ const getProfileFormData = (me: MeResponse): ProfileFormData => {
     lastName: me.last_name || '',
     email: me.email || '',
     ...splitPhone(me.phone || '', DEFAULT_PHONE_COUNTRY),
-    country: me.country || '',
+    // 예전에 직접 입력한 값은 목록의 이름으로 맞추고, 찾을 수 없으면 비워 둔다.
+    country: toCountryLabel(me.country),
     city: me.city || '',
     stateProvince: me.state_province || '',
     zipCode: me.zip_code || '',
@@ -132,7 +121,6 @@ const getUpdateProfilePayload = (
   const payload: UpdateProfileRequest = {
     first_name: formData.firstName.trim(),
     last_name: formData.lastName.trim(),
-    country: formData.country.trim(),
     city: formData.city.trim(),
     state_province: formData.stateProvince.trim(),
     address_line1: formData.addressLine1.trim(),
@@ -142,6 +130,11 @@ const getUpdateProfilePayload = (
     // 현재 사용 안함: 프로필 수정 시 기존 Google avatar_url을 덮어쓰지 않도록 전송하지 않음.
     // avatar_url: avatarUrl,
   };
+  // 국가를 고르지 않았으면 보내지 않아 기존 저장 값을 그대로 둔다.
+  if (formData.country) {
+    payload.country = formData.country;
+  }
+
   const nextReferrerCode = formData.referrerCode.trim();
 
   if (!currentReferrerCode && nextReferrerCode) {
@@ -222,6 +215,11 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const country = e.target.value;
+    setFormData((prev) => ({ ...prev, country }));
   };
 
   const handlePhoneCountryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -536,6 +534,7 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
                         <label className="block text-gray-400 text-sm mb-2 font-medium">
                           {text.country}
                         </label>
+                        {/* 직접 입력 대신 회원가입 2단계와 같은 국가 목록에서 선택
                         <input
                           type="text"
                           name="country"
@@ -544,6 +543,36 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
                           className="w-full bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#0052FF] transition-colors"
                           placeholder={text.countryPlaceholder}
                         />
+                        */}
+                        <div className="relative">
+                          <select
+                            name="country"
+                            value={formData.country}
+                            onChange={handleCountryChange}
+                            aria-label={text.country}
+                            className={`w-full bg-[#1a1a24] border border-[#2a2a3a] rounded-lg pl-4 pr-10 py-3 text-sm focus:outline-none focus:border-[#0052FF] transition-colors appearance-none cursor-pointer ${
+                              formData.country ? 'text-white' : 'text-gray-500'
+                            }`}
+                          >
+                            <option value="" disabled>
+                              {text.countryPlaceholder}
+                            </option>
+                            {COUNTRY_OPTIONS.map((option) => (
+                              <option key={option.code} value={option.label} className="text-white">
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                          <svg
+                            className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            aria-hidden
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
                       </div>
 
                       {/* City */}

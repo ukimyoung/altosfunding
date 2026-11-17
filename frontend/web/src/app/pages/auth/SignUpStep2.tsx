@@ -9,35 +9,15 @@ import {
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
 import 'react-phone-number-input/style.css';
-import PhoneInput, { getCountries, getCountryCallingCode } from 'react-phone-number-input';
+import PhoneInput, { getCountryCallingCode } from 'react-phone-number-input';
 import type { Country } from 'react-phone-number-input';
-import labelsEn from 'react-phone-number-input/locale/en';
 import { allCountries } from 'country-region-data';
 import { AppBrand } from '../../components/shared/AppBrand';
 import { ImageWithFallback } from '../../components/shared/figma/ImageWithFallback';
 import { useSignUpFlow } from './SignUpFlowContext';
 import { useLocale } from '@/app/i18n/LocaleContext';
 import { LanguageSelector } from '../../components/shared/LanguageSelector';
-
-const COUNTRY_LABELS = labelsEn as Record<string, string>;
-
-const PRIORITY_COUNTRY_CODES: Country[] = ['US', 'CA', 'GB'];
-
-const COUNTRY_OPTIONS = [
-  ...PRIORITY_COUNTRY_CODES.map((code) => ({
-    code,
-    label: COUNTRY_LABELS[code] ?? code,
-    callingCode: `+${getCountryCallingCode(code)}`,
-  })),
-  ...getCountries()
-    .filter((code) => !PRIORITY_COUNTRY_CODES.includes(code))
-    .map((code) => ({
-      code,
-      label: COUNTRY_LABELS[code] ?? code,
-      callingCode: `+${getCountryCallingCode(code)}`,
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label)),
-];
+import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../utils/countries';
 
 type PhoneCountrySelectOption = {
   value?: Country;

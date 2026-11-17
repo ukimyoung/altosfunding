@@ -45,7 +45,8 @@ export interface MeResponse {
 export type UpdateProfileRequest = {
   first_name: string;
   last_name: string;
-  country: string;
+  // 국가를 고르지 않으면 보내지 않아 기존 값을 유지한다.
+  country?: string;
   city: string;
   state_province: string;
   address_line1: string;
