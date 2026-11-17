@@ -162,6 +162,23 @@ def test_forgot_and_reset_password(client, member, sent_emails):  # noqa: F811
     assert _login(client, password=NEW_PASSWORD).status_code == 200
 
 
+def test_reset_link_uses_allowed_origin(client, member, sent_emails, monkeypatch):  # noqa: F811
+    """로컬 웹에서 요청하면 링크도 로컬 웹으로, 허용되지 않은 주소면 기본 사용자 웹으로 간다."""
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "web_base_url", "https://web.example.com")
+    monkeypatch.setattr(settings, "frontend_allowed_origins", "https://local.example.com:5173")
+    sent_emails.clear()
+    headers = {"Origin": "https://local.example.com:5173"}
+    client.post("/api/v1/auth/password/forgot", json={"email": EMAIL, "recaptcha_token": "t"}, headers=headers)
+    assert sent_emails[0]["reset_url"].startswith("https://local.example.com:5173/reset-password?token=")
+
+    run_sql("update core.password_reset_tokens set created_at = now() - interval '1 hour'")
+    headers = {"Origin": "https://evil.example.com"}
+    client.post("/api/v1/auth/password/forgot", json={"email": EMAIL, "recaptcha_token": "t"}, headers=headers)
+    assert sent_emails[1]["reset_url"].startswith("https://web.example.com/reset-password?token=")
+
+
 def test_reset_token_expired(client, member, sent_emails):  # noqa: F811
     sent_emails.clear()
     client.post("/api/v1/auth/password/forgot", json={"email": EMAIL, "recaptcha_token": "t"})

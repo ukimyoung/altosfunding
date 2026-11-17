@@ -148,7 +148,7 @@ async def forgot_password(
 ) -> OkResponse:
     """가입 여부와 관계없이 같은 응답을 준다. 실제 메일은 이메일 가입 회원에게만 간다."""
     await verify_recaptcha(body.recaptcha_token, request.client.host if request.client else None)
-    await password.request_reset(session, sender, body.email, _locale(request))
+    await password.request_reset(session, sender, body.email, _locale(request), request.headers.get("origin"))
     return OkResponse(message_key="auth.password_reset_sent")
 
 
