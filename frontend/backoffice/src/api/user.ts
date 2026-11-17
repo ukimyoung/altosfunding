@@ -29,11 +29,14 @@ export interface MeResponse {
   subscribed_newsletter?: boolean;
   grade?: string;
   total_referrals?: number;
+  /** 회원 언어 (알림 메일 언어) */
+  locale?: UserLocale;
   [key: string]: unknown;
 }
 
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'BANNED';
 export type UserGrade = 'NORMAL' | 'VIP';
+export type UserLocale = 'en' | 'ko';
 export type UserKycStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface CreateUserRequest {
@@ -71,6 +74,7 @@ export interface UpdateUserRequest {
   kyc_status?: UserKycStatus;
   grade?: UserGrade;
   admin_note?: string;
+  locale?: UserLocale;
 }
 
 export interface SuspendUserRequest {
@@ -120,6 +124,8 @@ export interface User {
   grade: UserGrade;
   total_referrals: number;
   admin_note?: string | null;
+  /** 회원 언어 (알림 메일 언어) */
+  locale?: UserLocale;
 }
 
 export interface ListUsersParams {

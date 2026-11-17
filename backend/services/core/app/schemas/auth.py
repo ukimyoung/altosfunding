@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+LocaleLiteral = Literal["en", "ko"]
+
 
 class VerificationPurpose(str, Enum):
     SIGNUP = "SIGNUP"
@@ -88,6 +90,7 @@ class UserOut(BaseModel):
     referrer_code: str | None = None
     agreed_to_terms: bool = False
     subscribed_newsletter: bool = False
+    locale: str = "en"
     grade: str = "NORMAL"
     total_referrals: int = 0
     can_change_password: bool | None = None
@@ -246,6 +249,11 @@ class AdminProfileUpdateRequest(BaseModel):
     kyc_status: KycStatusLiteral | None = None
     grade: UserGradeLiteral | None = None
     admin_note: str | None = None
+    locale: LocaleLiteral | None = None
+
+
+class LocaleUpdateRequest(BaseModel):
+    locale: LocaleLiteral
 
 
 class SuspendRequest(BaseModel):

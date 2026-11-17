@@ -13,6 +13,7 @@ from app.api.v1.auth import (
     Session,
     _client_ip,
     _delete_cookie,
+    _locale,
     _set_cookie,
 )
 from app.config import settings
@@ -92,7 +93,8 @@ async def google_callback(
     try:
         google_auth.ensure_configured()
         profile = await google_auth.exchange_code(code)
-        user, is_new = await google_auth.find_or_create_user(session, profile)
+        # 새 회원의 언어는 브라우저 언어로 정한다 (웹에서 언어를 바꾸면 그때 저장된다).
+        user, is_new = await google_auth.find_or_create_user(session, profile, _locale(request))
         auth.ensure_can_sign_in(user)
     except AppError as exc:
         await session.rollback()
@@ -100,7 +102,7 @@ async def google_callback(
 
     if is_new:
         await session.commit()
-        await notify.welcome(session, sender, user.id, "en")
+        await notify.welcome(session, sender, user.id)
     welcome = "welcome=true" if is_new else ""
     if user.is_2fa_enabled:
         await session.commit()

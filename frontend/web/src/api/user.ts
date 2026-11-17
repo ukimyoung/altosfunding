@@ -37,6 +37,8 @@ export interface MeResponse {
   grade?: string;
   total_referrals?: number;
   is_email_enabled?: boolean;
+  /** 회원 언어 (알림 메일 언어) */
+  locale?: 'en' | 'ko';
   [key: string]: unknown;
 }
 
@@ -124,6 +126,11 @@ export const getMe = async (config?: AuthRequestConfig) => {
 export const updateProfile = async (payload: UpdateProfileRequest) => {
   const response = await api.put<MeResponse>('/v1/auth/profile', payload);
   return response.data;
+};
+
+// 회원 언어 저장. 로그인한 상태에서 웹 언어를 바꾸면 알림 메일(입출금 승인, KYC 결과 등)도 그 언어로 받는다.
+export const updateLocale = async (locale: 'en' | 'ko') => {
+  await api.put('/v1/auth/account/locale', { locale }, { skipAuthRedirect: true } as AuthRequestConfig);
 };
 
 export const withdrawAccount = async () => {

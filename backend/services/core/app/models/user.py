@@ -48,6 +48,7 @@ class User(Base):
     two_factor_failed_count: Mapped[int] = mapped_column(Integer, server_default="0")
     two_factor_locked_until: Mapped[datetime | None]
     is_email_enabled: Mapped[bool] = mapped_column(server_default="true")
+    locale: Mapped[str] = mapped_column(server_default="en")
 
     referral_code: Mapped[str] = mapped_column(String, unique=True)
     referrer_id: Mapped[uuid.UUID | None] = mapped_column(

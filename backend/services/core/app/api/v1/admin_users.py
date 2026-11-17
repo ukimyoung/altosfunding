@@ -134,10 +134,10 @@ async def withdraw_user(user_id: uuid.UUID, admin: AdminUser, session: Session, 
     user = await _get_user(session, user_id, lock=True)
     if user.role == "ADMIN":
         raise AppError(400, "cannot_block_admin", "관리자 계정은 탈퇴 처리할 수 없습니다.")
-    name = notify.user_name(user)
+    name, locale = notify.user_name(user), user.locale
     email = await user_admin.withdraw(session, user, "관리자 탈퇴 처리", admin.id)
     await session.commit()
-    await notify.send(session, sender, email, "user_withdrawn", {"user_name": name})
+    await notify.send(session, sender, email, "user_withdrawn", {"user_name": name}, locale=locale)
     return {"ok": True, "user_id": str(user.id), "status": user.status}
 
 

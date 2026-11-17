@@ -228,6 +228,8 @@ async def update_user(session: AsyncSession, user: User, data: dict, admin: User
             setattr(user, field, _clean(data[field]))
     if data.get("grade"):
         user.grade = data["grade"]
+    if data.get("locale"):
+        user.locale = data["locale"]
     if data.get("kyc_status"):
         _apply_kyc_status(user, data["kyc_status"])
     if data.get("password"):

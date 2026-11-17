@@ -62,8 +62,11 @@ def test_deposit_and_withdrawal_mails(client, admin_headers, trader, sent_emails
 
 
 def test_disabled_template_is_skipped_and_failure_does_not_break(
-    client, admin_headers, trader, sent_emails
-):  # noqa: F811
+    client,
+    admin_headers,  # noqa: F811
+    trader,  # noqa: F811
+    sent_emails,
+):
     from app.main import app
     from app.services.email import EmailSendError, get_email_sender
 
@@ -168,3 +171,75 @@ def test_admin_kyc_change_sends_mail(client, admin_headers, sent_emails):  # noq
     )
     assert res.status_code == 200, res.text
     assert _purposes(sent_emails) == ["kyc_approved"]
+
+
+def test_member_locale_is_saved_and_used(client, admin_headers, trader, sent_emails):  # noqa: F811
+    from tests.test_login import _login as login
+
+    assert client.get("/api/v1/auth/me", headers=trader).json()["locale"] == "en"
+    # 로그인한 화면 언어를 저장한다.
+    res = client.post(
+        "/api/v1/auth/login",
+        json={"email": TRADER, "password": "Target123!", "recaptcha_token": "t"},
+        headers={"Accept-Language": "ko"},
+    )
+    assert res.status_code == 200
+    assert (
+        run_sql("select locale from core.users where email = $1", TRADER)[0]["locale"]
+        == "ko"
+    )
+    # Accept-Language가 없으면 바꾸지 않는다.
+    login(client, email=TRADER, password="Target123!")
+    assert (
+        run_sql("select locale from core.users where email = $1", TRADER)[0]["locale"]
+        == "ko"
+    )
+
+    sent_emails.clear()
+    dep = _deposit(client, trader, amount=100).json()["request_id"]
+    client.post(f"/api/v1/admin/wallets/deposits/{dep}/approve", headers=admin_headers)
+    assert (
+        sent_emails[-1]["subject"]
+        == "[Altos Funding] 100.00 USDT 입금이 완료되었습니다"
+    )
+
+    # 웹에서 언어를 바꾸면 저장
+    assert (
+        client.put(
+            "/api/v1/auth/account/locale", headers=trader, json={"locale": "en"}
+        ).status_code
+        == 200
+    )
+    assert (
+        client.put(
+            "/api/v1/auth/account/locale", headers=trader, json={"locale": "ja"}
+        ).status_code
+        == 422
+    )
+    assert client.get("/api/v1/auth/me", headers=trader).json()["locale"] == "en"
+
+    # 관리자가 바꿀 수도 있다
+    user_id = run_sql("select id from core.users where email = $1", TRADER)[0]["id"]
+    res = client.patch(
+        f"/api/v1/admin/users/{user_id}/profile",
+        headers=admin_headers,
+        json={"locale": "ko"},
+    )
+    assert res.status_code == 200 and res.json()["locale"] == "ko"
+
+
+def test_register_saves_page_locale(client, sent_emails):
+    from tests.test_signup import _payload, _send, _verify
+
+    assert _send(client).status_code == 201
+    assert _verify(client, sent_emails[-1]["code"]).status_code == 200
+    res = client.post(
+        "/api/v1/auth/register", json=_payload(), headers={"Accept-Language": "ko"}
+    )
+    assert res.status_code == 201, res.text
+    assert res.json()["locale"] == "ko"
+    assert (
+        sent_emails[-1]["purpose"] == "user_registered"
+        and sent_emails[-1]["locale"] == "ko"
+    )
+    assert sent_emails[-1]["subject"] == "[Altos Funding] 알토스 펀딩 가입을 환영합니다"

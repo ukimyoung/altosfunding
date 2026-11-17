@@ -3,8 +3,8 @@
 업무 처리(DB 커밋)가 끝난 뒤 부른다. 메일이 실패해도 업무 결과는 그대로 두고 로그만 남긴다.
 템플릿은 백오피스 '템플릿 관리'의 DB 템플릿을 쓰고, 사용 안 함으로 꺼 두면 보내지 않는다.
 
-언어: 회원이 직접 한 요청(가입·출금 신청·탈퇴)은 요청 언어(Accept-Language),
-관리자 처리·웹훅처럼 회원 요청이 아닌 경우는 회원 언어를 저장하지 않아 영문(en)으로 보낸다.
+언어: 회원 언어(core.users.locale)로 보낸다. 회원 언어는 가입·로그인 때와 웹에서 언어를 바꿀 때 저장된다.
+회원이 직접 한 요청(출금 신청·본인 탈퇴)은 그 요청의 화면 언어(Accept-Language)를 쓴다.
 """
 
 import logging
@@ -71,9 +71,11 @@ async def to_user(
     template_id: str,
     variables: dict[str, Any] | None = None,
     *,
-    locale: str = DEFAULT_NOTIFY_LOCALE,
+    locale: str | None = None,
     meta: dict | None = None,
 ) -> bool:
+    """회원에게 보낸다. locale을 주지 않으면 회원 언어."""
+    locale = locale or user.locale or DEFAULT_NOTIFY_LOCALE
     if user.status == "WITHDRAWN" or user.email.endswith("@deleted.local"):
         return False
     values = {"user_name": user_name(user), **(variables or {})}
@@ -91,8 +93,8 @@ async def kyc_changed(session: AsyncSession, sender: EmailSender, user: User, be
         await to_user(session, sender, user, "kyc_rejected", {"reason": reason})
 
 
-async def welcome(session: AsyncSession, sender: EmailSender, user_id: Any, locale: str) -> None:
-    """회원가입 환영 메일."""
+async def welcome(session: AsyncSession, sender: EmailSender, user_id: Any) -> None:
+    """회원가입 환영 메일 (가입 때 저장한 회원 언어)."""
     user = await session.get(User, user_id)
     if user is not None:
-        await to_user(session, sender, user, "user_registered", {"login_url": login_url()}, locale=locale)
+        await to_user(session, sender, user, "user_registered", {"login_url": login_url()})

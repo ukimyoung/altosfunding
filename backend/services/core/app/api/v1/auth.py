@@ -84,6 +84,11 @@ def _locale(request: Request) -> str:
     return "ko" if request.headers.get("accept-language", "").lower().startswith("ko") else "en"
 
 
+def _header_locale(request: Request) -> str | None:
+    """웹이 보낸 화면 언어 (Accept-Language). 헤더가 없으면 None — 회원 언어를 바꾸지 않는다."""
+    return _locale(request) if request.headers.get("accept-language") else None
+
+
 @router.post(
     "/email/send-verification",
     status_code=status.HTTP_201_CREATED,
@@ -131,8 +136,8 @@ async def register(
     sender: Annotated[EmailSender, Depends(get_email_sender)],
 ) -> UserOut:
     """이메일 인증을 마친 뒤 호출한다. 가입이 끝나면 환영 메일을 보낸다."""
-    out = await signup.register(session, body)
-    await notify.welcome(session, sender, out.id, _locale(request))
+    out = await signup.register(session, body, _locale(request))
+    await notify.welcome(session, sender, out.id)
     return out
 
 
@@ -154,7 +159,12 @@ async def login(
     """
     await verify_recaptcha(body.recaptcha_token, _client_ip(request))
     result = await auth.login(
-        session, body.email, body.password, _client_ip(request), request.headers.get("user-agent")
+        session,
+        body.email,
+        body.password,
+        _client_ip(request),
+        request.headers.get("user-agent"),
+        _header_locale(request),
     )
     if result.two_factor_temp_token:
         _set_cookie(
@@ -229,7 +239,7 @@ async def login_2fa(
         raise
 
     result = await auth.complete_login(
-        session, user, _client_ip(request), request.headers.get("user-agent")
+        session, user, _client_ip(request), request.headers.get("user-agent"), _header_locale(request)
     )
     _delete_cookie(response, TWO_FACTOR_COOKIE)
     return _token_response(response, result)
