@@ -7,9 +7,9 @@ from fastapi import APIRouter, Header, Request
 from pydantic import BaseModel
 
 from app.api.v1.auth import Session
-from app.deps import CurrentUser
+from app.deps import CurrentUser, Sender
 from app.errors import AppError
-from app.services import kyc
+from app.services import kyc, notify
 
 router = APIRouter(tags=["kyc"])
 
@@ -41,6 +41,7 @@ async def sumsub_token(user: CurrentUser) -> SumsubTokenResponse:
 async def sumsub_webhook(
     request: Request,
     session: Session,
+    sender: Sender,
     x_payload_digest: Annotated[str | None, Header()] = None,
     x_payload_digest_alg: Annotated[str | None, Header()] = None,
 ) -> dict:
@@ -51,6 +52,9 @@ async def sumsub_webhook(
         payload = json.loads(body)
     except ValueError as exc:
         raise AppError(400, "invalid_payload", "invalid payload") from exc
-    await kyc.handle_webhook(session, payload)
+    change = await kyc.handle_webhook(session, payload)
     await session.commit()
+    if change is not None:
+        user, before = change
+        await notify.kyc_changed(session, sender, user, before)
     return {"ok": True}

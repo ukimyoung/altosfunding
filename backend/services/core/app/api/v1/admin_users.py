@@ -7,7 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, status
 
 from app.api.v1.auth import Session
-from app.deps import AdminUser
+from app.deps import AdminUser, Sender
 from app.errors import AppError
 from app.models import User
 from app.schemas.auth import (
@@ -21,7 +21,7 @@ from app.schemas.auth import (
     UserOut,
     UserPage,
 )
-from app.services import user_admin
+from app.services import notify, user_admin
 
 router = APIRouter(prefix="/admin/users", tags=["admin-users"])
 
@@ -80,47 +80,64 @@ async def get_user(user_id: uuid.UUID, admin: AdminUser, session: Session) -> Us
 
 @router.patch("/{user_id}/profile", response_model=UserOut, summary="회원 정보 수정")
 async def update_user(
-    user_id: uuid.UUID, body: AdminProfileUpdateRequest, admin: AdminUser, session: Session
+    user_id: uuid.UUID, body: AdminProfileUpdateRequest, admin: AdminUser, session: Session, sender: Sender
 ) -> UserOut:
     user = await _get_user(session, user_id, lock=True)
+    kyc_before = user.kyc_status
     await user_admin.update_user(session, user, body.model_dump(exclude_unset=True), admin)
     await session.commit()
+    await notify.kyc_changed(session, sender, user, kyc_before)
     return await user_admin.user_out(session, user, for_admin=True)
 
 
-async def _change(session, user_id: uuid.UUID, to_status: str, reason: str | None, admin: User) -> dict:
+# 상태가 바뀌면 보내는 안내 메일
+STATUS_TEMPLATES = {"INACTIVE": "user_suspended", "BANNED": "user_banned", "ACTIVE": "user_reactivated"}
+
+
+async def _change(
+    session, sender, user_id: uuid.UUID, to_status: str, reason: str | None, admin: User
+) -> dict:
     user = await _get_user(session, user_id, lock=True)
+    before = user.status
     await user_admin.change_status(session, user, to_status, reason, admin.id)
     await session.commit()
+    if user.status != before:
+        await notify.to_user(session, sender, user, STATUS_TEMPLATES[to_status], {"reason": reason or "-"})
     return {"ok": True, "user_id": str(user.id), "status": user.status}
 
 
 @router.post("/{user_id}/suspend", summary="회원 비활성 (로그인 차단)")
-async def suspend_user(user_id: uuid.UUID, body: SuspendRequest, admin: AdminUser, session: Session) -> dict:
-    return await _change(session, user_id, "INACTIVE", body.reason, admin)
+async def suspend_user(
+    user_id: uuid.UUID, body: SuspendRequest, admin: AdminUser, session: Session, sender: Sender
+) -> dict:
+    return await _change(session, sender, user_id, "INACTIVE", body.reason, admin)
 
 
 @router.post("/{user_id}/ban", summary="회원 영구 정지")
-async def ban_user(user_id: uuid.UUID, body: BanRequest, admin: AdminUser, session: Session) -> dict:
+async def ban_user(
+    user_id: uuid.UUID, body: BanRequest, admin: AdminUser, session: Session, sender: Sender
+) -> dict:
     """MT4 계좌 차단은 트레이딩 계좌 기능을 옮길 때 함께 연결한다."""
     if body.admin_note is not None:
         user = await _get_user(session, user_id, lock=True)
         user.admin_note = body.admin_note
-    return await _change(session, user_id, "BANNED", body.reason, admin)
+    return await _change(session, sender, user_id, "BANNED", body.reason, admin)
 
 
 @router.post("/{user_id}/activate", summary="회원 활성 복귀")
-async def activate_user(user_id: uuid.UUID, admin: AdminUser, session: Session) -> dict:
-    return await _change(session, user_id, "ACTIVE", "관리자 활성화", admin)
+async def activate_user(user_id: uuid.UUID, admin: AdminUser, session: Session, sender: Sender) -> dict:
+    return await _change(session, sender, user_id, "ACTIVE", "관리자 활성화", admin)
 
 
 @router.post("/{user_id}/withdraw", summary="회원 탈퇴 처리 (개인정보 익명화)")
-async def withdraw_user(user_id: uuid.UUID, admin: AdminUser, session: Session) -> dict:
+async def withdraw_user(user_id: uuid.UUID, admin: AdminUser, session: Session, sender: Sender) -> dict:
     user = await _get_user(session, user_id, lock=True)
     if user.role == "ADMIN":
         raise AppError(400, "cannot_block_admin", "관리자 계정은 탈퇴 처리할 수 없습니다.")
-    await user_admin.withdraw(session, user, "관리자 탈퇴 처리", admin.id)
+    name = notify.user_name(user)
+    email = await user_admin.withdraw(session, user, "관리자 탈퇴 처리", admin.id)
     await session.commit()
+    await notify.send(session, sender, email, "user_withdrawn", {"user_name": name})
     return {"ok": True, "user_id": str(user.id), "status": user.status}
 
 

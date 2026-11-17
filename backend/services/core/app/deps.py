@@ -10,6 +10,7 @@ from app.db import get_session
 from app.errors import AppError
 from app.models import User
 from app.services import tokens
+from app.services.email import EmailSender, get_email_sender
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -65,3 +66,6 @@ async def require_admin(user: CurrentUser) -> User:
 
 
 AdminUser = Annotated[User, Depends(require_admin)]
+
+# 메일 발송기 (테스트에서는 dependency_overrides로 바꾼다)
+Sender = Annotated[EmailSender, Depends(get_email_sender)]

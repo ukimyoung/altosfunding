@@ -21,7 +21,7 @@ from app.schemas.auth import (
     UserOut,
     VerificationPurpose,
 )
-from app.services import auth, signup, tokens, two_factor
+from app.services import auth, notify, signup, tokens, two_factor
 from app.services.email import EmailSender, get_email_sender
 from app.services.recaptcha import verify_recaptcha
 
@@ -124,9 +124,16 @@ async def verify_email(body: EmailVerifyRequest, session: Session) -> OkResponse
     response_model=UserOut,
     summary="회원가입",
 )
-async def register(body: RegisterRequest, session: Session) -> UserOut:
-    """이메일 인증을 마친 뒤 호출한다."""
-    return await signup.register(session, body)
+async def register(
+    body: RegisterRequest,
+    session: Session,
+    request: Request,
+    sender: Annotated[EmailSender, Depends(get_email_sender)],
+) -> UserOut:
+    """이메일 인증을 마친 뒤 호출한다. 가입이 끝나면 환영 메일을 보낸다."""
+    out = await signup.register(session, body)
+    await notify.welcome(session, sender, out.id, _locale(request))
+    return out
 
 
 @router.post(
