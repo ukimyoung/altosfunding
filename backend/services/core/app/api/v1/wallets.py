@@ -9,6 +9,7 @@
     POST /wallets/me/withdraw          출금 신청 (잔고에서 바로 차감 → 관리자 송금·승인 대기)
 - 관리자 (백오피스 '입출금 승인 관리', '입출금 내역', '수익 분배 설정')
     GET  /admin/wallets/requests/pending|history|summary
+    GET  /admin/wallets/requests/history/totals  입출금 내역 상단 카드 (승인된 입금·출금 합계)
     POST /admin/wallets/deposits/{id}/approve|reject
     POST /admin/wallets/withdrawals/{id}/approve|reject
     GET/PUT /admin/payout-settings/network-fees, profit-split, GET profit-split/history
@@ -187,6 +188,21 @@ async def admin_history(
     return await wallet_history.list_admin_requests(
         session, pending=False, keyword=keyword, display_tx_type=display_tx_type, display_status=display_status,
         direction=direction, start_date=start_date, end_date=end_date, page=page, size=size,
+    )
+
+
+@admin_router.get("/admin/wallets/requests/history/totals", summary="입출금 내역 총 입금·출금 금액 (승인 완료 기준)")
+async def admin_history_totals(
+    admin: AdminUser,
+    session: Session,
+    keyword: Annotated[str | None, Query(description="이름 / 이메일 / UID / TX hash / 지갑 주소")] = None,
+    display_tx_type: Annotated[str | None, Query(description="External Wallet | Payout")] = None,
+    start_date: Annotated[str | None, Query(description="YYYY-MM-DD (KST, 요청일 기준)")] = None,
+    end_date: Annotated[str | None, Query(description="YYYY-MM-DD (KST, 요청일 기준)")] = None,
+) -> dict:
+    """목록과 같은 검색 조건(상태 필터 제외)으로 승인된 입금·출금 금액을 더한다. 출금은 수수료 포함 신청 금액."""
+    return await wallet_history.admin_totals(
+        session, keyword=keyword, display_tx_type=display_tx_type, start_date=start_date, end_date=end_date
     )
 
 

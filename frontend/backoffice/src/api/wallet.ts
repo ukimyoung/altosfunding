@@ -54,6 +54,16 @@ export interface WalletRequestsSummary {
   withdraw_pending_count: number;
 }
 
+export interface WalletRequestHistoryTotals {
+  total_deposit_amount: number;
+  total_withdraw_amount: number;
+}
+
+export type WalletRequestHistoryTotalsParams = Pick<
+  ListWalletRequestHistoryParams,
+  'keyword' | 'display_tx_type' | 'start_date' | 'end_date'
+>;
+
 export interface WalletRequestsSummaryParams {
   status?: string | null;
 }
@@ -73,6 +83,16 @@ export const listWalletRequestHistory = async (
   const response = await api.get<ListWalletRequestsResponse>('/v1/admin/wallets/requests/history', {
     params,
   });
+  return response.data;
+};
+
+export const getWalletRequestHistoryTotals = async (
+  params: WalletRequestHistoryTotalsParams = {},
+): Promise<WalletRequestHistoryTotals> => {
+  const response = await api.get<WalletRequestHistoryTotals>(
+    '/v1/admin/wallets/requests/history/totals',
+    { params },
+  );
   return response.data;
 };
 

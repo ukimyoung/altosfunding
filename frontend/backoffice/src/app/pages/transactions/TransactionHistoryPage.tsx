@@ -18,7 +18,10 @@ import {
 } from '../../components/shared/TableFilters';
 import { useAppShell } from '../../layouts/AppShell';
 import { TRANSFER_STATUS_FILTER, TRANSFER_TYPE_FILTER } from '../../constants/status';
-import { useListWalletRequestHistoryQuery } from '../../queries/wallet';
+import {
+  useListWalletRequestHistoryQuery,
+  useWalletRequestHistoryTotalsQuery,
+} from '../../queries/wallet';
 import { formatKstDateTime, formatUsdMoney } from '../../utils/utils';
 import { getWalletStatusBadge } from '../../utils/walletDisplay';
 
@@ -70,6 +73,17 @@ export function TransactionHistoryPage() {
     [currentPage, endDate, searchTerm, startDate, statusFilter, typeFilter],
   );
   const requestsQuery = useListWalletRequestHistoryQuery(requestParams);
+  // 상단 카드: 목록과 같은 검색 조건(검색어·유형·기간)의 승인 완료 금액 합계. 상태 필터는 적용하지 않는다.
+  const totalsQuery = useWalletRequestHistoryTotalsQuery({
+    keyword: requestParams.keyword,
+    display_tx_type: requestParams.display_tx_type,
+    start_date: requestParams.start_date,
+    end_date: requestParams.end_date,
+  });
+  const formatTotal = (value: number | undefined) => {
+    if (value !== undefined) return formatUsdMoney(value);
+    return totalsQuery.isError ? '—' : '...';
+  };
 
   const t = {
     surface: dark ? '#0F1829' : '#ffffff',
@@ -172,6 +186,27 @@ export function TransactionHistoryPage() {
         <p style={{ fontSize: 13, color: t.textSec, margin: 0 }}>
           유저의 입출금 이력을 조회합니다. 승인/반려는 입출금 승인 관리 메뉴에서 처리하세요.
         </p>
+      </div>
+
+      {/* Summary Stat Cards */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 16,
+          marginBottom: 24,
+        }}
+      >
+        <StatCard
+          label="총 입금 금액"
+          value={formatTotal(totalsQuery.data?.total_deposit_amount)}
+          t={t}
+        />
+        <StatCard
+          label="총 출금 금액"
+          value={formatTotal(totalsQuery.data?.total_withdraw_amount)}
+          t={t}
+        />
       </div>
 
       <TableFilterBar
@@ -444,6 +479,29 @@ export function TransactionHistoryPage() {
           onClose={() => setSelectedTransfer(null)}
         />
       )}
+    </div>
+  );
+}
+
+// Stat Card Component (구매 내역 화면과 같은 형식)
+interface StatCardProps {
+  label: string;
+  value: string;
+  t: { surface: string; border: string; text: string; textSec: string };
+}
+
+function StatCard({ label, value, t }: StatCardProps) {
+  return (
+    <div
+      style={{
+        padding: '16px 20px',
+        background: t.surface,
+        borderRadius: 12,
+        border: `1px solid ${t.border}`,
+      }}
+    >
+      <div style={{ fontSize: 11, color: t.textSec, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: t.text }}>{value}</div>
     </div>
   );
 }
