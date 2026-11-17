@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
-from app.models import User, UserStatusHistory
+from app.models import User, UserStatusHistory, Wallet
 from app.schemas.auth import UserOut
 from app.security import hash_password
 from app.services import tokens
@@ -72,6 +72,17 @@ async def withdraw(session: AsyncSession, user: User, reason: str, changed_by: u
     return old_email
 
 
+# 총 자산 = 통합 지갑(INTEGRATED) 잔액. 챌린지·펀디드 계좌 잔액은 아직 Core에 없어 포함하지 않는다.
+_wallet_balance = func.coalesce(Wallet.balance_usdt, 0)
+
+
+async def _total_assets(session: AsyncSession, user_id: uuid.UUID) -> float:
+    value = await session.scalar(
+        select(Wallet.balance_usdt).where(Wallet.user_id == user_id, Wallet.wallet_type == "INTEGRATED")
+    )
+    return float(value or 0)
+
+
 async def user_out(session: AsyncSession, user: User, *, for_admin: bool) -> UserOut:
     referrer_code = None
     if user.referrer_id:
@@ -79,7 +90,12 @@ async def user_out(session: AsyncSession, user: User, *, for_admin: bool) -> Use
     total_referrals = await session.scalar(
         select(func.count()).select_from(User).where(User.referrer_id == user.id)
     )
-    out = to_user_out(user, referrer_code=referrer_code, total_referrals=total_referrals or 0)
+    out = to_user_out(
+        user,
+        referrer_code=referrer_code,
+        total_referrals=total_referrals or 0,
+        total_assets=await _total_assets(session, user.id),
+    )
     if not for_admin:
         # 관리자 메모는 회원 본인에게 보여 주지 않는다.
         out.admin_note = None
@@ -125,15 +141,19 @@ async def list_users(
         select(User.referrer_id, func.count().label("n")).where(User.referrer_id.is_not(None)).group_by(User.referrer_id)
     ).subquery()
     rows = await session.execute(
-        select(User, referrer.c.referral_code, func.coalesce(referral_counts.c.n, 0))
+        select(User, referrer.c.referral_code, func.coalesce(referral_counts.c.n, 0), _wallet_balance)
         .outerjoin(referrer, referrer.c.id == User.referrer_id)
         .outerjoin(referral_counts, referral_counts.c.referrer_id == User.id)
+        .outerjoin(Wallet, (Wallet.user_id == User.id) & (Wallet.wallet_type == "INTEGRATED"))
         .where(*conditions)
         .order_by(User.created_at.desc(), User.id)
         .offset((page - 1) * size)
         .limit(size)
     )
-    items = [to_user_out(u, referrer_code=code, total_referrals=n) for u, code, n in rows.all()]
+    items = [
+        to_user_out(u, referrer_code=code, total_referrals=n, total_assets=float(bal))
+        for u, code, n, bal in rows.all()
+    ]
     return items, total
 
 

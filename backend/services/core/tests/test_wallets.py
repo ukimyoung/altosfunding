@@ -241,3 +241,17 @@ def test_payout_settings(client, admin_headers, trader):  # noqa: F811
     assert client.put(ps, headers=admin_headers, json={"trader_pct": 85}).json() == {"trader_pct": 85.0, "company_pct": 15.0}
     hist = client.get(f"{ps}/history", headers=admin_headers).json()
     assert hist["total"] == 1 and hist["items"][0]["old_pct"] == 80 and hist["items"][0]["admin_email"] == ADMIN_EMAIL
+
+
+def test_admin_member_list_total_assets(client, admin_headers, trader):  # noqa: F811
+    """백오피스 회원 목록·상세의 총 자산은 통합 지갑 잔액이다."""
+    def listed():
+        items = client.get("/api/v1/admin/users", headers=admin_headers, params={"keyword": TRADER}).json()["items"]
+        return items[0]["total_assets"]
+
+    assert listed() == 0.0  # 지갑이 아직 없는 회원
+    req = _deposit(client, trader, amount=250.75, tx_hash="hash-total").json()["request_id"]
+    assert client.post(f"/api/v1/admin/wallets/deposits/{req}/approve", headers=admin_headers).status_code == 200
+    assert listed() == 250.75
+    user_id = run_sql("select id from core.users where email = $1", TRADER)[0]["id"]
+    assert client.get(f"/api/v1/admin/users/{user_id}", headers=admin_headers).json()["total_assets"] == 250.75

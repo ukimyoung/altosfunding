@@ -254,7 +254,9 @@ async def register(session: AsyncSession, body: RegisterRequest, locale: str = "
     return to_user_out(user, referrer_code=referrer.referral_code if referrer else None)
 
 
-def to_user_out(user: User, referrer_code: str | None = None, total_referrals: int = 0) -> UserOut:
+def to_user_out(
+    user: User, referrer_code: str | None = None, total_referrals: int = 0, total_assets: float = 0.0
+) -> UserOut:
     return UserOut(
         id=str(user.id),
         uid=user.uid,
@@ -291,5 +293,6 @@ def to_user_out(user: User, referrer_code: str | None = None, total_referrals: i
         locale=user.locale,
         grade=user.grade,
         total_referrals=total_referrals,
+        total_assets=total_assets,
         can_change_password=user.auth_provider == "LOCAL",
     )
