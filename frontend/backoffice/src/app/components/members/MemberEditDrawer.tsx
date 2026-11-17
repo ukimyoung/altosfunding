@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import type * as React from 'react';
+import { toCountryLabel } from '@altosfunding/shared/countries';
 import { Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { ModalCloseBtn } from '../shared/ModalCloseButton';
 import { tok } from '../../theme/tokens';
@@ -84,6 +86,8 @@ function EditInput({
   required,
   type = 'text',
   disabled,
+  options,
+  placeholder,
 }: {
   label: string;
   value: string;
@@ -92,7 +96,26 @@ function EditInput({
   required?: boolean;
   type?: string;
   disabled?: boolean;
+  // 값이 있으면 직접 입력 대신 목록에서 고르는 입력란으로 그린다.
+  options?: { value: string; label: string }[];
+  placeholder?: string;
 }) {
+  const fieldStyle: React.CSSProperties = {
+    width: '100%',
+    height: 36,
+    padding: options ? '0 8px' : '0 12px',
+    borderRadius: 8,
+    border: `1px solid ${t.border}`,
+    background: t.surface2,
+    color: options && !value ? t.textHint : t.text,
+    fontSize: 13,
+    fontFamily: "'Noto Sans KR','DM Sans',sans-serif",
+    boxSizing: 'border-box',
+    outline: 'none',
+    cursor: disabled ? 'not-allowed' : options ? 'pointer' : 'text',
+    opacity: disabled ? 0.72 : 1,
+  };
+
   return (
     <div>
       <label
@@ -108,27 +131,31 @@ function EditInput({
         {label}
         {required && <span style={{ color: '#DC2626' }}>*</span>}
       </label>
-      <input
-        value={value}
-        type={type}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        style={{
-          width: '100%',
-          height: 36,
-          padding: '0 12px',
-          borderRadius: 8,
-          border: `1px solid ${t.border}`,
-          background: t.surface2,
-          color: t.text,
-          fontSize: 13,
-          fontFamily: "'Noto Sans KR','DM Sans',sans-serif",
-          boxSizing: 'border-box',
-          outline: 'none',
-          cursor: disabled ? 'not-allowed' : 'text',
-          opacity: disabled ? 0.72 : 1,
-        }}
-      />
+      {options ? (
+        <select
+          value={value}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          style={fieldStyle}
+        >
+          <option value="" disabled>
+            {placeholder}
+          </option>
+          {options.map((option) => (
+            <option key={option.value} value={option.value} style={{ color: t.text }}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          value={value}
+          type={type}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          style={fieldStyle}
+        />
+      )}
     </div>
   );
 }
@@ -171,7 +198,8 @@ export function MemberEditDrawer({
   const [lastName, setLastName] = useState(user.last_name ?? '');
   const [email, setEmail] = useState(user.email ?? '');
   const [password, setPassword] = useState('');
-  const [country, setCountry] = useState(user.country ?? '');
+  // 예전에 직접 입력한 값은 목록의 국가 이름으로 맞추고, 찾을 수 없으면 비워 둔다(비운 채 저장하면 기존 값 유지).
+  const [country, setCountry] = useState(toCountryLabel(user.country));
   const [city, setCity] = useState(user.city ?? '');
   const [stateProvince, setStateProvince] = useState(user.state_province ?? '');
   const [phone, setPhone] = useState(user.phone ? phoneRender(user.phone) : '');
@@ -284,7 +312,7 @@ export function MemberEditDrawer({
             onChange={handleBasicInfoChange}
             gap={12}
             bottomMargin={28}
-            renderField={({ key, label, value, onChange, required, type }) => (
+            renderField={({ key, label, value, onChange, placeholder, required, type, options }) => (
               <EditInput
                 key={key}
                 label={label}
@@ -294,6 +322,8 @@ export function MemberEditDrawer({
                 required={required}
                 type={type}
                 disabled={key === 'email'}
+                options={options}
+                placeholder={placeholder}
               />
             )}
             renderPassword={() => (

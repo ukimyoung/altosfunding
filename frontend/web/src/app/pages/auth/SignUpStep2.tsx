@@ -17,7 +17,7 @@ import { ImageWithFallback } from '../../components/shared/figma/ImageWithFallba
 import { useSignUpFlow } from './SignUpFlowContext';
 import { useLocale } from '@/app/i18n/LocaleContext';
 import { LanguageSelector } from '../../components/shared/LanguageSelector';
-import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '../../utils/countries';
+import { COUNTRY_LABELS, COUNTRY_OPTIONS } from '@altosfunding/shared/countries';
 
 type PhoneCountrySelectOption = {
   value?: Country;

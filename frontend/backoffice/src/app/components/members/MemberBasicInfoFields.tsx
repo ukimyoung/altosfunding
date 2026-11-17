@@ -1,5 +1,7 @@
 import type * as React from 'react';
 
+import { COUNTRY_OPTIONS } from '@altosfunding/shared/countries';
+
 type MemberAddressFieldValues = {
   country: string;
   city: string;
@@ -28,7 +30,15 @@ type BasicField = {
   placeholder: string;
   required?: boolean;
   type?: string;
+  // 값이 있으면 직접 입력 대신 목록에서 고르는 입력란으로 그린다.
+  options?: { value: string; label: string }[];
 };
+
+// 웹 회원가입·프로필 수정과 같은 국가 목록. 저장 값은 영어 국가 이름이다.
+const COUNTRY_SELECT_OPTIONS = COUNTRY_OPTIONS.map((option) => ({
+  value: option.label,
+  label: option.label,
+}));
 
 type MemberBasicInfoFieldsProps = {
   values: MemberBasicInfoValues;
@@ -86,6 +96,7 @@ export function MemberBasicInfoFields({
       onChange: (value) => onChange(key, value),
       placeholder,
       required,
+      options: key === 'country' ? COUNTRY_SELECT_OPTIONS : undefined,
     });
 
   return (
@@ -99,7 +110,8 @@ export function MemberBasicInfoFields({
       {field('phone', labels.phone, '010-0000-0000', { type: 'tel' })}
       <div style={{ display: 'flex', flexDirection: 'column', gap }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap }}>
-          {addressField('country', 'United States')}
+          {/* 국가는 직접 입력 대신 목록에서 선택: {addressField('country', 'United States')} */}
+          {addressField('country', '국가 선택')}
           {addressField('stateProvince', 'California')}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap }}>
