@@ -107,6 +107,33 @@ def test_update_profile_and_reset_password(client, admin_headers):
     assert _login(client, email="target@example.com", password="Changed123!").status_code == 200
 
 
+def test_update_newsletter_subscription(client, admin_headers):
+    target = _create(client, admin_headers)
+    url = f"/api/v1/admin/users/{target['id']}/profile"
+    sql = "select subscribed_newsletter, newsletter_unsubscribed_at from core.users where id = $1"
+
+    res = client.patch(url, headers=admin_headers, json={"subscribed_newsletter": True})
+    assert res.status_code == 200, res.text
+    assert res.json()["subscribed_newsletter"] is True
+    row = run_sql(sql, target["id"])[0]
+    assert row["subscribed_newsletter"] is True and row["newsletter_unsubscribed_at"] is None
+
+    # 미수신으로 바꾸면 수신거부 링크처럼 수신거부 시각이 남아 수신거부 관리 목록에 보인다.
+    res = client.patch(url, headers=admin_headers, json={"subscribed_newsletter": False})
+    assert res.json()["subscribed_newsletter"] is False
+    row = run_sql(sql, target["id"])[0]
+    assert row["subscribed_newsletter"] is False and row["newsletter_unsubscribed_at"] is not None
+    unsub = client.post(
+        "/api/v1/admin/notifications/manual-send/recipients/unsubscribed/search", headers=admin_headers,
+        json={"unsubscribed_from": "2020-01-01", "unsubscribed_to": "2099-12-31"},
+    ).json()
+    assert "target@example.com" in [i["email"] for i in unsub["items"]]
+
+    # 값을 보내지 않으면(다른 항목만 수정) 수신 상태와 수신거부 시각은 그대로다.
+    client.patch(url, headers=admin_headers, json={"phone": "010"})
+    assert run_sql(sql, target["id"])[0] == row
+
+
 def test_create_and_change_role(client, admin_headers):
     # 관리자 계정을 바로 만들 수 있고, 만든 계정은 관리자 API를 쓸 수 있다.
     created = _create(client, admin_headers, email="ops@example.com", role="ADMIN")

@@ -252,6 +252,8 @@ class AdminProfileUpdateRequest(BaseModel):
     role: UserRoleLiteral | None = None
     admin_note: str | None = None
     locale: LocaleLiteral | None = None
+    # 마케팅(뉴스레터) 메일 수신 동의. 수신거부 링크·백오피스 수신거부 관리와 같은 값을 쓴다.
+    subscribed_newsletter: bool | None = None
 
 
 class LocaleUpdateRequest(BaseModel):
