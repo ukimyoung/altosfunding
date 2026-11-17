@@ -110,7 +110,7 @@ async def send_verification(
     if body.purpose is VerificationPurpose.WITHDRAW_REQUEST:
         if user is None:
             raise AppError(401, "not_authenticated", "로그인이 필요합니다.")
-        await signup.send_withdraw_code(session, sender, user, body.email, _locale(request))
+        await signup.send_withdraw_code(session, sender, user, body.email, user.locale or "en")  # 회원 메일 언어
         return OkResponse(message_key="auth.email.verification_sent")
     await verify_recaptcha(body.recaptcha_token, request.client.host if request.client else None)
     await signup.send_verification_code(session, sender, body.email, body.purpose, _locale(request))
