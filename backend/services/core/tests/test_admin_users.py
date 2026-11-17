@@ -107,6 +107,44 @@ def test_update_profile_and_reset_password(client, admin_headers):
     assert _login(client, email="target@example.com", password="Changed123!").status_code == 200
 
 
+def test_create_and_change_role(client, admin_headers):
+    # 관리자 계정을 바로 만들 수 있고, 만든 계정은 관리자 API를 쓸 수 있다.
+    created = _create(client, admin_headers, email="ops@example.com", role="ADMIN")
+    assert created["role"] == "ADMIN"
+    token = _login(client, email="ops@example.com", password="Target123!").json()["access_token"]
+    ops_headers = {"Authorization": f"Bearer {token}"}
+    assert client.get("/api/v1/admin/users", headers=ops_headers).status_code == 200
+
+    # 비활성 상태로는 관리자를 만들 수 없다.
+    res = client.post("/api/v1/admin/users", headers=admin_headers,
+                      json={"email": "x@example.com", "password": "Target123!", "role": "ADMIN", "status": "INACTIVE"})
+    assert res.json()["error_code"] == "cannot_block_admin"
+    res = client.post("/api/v1/admin/users", headers=admin_headers,
+                      json={"email": "y@example.com", "password": "Target123!", "role": "SUPER"})
+    assert res.status_code == 422
+
+    # USER로 내리면 기존 토큰으로는 관리자 API를 쓸 수 없다.
+    res = client.patch(f"/api/v1/admin/users/{created['id']}/profile", headers=admin_headers, json={"role": "USER"})
+    assert res.status_code == 200, res.text
+    assert res.json()["role"] == "USER"
+    assert client.get("/api/v1/admin/users", headers=ops_headers).status_code == 403
+
+    # 다시 ADMIN으로 올릴 수 있다. 비활성 회원은 올릴 수 없다.
+    target = _create(client, admin_headers)
+    client.post(f"/api/v1/admin/users/{target['id']}/suspend", headers=admin_headers, json={"reason": "x"})
+    res = client.patch(f"/api/v1/admin/users/{target['id']}/profile", headers=admin_headers, json={"role": "ADMIN"})
+    assert res.json()["error_code"] == "cannot_block_admin"
+    res = client.patch(f"/api/v1/admin/users/{created['id']}/profile", headers=admin_headers, json={"role": "ADMIN"})
+    assert res.json()["role"] == "ADMIN"
+
+    # 본인 Role은 바꿀 수 없다 (같은 값 저장은 허용).
+    admin_id = client.get("/api/v1/auth/me", headers=admin_headers).json()["id"]
+    res = client.patch(f"/api/v1/admin/users/{admin_id}/profile", headers=admin_headers, json={"role": "USER"})
+    assert res.json()["error_code"] == "cannot_change_own_role"
+    res = client.patch(f"/api/v1/admin/users/{admin_id}/profile", headers=admin_headers, json={"role": "ADMIN"})
+    assert res.status_code == 200
+
+
 def test_admin_withdraw_user(client, admin_headers):
     target = _create(client, admin_headers)
     res = client.post(f"/api/v1/admin/users/{target['id']}/withdraw", headers=admin_headers)

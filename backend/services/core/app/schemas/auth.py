@@ -210,6 +210,7 @@ class LoginHistoryPage(BaseModel):
 
 UserStatusLiteral = Literal["ACTIVE", "INACTIVE", "BANNED"]
 UserGradeLiteral = Literal["NORMAL", "VIP"]
+UserRoleLiteral = Literal["USER", "ADMIN"]
 KycStatusLiteral = Literal["NONE", "PENDING", "APPROVED", "REJECTED"]
 
 
@@ -226,7 +227,7 @@ class AdminUserCreateRequest(BaseModel):
     address_line1: str | None = None
     address_line2: str | None = None
     admin_note: str | None = None
-    role: Literal["USER"] = "USER"
+    role: UserRoleLiteral = "USER"
     grade: UserGradeLiteral = "NORMAL"
     status: UserStatusLiteral = "ACTIVE"
     kyc_status: KycStatusLiteral = "NONE"
@@ -248,6 +249,7 @@ class AdminProfileUpdateRequest(BaseModel):
     status: UserStatusLiteral | None = None
     kyc_status: KycStatusLiteral | None = None
     grade: UserGradeLiteral | None = None
+    role: UserRoleLiteral | None = None
     admin_note: str | None = None
     locale: LocaleLiteral | None = None
 

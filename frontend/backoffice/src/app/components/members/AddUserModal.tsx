@@ -9,7 +9,7 @@ import {
   type MemberBasicInfoFieldKey,
   type MemberBasicInfoValues,
 } from "./MemberBasicInfoFields";
-import type { CreateUserRequest, UserKycStatus, UserStatus } from "@/api/user";
+import { USER_ROLE_OPTIONS, type CreateUserRequest, type UserKycStatus, type UserRole, type UserStatus } from "@/api/user";
 
 type AccountStatusValue = UserStatus;
 type KycStatusOptionValue = "APPROVED" | "Unverified" | "Rejected";
@@ -39,6 +39,7 @@ export function AddUserModal({
 }) {
   const t = tok(dark);
   const [userType, setUserType] = useState<"normal" | "vip">("normal");
+  const [role, setRole] = useState<UserRole>("USER");
   const [accountStatus, setAccountStatus] = useState<AccountStatusValue>("ACTIVE");
   const [kycStatus, setKycStatus] = useState<KycStatusOptionValue>("Unverified");
   const [firstName, setFirstName] = useState("");
@@ -104,7 +105,7 @@ export function AddUserModal({
     const payload: CreateUserRequest = {
       email: email.trim(),
       password: pwValue,
-      role: "USER",
+      role,
       grade: userType === "vip" ? "VIP" : "NORMAL",
       status: normalizeAccountStatus(accountStatus),
       kyc_status: normalizeKycStatus(kycStatus),
@@ -252,6 +253,10 @@ export function AddUserModal({
                   </button>
                 );
               })}
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <FormLabel label="Role" t={t} />
+              <FormSelect placeholder="Role 선택" options={USER_ROLE_OPTIONS} value={role} onChange={(v) => setRole(v as UserRole)} t={t} />
             </div>
           </div>
 

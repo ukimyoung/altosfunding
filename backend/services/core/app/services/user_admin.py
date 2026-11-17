@@ -192,6 +192,9 @@ def _apply_kyc_status(user: User, kyc_status: str) -> None:
 
 async def create_user(session: AsyncSession, data: dict, admin: User) -> User:
     email = normalize_email(data["email"])
+    role = data.get("role") or "USER"
+    if role == "ADMIN" and data["status"] != "ACTIVE":
+        raise AppError(400, "cannot_block_admin", "관리자 계정은 활성 상태로만 만들 수 있습니다.")
     exists = await session.scalar(select(User.id).where(User.email == email, User.status != "WITHDRAWN"))
     if exists:
         raise AppError(409, "email_already_exists", "이미 가입된 이메일입니다.")
@@ -200,7 +203,7 @@ async def create_user(session: AsyncSession, data: dict, admin: User) -> User:
         email=email,
         password_hash=hash_password(data["password"]),
         auth_provider="LOCAL",
-        role="USER",
+        role=role,
         grade=data["grade"],
         status="ACTIVE",
         email_verified_at=_now(),
@@ -223,9 +226,19 @@ async def create_user(session: AsyncSession, data: dict, admin: User) -> User:
 async def update_user(session: AsyncSession, user: User, data: dict, admin: User) -> None:
     if user.status == "WITHDRAWN":
         raise AppError(409, "account_already_withdrawn", "Account is already withdrawn")
+    role = data.get("role")
+    if role and role != user.role:
+        if user.id == admin.id:
+            raise AppError(400, "cannot_change_own_role", "본인 계정의 Role은 변경할 수 없습니다.")
+        if role == "ADMIN" and (data.get("status") or user.status) != "ACTIVE":
+            raise AppError(400, "cannot_block_admin", "활성 상태의 회원만 관리자로 지정할 수 있습니다.")
     for field in _PROFILE_FIELDS:
         if field in data:
             setattr(user, field, _clean(data[field]))
+    if role and role != user.role:
+        user.role = role
+        # 권한이 바뀌면 그 회원의 모든 기기 로그인을 끊어 새 권한으로 다시 로그인하게 한다.
+        await tokens.revoke_all_for_user(session, user.id)
     if data.get("grade"):
         user.grade = data["grade"]
     if data.get("locale"):

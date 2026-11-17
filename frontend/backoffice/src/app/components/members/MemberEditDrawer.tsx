@@ -10,7 +10,8 @@ import {
   type MemberBasicInfoFieldKey,
   type MemberBasicInfoValues,
 } from './MemberBasicInfoFields';
-import type { UpdateUserRequest, User } from '@/api/user';
+import { USER_ROLE_OPTIONS, type UpdateUserRequest, type User, type UserRole } from '@/api/user';
+import { useMeQuery } from '../../queries/profile';
 
 const emptyValue = '-';
 
@@ -22,6 +23,7 @@ const text = {
   issueTemp: '임시 발급',
   accountSettings: '계정 설정',
   accountMemo: '계정 메모 (선택)',
+  roleSelfHint: '본인 계정의 Role은 변경할 수 없습니다.',
   mailLocale: '메일 언어',
   mailLocaleHint: '입출금 승인, KYC 결과 등 알림 메일을 이 언어로 보냅니다. 회원이 웹에서 언어를 바꾸면 자동으로 바뀝니다.',
   memoPlaceholder: '내부 메모',
@@ -210,6 +212,10 @@ export function MemberEditDrawer({
   const [userType, setUserType] = useState<'NORMAL' | 'VIP'>(
     String(user.grade).toUpperCase() === 'VIP' ? 'VIP' : 'NORMAL',
   );
+  const [role, setRole] = useState<UserRole>(user.role === 'ADMIN' ? 'ADMIN' : 'USER');
+  const { data: me } = useMeQuery();
+  // 본인 계정의 Role은 바꿀 수 없다 (서버에서도 막는다).
+  const isSelf = Boolean(me?.id && me.id === user.id);
   const [memo, setMemo] = useState(user.admin_note ?? '');
   const [mailLocale, setMailLocale] = useState<'en' | 'ko'>(user.locale === 'ko' ? 'ko' : 'en');
 
@@ -234,6 +240,7 @@ export function MemberEditDrawer({
       avatar_url: user.avatar_url || undefined,
       password: password.trim() || undefined,
       grade: userType,
+      role,
       admin_note: memo.trim() || undefined,
       locale: mailLocale,
     });
@@ -449,6 +456,20 @@ export function MemberEditDrawer({
                   );
                 })}
               </div>
+            </div>
+
+            <div>
+              <EditInput
+                label="Role"
+                value={role}
+                onChange={(value) => setRole(value as UserRole)}
+                t={t}
+                options={USER_ROLE_OPTIONS}
+                disabled={isSelf}
+              />
+              {isSelf && (
+                <div style={{ fontSize: 11, color: t.textSec, marginTop: 6 }}>{text.roleSelfHint}</div>
+              )}
             </div>
 
             <div>
