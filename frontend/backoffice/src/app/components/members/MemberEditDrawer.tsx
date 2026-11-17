@@ -20,6 +20,8 @@ const text = {
   issueTemp: '임시 발급',
   accountSettings: '계정 설정',
   accountMemo: '계정 메모 (선택)',
+  mailLocale: '메일 언어',
+  mailLocaleHint: '입출금 승인, KYC 결과 등 알림 메일을 이 언어로 보냅니다. 회원이 웹에서 언어를 바꾸면 자동으로 바뀝니다.',
   memoPlaceholder: '내부 메모',
   cancel: '취소',
   save: '저장',
@@ -181,6 +183,7 @@ export function MemberEditDrawer({
     String(user.grade).toUpperCase() === 'VIP' ? 'VIP' : 'NORMAL',
   );
   const [memo, setMemo] = useState(user.admin_note ?? '');
+  const [mailLocale, setMailLocale] = useState<'en' | 'ko'>(user.locale === 'ko' ? 'ko' : 'en');
 
   const generateTempPassword = () => {
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
@@ -204,6 +207,7 @@ export function MemberEditDrawer({
       password: password.trim() || undefined,
       grade: userType,
       admin_note: memo.trim() || undefined,
+      locale: mailLocale,
     });
   };
 
@@ -415,6 +419,45 @@ export function MemberEditDrawer({
                   );
                 })}
               </div>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: t.textSec,
+                  marginBottom: 8,
+                }}
+              >
+                {text.mailLocale}
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {(['en', 'ko'] as const).map((code) => {
+                  const active = mailLocale === code;
+                  return (
+                    <button
+                      key={code}
+                      onClick={() => setMailLocale(code)}
+                      style={{
+                        flex: 1,
+                        height: 36,
+                        borderRadius: 8,
+                        border: active ? 'none' : `1px solid ${t.border}`,
+                        background: active ? t.accent : 'transparent',
+                        color: active ? '#fff' : t.textSec,
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {code === 'ko' ? '한국어' : 'English'}
+                    </button>
+                  );
+                })}
+              </div>
+              <div style={{ fontSize: 11, color: t.textSec, marginTop: 6 }}>{text.mailLocaleHint}</div>
             </div>
 
             <div>

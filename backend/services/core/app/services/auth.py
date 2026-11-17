@@ -38,6 +38,7 @@ async def login(
     password: str,
     ip_address: str | None,
     user_agent: str | None,
+    locale: str | None = None,
 ) -> LoginResult:
     user = await session.scalar(
         select(User).where(User.email == normalize_email(email), User.status != "WITHDRAWN")
@@ -57,13 +58,22 @@ async def login(
     if user.is_2fa_enabled:
         return LoginResult(user=user, two_factor_temp_token=tokens.create_2fa_temp_token(user))
 
-    return await complete_login(session, user, ip_address, user_agent)
+    return await complete_login(session, user, ip_address, user_agent, locale)
 
 
 async def complete_login(
-    session: AsyncSession, user: User, ip_address: str | None, user_agent: str | None
+    session: AsyncSession,
+    user: User,
+    ip_address: str | None,
+    user_agent: str | None,
+    locale: str | None = None,
 ) -> LoginResult:
-    """비밀번호(와 2FA) 확인을 마친 회원에게 토큰을 발급하고 로그인 이력을 남긴다."""
+    """비밀번호(와 2FA) 확인을 마친 회원에게 토큰을 발급하고 로그인 이력을 남긴다.
+
+    locale을 주면 회원 언어로 저장한다 (로그인한 웹 화면의 언어).
+    """
+    if locale in ("en", "ko"):
+        user.locale = locale
     user.last_login_at = _now()
     user.last_login_ip = ip_address
     session.add(

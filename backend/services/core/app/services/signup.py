@@ -181,7 +181,7 @@ async def generate_uid(session: AsyncSession) -> str:
     raise AppError(500, "code_generation_failed", "잠시 후 다시 시도해 주세요.")
 
 
-async def register(session: AsyncSession, body: RegisterRequest) -> UserOut:
+async def register(session: AsyncSession, body: RegisterRequest, locale: str = "en") -> UserOut:
     email = normalize_email(body.email)
 
     if body.auth_provider != "LOCAL":
@@ -234,6 +234,7 @@ async def register(session: AsyncSession, body: RegisterRequest) -> UserOut:
         referrer_id=referrer.id if referrer else None,
         agreed_to_terms=True,
         subscribed_newsletter=body.subscribe_newsletter,
+        locale=locale,
     )
     session.add(user)
     verification.consumed_at = now
@@ -283,6 +284,7 @@ def to_user_out(user: User, referrer_code: str | None = None, total_referrals: i
         referrer_code=referrer_code,
         agreed_to_terms=user.agreed_to_terms,
         subscribed_newsletter=user.subscribed_newsletter,
+        locale=user.locale,
         grade=user.grade,
         total_referrals=total_referrals,
         can_change_password=user.auth_provider == "LOCAL",

@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { getAccessToken } from '@altosfunding/shared/auth/tokenStore';
+import { updateLocale } from '@/api/user';
 import { type Locale, type Translations, translations } from './translations';
 
 interface LocaleContextValue {
@@ -88,6 +90,10 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(LOCALE_STORAGE_KEY, l);
       syncLocaleToUrl(l);
     } catch {}
+    // 로그인한 회원이 언어를 바꾸면 회원 언어로 저장한다 (알림 메일 언어). 실패해도 화면에는 영향 없음.
+    if (getAccessToken()) {
+      updateLocale(l).catch(() => {});
+    }
   }, []);
 
   useEffect(() => {

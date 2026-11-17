@@ -160,7 +160,9 @@ async def exchange_code(code: str) -> GoogleProfile:
     )
 
 
-async def find_or_create_user(session: AsyncSession, profile: GoogleProfile) -> tuple[User, bool]:
+async def find_or_create_user(
+    session: AsyncSession, profile: GoogleProfile, locale: str = "en"
+) -> tuple[User, bool]:
     """같은 이메일 회원이 있으면 그 회원으로 로그인하고, 없으면 바로 가입시킨다 (기존 서버와 동일).
 
     Google이 인증한 이메일이므로 이메일 가입 회원도 같은 이메일이면 Google로 로그인할 수 있다.
@@ -186,6 +188,7 @@ async def find_or_create_user(session: AsyncSession, profile: GoogleProfile) -> 
         referral_code=await _generate_unique(session, User.referral_code, 8),
         # 기존 서버와 같이 Google 가입은 약관 동의로 본다 (로그인 화면에 약관 안내가 있다).
         agreed_to_terms=True,
+        locale=locale,
     )
     session.add(user)
     try:

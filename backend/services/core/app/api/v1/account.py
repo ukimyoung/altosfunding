@@ -18,6 +18,7 @@ from app.errors import AppError
 from app.models import LoginHistory, User
 from app.schemas.auth import (
     BackupCodesResponse,
+    LocaleUpdateRequest,
     LoginHistoryOut,
     LoginHistoryPage,
     MessageResponse,
@@ -87,6 +88,14 @@ async def toggle_withdraw_email(
     user.is_email_enabled = body.enabled
     await session.commit()
     return WithdrawEmailResponse(is_email_enabled=user.is_email_enabled)
+
+
+@router.put("/account/locale", response_model=OkResponse, summary="회원 언어 저장 (en | ko)")
+async def update_locale(body: LocaleUpdateRequest, user: CurrentUser, session: Session) -> OkResponse:
+    """웹에서 언어를 바꾸면 호출한다. 알림 메일(입출금 승인, KYC 결과 등)을 이 언어로 보낸다."""
+    user.locale = body.locale
+    await session.commit()
+    return OkResponse(message_key="auth.locale_updated")
 
 
 @router.get("/login-history", response_model=LoginHistoryPage, summary="로그인 이력 조회")
@@ -193,10 +202,10 @@ async def withdraw_account(
     """개인정보를 지우고 모든 기기의 로그인을 끊는다. 관리자 계정은 직접 탈퇴할 수 없다."""
     if user.role == "ADMIN":
         raise AppError(400, "admin_self_withdraw_forbidden", "Admin accounts cannot be withdrawn via this endpoint")
-    name = notify.user_name(user)
+    name, locale = notify.user_name(user), _locale(request)
     email = await user_admin.withdraw(session, user, "회원 본인 탈퇴", user.id)
     await session.commit()
-    await notify.send(session, sender, email, "user_withdrawn", {"user_name": name}, locale=_locale(request))
+    await notify.send(session, sender, email, "user_withdrawn", {"user_name": name}, locale=locale)
     _delete_cookie(response, REFRESH_COOKIE)
     _delete_cookie(response, TWO_FACTOR_COOKIE)
     return OkResponse(message_key="auth.account_withdrawn")
