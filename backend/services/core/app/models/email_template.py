@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import ForeignKey, func
+from sqlalchemy import BigInteger, ForeignKey, Identity, func
 from sqlalchemy.dialects.postgresql import ARRAY, TEXT, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -35,3 +35,22 @@ class EmailTemplateContent(Base):
     html_content: Mapped[str]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class EmailLog(Base):
+    """메일 발송 이력 (한 통에 한 줄). 본문·변수는 저장하지 않는다."""
+
+    __tablename__ = "email_logs"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    batch_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), server_default=func.gen_random_uuid())
+    template_id: Mapped[str]
+    recipient: Mapped[str]
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
+    locale: Mapped[str | None]
+    subject: Mapped[str]
+    status: Mapped[str]
+    error_message: Mapped[str | None]
+    provider: Mapped[str]
+    provider_message_id: Mapped[str | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

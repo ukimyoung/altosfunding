@@ -27,8 +27,10 @@ import { formatKstDateTime } from '../../utils/utils';
 import { AddTemplateModal } from '../../components/email-notifications/AddTemplateModal';
 import type { AddTemplateDraft } from '../../components/email-notifications/AddTemplateModal';
 import { ManualDispatchTab } from '../../components/email-notifications/ManualDispatchTab';
+import { EmailLogDetailModal } from '../../components/email-notifications/EmailLogDetailModal';
 import { useSearchManualEmailUnsubscribedRecipientsMutation } from '../../queries/manualEmail';
 import type { ManualEmailGrade, ManualEmailRecipientPreview } from '../../../api/manualEmail';
+import type { NotificationLogStatus } from '../../../api/eventTemplate';
 
 type TabType = 'templates' | 'history' | 'dispatch' | 'unsub';
 const HISTORY_PAGE_SIZE = 20;
@@ -417,6 +419,12 @@ export function EmailNotificationPage() {
   const dateFrom = searchParams.get('start_date') ?? '';
   const dateTo = searchParams.get('end_date') ?? '';
   const historyPage = parsePageParam(searchParams.get('page'));
+  const statusParam = searchParams.get('status');
+  const statusFilter: NotificationLogStatus | '' =
+    statusParam === 'SENT' || statusParam === 'FAILED' ? statusParam : '';
+  const keywordFilter = searchParams.get('keyword') ?? '';
+  const [keywordInput, setKeywordInput] = useState(keywordFilter);
+  const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
 
   const updateParams = (updates: Record<string, string | number | null | undefined>) => {
     const next = new URLSearchParams(searchParams);
@@ -472,9 +480,12 @@ export function EmailNotificationPage() {
   const notificationLogsQuery = useListNotificationLogsQuery(
     {
       event_type: templateFilter || undefined,
+      status: statusFilter || undefined,
+      keyword: keywordFilter || undefined,
       start_date: dateFrom || undefined,
       end_date: dateTo || undefined,
-      group_by_batch: true,
+      // 지금은 메일마다 한 줄로 보여 준다 (수동 발송이 생기면 묶음 보기 추가)
+      group_by_batch: false,
       page: historyPage,
       page_size: HISTORY_PAGE_SIZE,
     },
@@ -655,6 +666,7 @@ export function EmailNotificationPage() {
   };
 
   const notificationLogs = notificationLogsQuery.data?.items ?? [];
+  const notificationLogSummary = notificationLogsQuery.data?.summary;
   const notificationLogTotal = notificationLogsQuery.data?.total ?? 0;
   const notificationLogPageSize = notificationLogsQuery.data?.page_size ?? HISTORY_PAGE_SIZE;
   const notificationLogTotalPages = Math.max(
@@ -1203,8 +1215,83 @@ export function EmailNotificationPage() {
                   fontSize: 13,
                 }}
               />
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  updateParams({ status: e.target.value, page: 1, tab: 'history' });
+                }}
+                style={{
+                  height: 36,
+                  padding: '0 12px',
+                  borderRadius: 8,
+                  border: `1px solid ${t.border}`,
+                  background: t.surface2,
+                  color: t.text,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                <option value="">상태: 전체</option>
+                <option value="SENT">성공</option>
+                <option value="FAILED">실패</option>
+              </select>
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  updateParams({ keyword: keywordInput.trim(), page: 1, tab: 'history' });
+                }}
+                style={{ display: 'flex', gap: 8, marginLeft: 'auto' }}
+              >
+                <input
+                  type="search"
+                  value={keywordInput}
+                  onChange={(e) => setKeywordInput(e.target.value)}
+                  placeholder="수신자 이메일 / 제목 검색"
+                  style={{
+                    height: 36,
+                    padding: '0 12px',
+                    borderRadius: 8,
+                    border: `1px solid ${t.border}`,
+                    background: t.surface2,
+                    color: t.text,
+                    fontSize: 13,
+                    minWidth: 220,
+                  }}
+                />
+                <button
+                  type="submit"
+                  style={{
+                    height: 36,
+                    padding: '0 16px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: t.accent,
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  검색
+                </button>
+              </form>
             </div>
           </div>
+
+          {/* Summary */}
+          {notificationLogSummary && (
+            <div style={{ padding: '0 24px 12px', display: 'flex', gap: 16, fontSize: 12, color: t.textSec }}>
+              <span>
+                전체 <strong style={{ color: t.text }}>{notificationLogSummary.total.toLocaleString()}</strong>건
+              </span>
+              <span>
+                성공 <strong style={{ color: '#16A34A' }}>{notificationLogSummary.sent.toLocaleString()}</strong>건
+              </span>
+              <span>
+                실패 <strong style={{ color: '#DC2626' }}>{notificationLogSummary.failed.toLocaleString()}</strong>건
+              </span>
+            </div>
+          )}
 
           {/* Table */}
           <div style={{ padding: '0 24px 32px' }}>
@@ -1219,7 +1306,7 @@ export function EmailNotificationPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-                    {['템플릿', '이벤트 트리거', '발송 시점', '수신자수', '발송일시'].map((h) => (
+                    {['템플릿', '이벤트 트리거', '수신자', '발송 시점', '상태', '발송일시'].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -1237,16 +1324,33 @@ export function EmailNotificationPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {notificationLogs.length === 0 && !notificationLogsQuery.isLoading && (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{ padding: '40px 16px', textAlign: 'center', fontSize: 13, color: t.textSec }}
+                      >
+                        발송 이력이 없습니다.
+                      </td>
+                    </tr>
+                  )}
                   {notificationLogs.map((item) => (
                     <tr
-                      key={item.trace_id ?? `${item.event_type}-${item.sent_at}`}
-                      style={{ borderBottom: `1px solid ${t.border}` }}
+                      key={item.id ?? item.trace_id ?? `${item.event_type}-${item.sent_at}`}
+                      onClick={() => item.id && setSelectedLogId(item.id)}
+                      style={{ borderBottom: `1px solid ${t.border}`, cursor: item.id ? 'pointer' : 'default' }}
                     >
                       <td style={{ padding: '16px', fontSize: 12, color: t.text }}>
-                        {item.subject || '-'}
+                        <div>{item.subject || '-'}</div>
+                        {item.template_name && (
+                          <div style={{ marginTop: 4, fontSize: 11, color: t.textHint }}>{item.template_name}</div>
+                        )}
                       </td>
                       <td style={{ padding: '16px', fontSize: 11, color: t.textSec }}>
-                        {eventTypeNameMap.get(item.event_type) ?? item.event_type}
+                        {item.event_name || (eventTypeNameMap.get(item.event_type) ?? item.event_type)}
+                      </td>
+                      <td style={{ padding: '16px', fontSize: 12, color: t.text }}>
+                        {item.recipient ?? `${item.total_count.toLocaleString()}명`}
                       </td>
                       <td style={{ padding: '16px' }}>
                         <span
@@ -1264,8 +1368,22 @@ export function EmailNotificationPage() {
                           {formatNotificationSendTiming(item.send_mode, item.delay_minutes)}
                         </span>
                       </td>
-                      <td style={{ padding: '16px', fontSize: 12, color: t.text }}>
-                        {item.total_count.toLocaleString()}명
+                      <td style={{ padding: '16px' }}>
+                        <span
+                          title={item.error_message ?? undefined}
+                          style={{
+                            display: 'inline-flex',
+                            padding: '4px 10px',
+                            borderRadius: 9999,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                            background: item.failed_count > 0 ? 'rgba(220,38,38,0.12)' : 'rgba(22,163,74,0.12)',
+                            color: item.failed_count > 0 ? '#DC2626' : '#16A34A',
+                          }}
+                        >
+                          {item.failed_count > 0 ? '실패' : '성공'}
+                        </span>
                       </td>
                       <td
                         style={{
@@ -1303,6 +1421,9 @@ export function EmailNotificationPage() {
             </div>
           </div>
         </>
+      )}
+      {selectedLogId !== null && (
+        <EmailLogDetailModal logId={selectedLogId} t={t} onClose={() => setSelectedLogId(null)} />
       )}
       {activeTab === 'dispatch' && (
         <ManualDispatchTab dark={dark} onToast={onToast} t={t} />

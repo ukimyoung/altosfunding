@@ -1,8 +1,8 @@
 from app.models.announcement import Announcement, AnnouncementCategory
 from app.models.catalog import PlatformConfig, Product, Ruleset
-from app.models.contact import ContactCategory, ContactMessage
-from app.models.email_template import EmailTemplate, EmailTemplateContent
 from app.models.challenge import Challenge, ChallengeSchedule, Holiday
+from app.models.contact import ContactCategory, ContactMessage
+from app.models.email_template import EmailLog, EmailTemplate, EmailTemplateContent
 from app.models.user import (
     EmailVerification,
     LoginHistory,
@@ -31,6 +31,7 @@ __all__ = [
     "ContactCategory",
     "ContactMessage",
     "DepositRequest",
+    "EmailLog",
     "EmailTemplate",
     "EmailTemplateContent",
     "EmailVerification",

@@ -2,6 +2,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import {
   createEventTemplate,
   getEventTemplateDetail,
+  getNotificationLog,
   listEventTemplates,
   listEventTypes,
   listNotificationLogs,
@@ -22,6 +23,7 @@ export const eventTemplatesQueryKeys = {
   detail: (templateId: string) => [...eventTemplatesQueryKeys.all, 'detail', templateId] as const,
   logs: (params: ListNotificationLogsParams) =>
     [...eventTemplatesQueryKeys.all, 'logs', params] as const,
+  log: (logId: number) => [...eventTemplatesQueryKeys.all, 'log', logId] as const,
 };
 
 export function useListEventTemplatesQuery() {
@@ -55,6 +57,14 @@ export function useListNotificationLogsQuery(params: ListNotificationLogsParams,
     queryFn: () => listNotificationLogs(params),
     enabled,
     placeholderData: keepPreviousData,
+  });
+}
+
+export function useGetNotificationLogQuery(logId: number | null) {
+  return useQuery({
+    queryKey: eventTemplatesQueryKeys.log(logId ?? 0),
+    queryFn: () => getNotificationLog(logId as number),
+    enabled: logId !== null,
   });
 }
 

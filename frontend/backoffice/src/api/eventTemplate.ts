@@ -80,8 +80,14 @@ export interface UpdateEventTemplatePayload {
   locales: Record<string, EventTemplateLocaleContent>;
 }
 
+export type NotificationLogStatus = 'SENT' | 'FAILED';
+
 export interface ListNotificationLogsParams {
   event_type?: string;
+  /** SENT | FAILED */
+  status?: NotificationLogStatus;
+  /** 수신자 이메일 / 제목 */
+  keyword?: string;
   start_date?: string;
   end_date?: string;
   group_by_batch?: boolean;
@@ -90,7 +96,17 @@ export interface ListNotificationLogsParams {
 }
 
 export interface NotificationLog {
+  /** 한 통의 이력 id (group_by_batch=false일 때) */
+  id?: number;
   trace_id: string | null;
+  recipient?: string | null;
+  status?: NotificationLogStatus;
+  error_message?: string | null;
+  locale?: string | null;
+  provider?: string;
+  provider_message_id?: string | null;
+  user_id?: string | null;
+  user_uid?: string | null;
   event_type: string;
   subject: string;
   total_count: number;
@@ -107,6 +123,8 @@ export interface ListNotificationLogsResponse {
   total: number;
   page: number;
   page_size: number;
+  /** 필터 조건 전체의 발송 건수 요약 */
+  summary?: { total: number; sent: number; failed: number };
   items: NotificationLog[];
 }
 
@@ -162,6 +180,11 @@ export const listNotificationLogs = async (
   const response = await api.get<ListNotificationLogsResponse>('/v1/admin/logs', {
     params,
   });
+  return response.data;
+};
+
+export const getNotificationLog = async (logId: number): Promise<NotificationLog> => {
+  const response = await api.get<NotificationLog>(`/v1/admin/logs/${logId}`);
   return response.data;
 };
 
