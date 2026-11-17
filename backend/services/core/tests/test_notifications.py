@@ -266,3 +266,29 @@ def test_member_requests_use_member_locale(client, admin_headers, trader, sent_e
     )
     assert {r["template_id"] for r in rows} == {"withdraw_verification_code", "withdrawal_requested"}
     assert all(r["locale"] == "ko" for r in rows)
+
+
+def test_withdraw_code_expires_in_60_seconds(client, trader, sent_emails):  # noqa: F811
+    from app.services import email_templates
+
+    run_sql("update core.users set is_email_enabled = true where email = $1", TRADER)
+    res = client.post(
+        "/api/v1/auth/email/send-verification",
+        headers=trader,
+        json={"email": TRADER, "purpose": "WITHDRAW_REQUEST"},
+    )
+    assert res.status_code == 201, res.text
+    row = run_sql(
+        "select extract(epoch from expires_at - created_at) as ttl from core.email_verifications"
+        " where purpose = 'WITHDRAW_REQUEST'"
+    )[0]
+    assert round(float(row["ttl"])) == 60
+    mail = email_templates.render_default(
+        "withdraw_verification_code", "ko", {"verification_code": "123456", "expiry_minutes": 1}
+    )
+    assert "1분 동안 유효" in mail.html
+    # 만료된 코드로는 출금할 수 없다
+    code = sent_emails[-1]["code"]
+    run_sql("update core.email_verifications set expires_at = now() - interval '1 second'")
+    res = _withdraw(client, trader, amount=10, verification_code=code)
+    assert res.status_code == 400
