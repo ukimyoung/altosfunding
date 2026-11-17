@@ -78,6 +78,8 @@ export interface UpdateUserRequest {
   role?: UserRole;
   admin_note?: string;
   locale?: UserLocale;
+  /** 마케팅(뉴스레터) 메일 수신 동의 */
+  subscribed_newsletter?: boolean;
 }
 
 export const USER_ROLE_OPTIONS: { value: UserRole; label: string }[] = [

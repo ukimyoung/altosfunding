@@ -22,6 +22,9 @@ const text = {
   passwordPlaceholder: '••••••••',
   issueTemp: '임시 발급',
   accountSettings: '계정 설정',
+  newsletter: '뉴스레터 수신',
+  newsletterOn: '수신',
+  newsletterOff: '미수신',
   accountMemo: '계정 메모 (선택)',
   roleSelfHint: '본인 계정의 Role은 변경할 수 없습니다.',
   mailLocale: '메일 언어',
@@ -218,6 +221,8 @@ export function MemberEditDrawer({
   const isSelf = Boolean(me?.id && me.id === user.id);
   const [memo, setMemo] = useState(user.admin_note ?? '');
   const [mailLocale, setMailLocale] = useState<'en' | 'ko'>(user.locale === 'ko' ? 'ko' : 'en');
+  // 마케팅 메일 수신 동의 (수신거부 링크·수신거부 관리와 같은 값)
+  const [newsletter, setNewsletter] = useState<boolean>(Boolean(user.subscribed_newsletter));
 
   const generateTempPassword = () => {
     const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
@@ -243,6 +248,9 @@ export function MemberEditDrawer({
       role,
       admin_note: memo.trim() || undefined,
       locale: mailLocale,
+      // 바뀐 경우에만 보낸다 (그대로면 수신거부 시각을 건드리지 않는다)
+      subscribed_newsletter:
+        newsletter !== Boolean(user.subscribed_newsletter) ? newsletter : undefined,
     });
   };
 
@@ -509,6 +517,44 @@ export function MemberEditDrawer({
                 })}
               </div>
               <div style={{ fontSize: 11, color: t.textSec, marginTop: 6 }}>{text.mailLocaleHint}</div>
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: 'block',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: t.textSec,
+                  marginBottom: 8,
+                }}
+              >
+                {text.newsletter}
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {([true, false] as const).map((value) => {
+                  const active = newsletter === value;
+                  return (
+                    <button
+                      key={String(value)}
+                      onClick={() => setNewsletter(value)}
+                      style={{
+                        flex: 1,
+                        height: 36,
+                        borderRadius: 8,
+                        border: active ? 'none' : `1px solid ${t.border}`,
+                        background: active ? t.accent : 'transparent',
+                        color: active ? '#fff' : t.textSec,
+                        cursor: 'pointer',
+                        fontSize: 13,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {value ? text.newsletterOn : text.newsletterOff}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             <div>

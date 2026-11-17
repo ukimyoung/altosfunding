@@ -243,6 +243,12 @@ async def update_user(session: AsyncSession, user: User, data: dict, admin: User
         user.grade = data["grade"]
     if data.get("locale"):
         user.locale = data["locale"]
+    subscribed = data.get("subscribed_newsletter")
+    if subscribed is not None and subscribed != user.subscribed_newsletter:
+        user.subscribed_newsletter = subscribed
+        # 수신거부 링크를 눌렀을 때와 같게: 미수신으로 바꾸면 수신거부 시각을 남기고(수신거부 관리 목록 기간 검색),
+        # 다시 수신으로 바꾸면 지운다.
+        user.newsletter_unsubscribed_at = None if subscribed else _now()
     if data.get("kyc_status"):
         _apply_kyc_status(user, data["kyc_status"])
     if data.get("password"):
