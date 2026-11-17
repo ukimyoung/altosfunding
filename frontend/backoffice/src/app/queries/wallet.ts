@@ -3,6 +3,7 @@ import {
   approveDepositRequest,
   approvePayoutRequest,
   approveWithdrawalRequest,
+  getWalletRequestHistoryTotals,
   getWalletRequestsSummary,
   listPendingWalletRequests,
   listWalletRequestHistory,
@@ -13,6 +14,7 @@ import {
 import type {
   ListPendingWalletRequestsParams,
   ListWalletRequestHistoryParams,
+  WalletRequestHistoryTotalsParams,
   WalletRequestsSummaryParams,
 } from '@/api/wallet';
 
@@ -25,6 +27,10 @@ export const walletQueryKeys = {
   listWalletRequestHistoryRoot: () => [...walletQueryKeys.all, 'ListWalletRequestHistory'] as const,
   listWalletRequestHistory: (params: ListWalletRequestHistoryParams = {}) =>
     [...walletQueryKeys.listWalletRequestHistoryRoot(), params] as const,
+  walletRequestHistoryTotalsRoot: () =>
+    [...walletQueryKeys.all, 'WalletRequestHistoryTotals'] as const,
+  walletRequestHistoryTotals: (params: WalletRequestHistoryTotalsParams = {}) =>
+    [...walletQueryKeys.walletRequestHistoryTotalsRoot(), params] as const,
   walletRequestsSummaryRoot: () => [...walletQueryKeys.all, 'WalletRequestsSummary'] as const,
   walletRequestsSummary: (params: WalletRequestsSummaryParams = {}) =>
     [...walletQueryKeys.walletRequestsSummaryRoot(), params] as const,
@@ -53,6 +59,16 @@ export function useListWalletRequestHistoryQuery(
   });
 }
 
+export function useWalletRequestHistoryTotalsQuery(
+  params: WalletRequestHistoryTotalsParams = {},
+) {
+  return useQuery({
+    queryKey: walletQueryKeys.walletRequestHistoryTotals(params),
+    queryFn: () => getWalletRequestHistoryTotals(params),
+    placeholderData: keepPreviousData,
+  });
+}
+
 export function useWalletRequestsSummaryQuery(params: WalletRequestsSummaryParams = {}) {
   return useQuery({
     queryKey: walletQueryKeys.walletRequestsSummary(params),
@@ -71,6 +87,7 @@ const useWalletRequestActionMutation = <TVariables,>(
       queryClient.invalidateQueries({ queryKey: walletQueryKeys.listPendingWalletRequestsRoot() });
       queryClient.invalidateQueries({ queryKey: walletQueryKeys.listWalletRequestHistoryRoot() });
       queryClient.invalidateQueries({ queryKey: walletQueryKeys.walletRequestsSummaryRoot() });
+      queryClient.invalidateQueries({ queryKey: walletQueryKeys.walletRequestHistoryTotalsRoot() });
     },
   });
 };

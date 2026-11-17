@@ -114,6 +114,17 @@ def test_deposit_approve_and_reject(client, admin_headers, trader):  # noqa: F81
     assert client.get("/api/v1/admin/wallets/requests/pending", headers=admin_headers,
                       params={"display_tx_type": "Payout"}).json()["total"] == 0
 
+    totals_url = "/api/v1/admin/wallets/requests/history/totals"
+    # 승인된 입금만 합산 (반려·대기 제외), 검색 조건은 목록과 같게
+    assert client.get(totals_url, headers=admin_headers).json() == {
+        "total_deposit_amount": 120.5, "total_withdraw_amount": 0.0,
+    }
+    assert client.get(totals_url, headers=admin_headers, params={"keyword": "hash-b"}).json()["total_deposit_amount"] == 0.0
+    assert client.get(totals_url, headers=admin_headers, params={"keyword": "Tar"}).json()["total_deposit_amount"] == 120.5
+    assert client.get(totals_url, headers=admin_headers, params={"display_tx_type": "Payout"}).json()["total_deposit_amount"] == 0.0
+    assert client.get(totals_url, headers=admin_headers, params={"end_date": "2000-01-01"}).json()["total_deposit_amount"] == 0.0
+    assert client.get(totals_url, headers=trader).status_code == 403
+
     assert _ledger_balanced() and _user_wallet_liability() == Decimal("120.50")
     row = run_sql("select wallet_tx_id from core.deposit_requests where id = $1", a)[0]
     assert row["wallet_tx_id"] is not None
@@ -166,6 +177,11 @@ def test_withdraw_approve_and_reject(client, admin_headers, trader):  # noqa: F8
     assert _balance(client, trader) == 40  # 반려 시 되돌림
     assert client.post(f"{url}/{w2['request_id']}/approve", headers=admin_headers,
                        json={"tx_hash": "x"}).json()["error_code"] == "invalid_status"
+
+    totals = client.get("/api/v1/admin/wallets/requests/history/totals", headers=admin_headers).json()
+    assert totals == {"total_deposit_amount": 100.0, "total_withdraw_amount": 60.0}  # 반려 출금 제외, 수수료 포함
+    assert client.get("/api/v1/admin/wallets/requests/history/totals", headers=admin_headers,
+                      params={"keyword": TRC_ADDR}).json()["total_withdraw_amount"] == 60.0
 
     assert _ledger_balanced() and _user_wallet_liability() == Decimal("40.00")
     rows = run_sql("select account_code, sum(credit - debit) v from core.journal_lines group by 1 order by 1")

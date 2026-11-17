@@ -246,3 +246,41 @@ async def admin_summary(
         "deposit_pending_count": row[2],
         "withdraw_pending_count": row[3],
     }
+
+
+async def admin_totals(
+    session: AsyncSession,
+    *,
+    keyword: str | None,
+    display_tx_type: str | None,
+    start_date: str | None,
+    end_date: str | None,
+) -> dict:
+    """'입출금 내역' 상단 카드: 승인(APPROVED)된 입금·출금 금액 합계.
+
+    별도 합계 테이블 없이 요청 테이블에서 바로 더한다. 검색 조건(검색어·유형·기간)은 목록과 같게 적용하고,
+    상태 필터는 적용하지 않는다(카드는 항상 승인 완료 금액). 출금 금액은 수수료를 포함한 신청 금액이다.
+    (status, created_at) include (amount) 인덱스로 회원 검색어가 없으면 테이블을 읽지 않고 합산한다.
+    """
+    zero = {"total_deposit_amount": 0.0, "total_withdraw_amount": 0.0}
+    # 지금은 External Wallet(입금·출금)만 있다. Payout 등은 해당 기능을 옮길 때 합친다.
+    if display_tx_type and display_tx_type.lower() != "all" and display_tx_type != EXTERNAL_WALLET:
+        return zero
+
+    kw = f"%{keyword.strip()}%" if keyword and keyword.strip() else None
+    nickname = func.trim(func.concat(func.coalesce(User.first_name, ""), " ", func.coalesce(User.last_name, "")))
+
+    async def _sum(model, address_col) -> float:
+        stmt = select(func.coalesce(func.sum(model.amount), 0)).where(model.status == "APPROVED")
+        if kw:
+            conds = [User.email.ilike(kw), nickname.ilike(kw), User.uid.ilike(kw), model.tx_hash.ilike(kw)]
+            if address_col is not None:
+                conds.append(address_col.ilike(kw))
+            stmt = stmt.join(User, User.id == model.user_id).where(or_(*conds))
+        stmt = _apply_dates(stmt, model.created_at, start_date, end_date)
+        return as_float(await session.scalar(stmt))
+
+    return {
+        "total_deposit_amount": await _sum(DepositRequest, None),
+        "total_withdraw_amount": await _sum(WithdrawalRequest, WithdrawalRequest.wallet_address),
+    }
