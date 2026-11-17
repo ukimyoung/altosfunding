@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type * as React from "react";
 import { Check, Eye, EyeOff, RefreshCw } from "lucide-react";
-import { FormInput, FormLabel, RadioItem, SectionLabel, TextareaField } from "../shared/FormControls";
+import { FormInput, FormLabel, FormSelect, RadioItem, SectionLabel, TextareaField } from "../shared/FormControls";
 import { ModalCloseBtn } from "../shared/ModalCloseButton";
 import { tok } from "../../theme/tokens";
 import {
@@ -184,9 +184,12 @@ export function AddUserModal({
           <MemberBasicInfoFields
             values={basicInfoValues}
             onChange={handleBasicInfoChange}
-            renderField={({ key, label, value, onChange, placeholder, required, type }) => (
+            renderField={({ key, label, value, onChange, placeholder, required, type, options }) => (
               <div key={key}>
                 <FormLabel label={label} required={required} t={t} />
+                {options ? (
+                  <FormSelect placeholder={placeholder} options={options} value={value} onChange={onChange} t={t} />
+                ) : (
                 <FormInput
                   placeholder={placeholder}
                   type={type}
@@ -199,6 +202,7 @@ export function AddUserModal({
                   )}
                   t={t}
                 />
+                )}
                 {key === "firstName" && errors.firstName && <div style={errorTextStyle}>{errors.firstName}</div>}
                 {key === "lastName" && errors.lastName && <div style={errorTextStyle}>{errors.lastName}</div>}
                 {key === "email" && errors.email && <div style={errorTextStyle}>{errors.email}</div>}

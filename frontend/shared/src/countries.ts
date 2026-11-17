@@ -3,7 +3,7 @@ import type { Country } from 'react-phone-number-input';
 import labelsEn from 'react-phone-number-input/locale/en';
 import labelsKo from 'react-phone-number-input/locale/ko';
 
-// 회원가입 2단계와 My Account > Edit Profile이 같은 국가 목록을 쓴다.
+// 웹 회원가입 2단계·My Account > Edit Profile과 백오피스 회원 추가·수정이 같은 국가 목록을 쓴다.
 // Core에는 영어 국가 이름(예: 'United States')이 저장된다.
 export const COUNTRY_LABELS = labelsEn as Record<string, string>;
 const COUNTRY_LABELS_KO = labelsKo as Record<string, string>;

@@ -15,7 +15,7 @@ import { type MeResponse, type UpdateProfileRequest } from '@/api/user';
 import { useLocale } from '@/app/i18n/LocaleContext';
 import { clearAccessToken } from '@altosfunding/shared/auth/tokenStore';
 import { getCountryCallingCode, parsePhoneNumber, type Country } from 'react-phone-number-input';
-import { COUNTRY_OPTIONS, toCountryLabel } from '@/app/utils/countries';
+import { COUNTRY_OPTIONS, toCountryLabel } from '@altosfunding/shared/countries';
 
 // 회원가입 화면과 같은 국가 목록·순서: 자주 쓰는 국가를 위에 두고 나머지는 이름순
 const PHONE_COUNTRY_OPTIONS = COUNTRY_OPTIONS.map((option) => ({

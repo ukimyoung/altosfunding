@@ -55,6 +55,53 @@ export function FormInput({
   );
 }
 
+export type FormSelectOption = { value: string; label: string };
+
+// 목록에서 고르는 입력란. value가 빈 문자열이면 placeholder를 흐리게 보여 준다.
+export function FormSelect({
+  placeholder,
+  options,
+  t,
+  style,
+  value,
+  onChange,
+  disabled,
+}: {
+  placeholder: string;
+  options: FormSelectOption[];
+  t: Tok;
+  style?: CSSProperties;
+  value?: string;
+  onChange?: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <select
+      value={value ?? ""}
+      disabled={disabled}
+      onChange={(e) => onChange?.(e.target.value)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      style={{
+        height: 38, background: t.surface2, border: `1px solid ${focused ? "#7C6AF7" : t.border2}`,
+        borderRadius: 8, fontSize: 13, padding: "0 8px", color: value ? t.text : t.textHint, outline: "none", width: "100%",
+        boxSizing: "border-box", fontFamily: "'Noto Sans KR','DM Sans',sans-serif",
+        transition: "border-color 0.15s", cursor: disabled ? "not-allowed" : "pointer", ...style,
+      }}
+    >
+      <option value="" disabled>
+        {placeholder}
+      </option>
+      {options.map((option) => (
+        <option key={option.value} value={option.value} style={{ color: t.text }}>
+          {option.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 export function RadioItem({ label, selected, onClick, t }: { label: string; selected: boolean; onClick: () => void; t: Tok }) {
   return (
     <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 8, height: 32, cursor: "pointer" }}>
