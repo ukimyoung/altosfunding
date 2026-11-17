@@ -615,7 +615,7 @@
       "lastNamePlaceholder": "Enter last name",
       "emailPlaceholder": "Enter email address",
       "phonePlaceholder": "Enter phone number",
-      "countryPlaceholder": "Enter country",
+      "countryPlaceholder": "Select country",
       "cityPlaceholder": "Enter city",
       "statePlaceholder": "Enter state or province",
       "postalCodePlaceholder": "Enter postal code",

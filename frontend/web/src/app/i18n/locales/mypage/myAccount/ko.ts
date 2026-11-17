@@ -106,7 +106,7 @@ export const myAccountKo: MyAccountTranslations = {
     registrationDate: '가입일',
     addressInformation: '주소 정보',
     country: '국가',
-    countryPlaceholder: '국가를 입력하세요',
+    countryPlaceholder: '국가를 선택하세요',
     city: '도시',
     cityPlaceholder: '도시를 입력하세요',
     stateProvince: '주/도',
