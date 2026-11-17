@@ -1,3 +1,4 @@
+import axios from 'axios';
 import api from './axios';
 
 export interface MeResponse {
@@ -36,6 +37,7 @@ export interface MeResponse {
 
 export type UserStatus = 'ACTIVE' | 'INACTIVE' | 'BANNED';
 export type UserGrade = 'NORMAL' | 'VIP';
+export type UserRole = 'USER' | 'ADMIN';
 export type UserLocale = 'en' | 'ko';
 export type UserKycStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -52,7 +54,7 @@ export interface CreateUserRequest {
   address_line1?: string;
   address_line2?: string;
   admin_note?: string;
-  role: 'USER';
+  role: UserRole;
   grade: UserGrade;
   status: UserStatus;
   kyc_status: UserKycStatus;
@@ -73,9 +75,25 @@ export interface UpdateUserRequest {
   status?: UserStatus;
   kyc_status?: UserKycStatus;
   grade?: UserGrade;
+  role?: UserRole;
   admin_note?: string;
   locale?: UserLocale;
 }
+
+export const USER_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: 'USER', label: 'USER' },
+  { value: 'ADMIN', label: 'ADMIN' },
+];
+
+/** 회원 추가·수정 API 오류를 화면에 보여 줄 문구로 바꾼다. */
+export const getUserApiErrorMessage = (error: unknown, fallback: string) => {
+  if (!axios.isAxiosError<{ message?: string; error_code?: string }>(error)) return fallback;
+  const code = error.response?.data?.error_code;
+  if (code === 'email_already_exists') return '이미 가입된 이메일입니다.';
+  if (code === 'cannot_change_own_role') return '본인 계정의 Role은 변경할 수 없습니다.';
+  if (code === 'validation_error' || error.response?.status === 422) return '입력값을 확인해 주세요.';
+  return error.response?.data?.message || fallback;
+};
 
 export interface SuspendUserRequest {
   reason: string;

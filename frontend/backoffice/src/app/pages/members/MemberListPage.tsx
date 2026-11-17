@@ -24,6 +24,7 @@ import { AddUserModal } from '../../components/members/AddUserModal';
 import { StatCard } from '../../components/members/StatCard';
 import { useCreateUserMutation, useListUsersQuery, useUserSummaryQuery } from '../../queries/users';
 import { formatKstDateTime, formatNumber, formatUsdMoney } from '../../utils/utils';
+import { getUserApiErrorMessage } from '@/api/user';
 import type {
   CreateUserRequest,
   User,
@@ -210,8 +211,8 @@ export function MemberListPage() {
         setShowAddUserModal(false);
         setToast({ message: '회원이 추가되었습니다.', type: 'success' });
       },
-      onError: () => {
-        setToast({ message: '회원 추가에 실패했습니다.', type: 'warning' });
+      onError: (error) => {
+        setToast({ message: getUserApiErrorMessage(error, '회원 추가에 실패했습니다.'), type: 'warning' });
       },
     });
   };

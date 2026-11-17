@@ -39,7 +39,7 @@ import { useListWalletRequestHistoryQuery } from '../../queries/wallet';
 import { formatKstDateTime, formatUsdMoney, phoneRender } from '../../utils/utils';
 import { getWalletStatusBadge } from '../../utils/walletDisplay';
 import type { AccountTier, ListAccountsResponse } from '@/api/account';
-import type { UpdateUserRequest, UserKycStatus } from '@/api/user';
+import { getUserApiErrorMessage, type UpdateUserRequest, type UserKycStatus } from '@/api/user';
 
 const emptyValue = '-';
 const accountPageSize = 20;
@@ -481,7 +481,12 @@ export function MemberDetailPage() {
   };
 
   const handleUpdateUser = async (payload: UpdateUserRequest) => {
-    await updateUserMutation.mutateAsync({ userId: memberId, payload });
+    try {
+      await updateUserMutation.mutateAsync({ userId: memberId, payload });
+    } catch (error) {
+      showToast(getUserApiErrorMessage(error, '저장에 실패했습니다.'), 'warning');
+      return;
+    }
     await refetchUserDetail();
     setShowEditDrawer(false);
     showToast('저장되었습니다');
