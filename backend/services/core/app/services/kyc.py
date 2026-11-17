@@ -106,18 +106,20 @@ def _reject_reason(review: dict) -> str | None:
     return review.get("moderationComment") or review.get("clientComment") or None
 
 
-async def handle_webhook(session: AsyncSession, payload: dict) -> None:
+async def handle_webhook(session: AsyncSession, payload: dict) -> tuple[User, str] | None:
+    """상태를 반영한다. 회원을 찾았으면 (회원, 바뀌기 전 KYC 상태)를 돌려준다 (안내 메일용)."""
     event = payload.get("type")
     external_user_id = payload.get("externalUserId")
     try:
         user_id = uuid.UUID(str(external_user_id))
     except (TypeError, ValueError):
         logger.warning("Sumsub 웹훅: 알 수 없는 externalUserId %s (%s)", external_user_id, event)
-        return
+        return None
     user = await session.get(User, user_id, with_for_update=True)
     if user is None:
         logger.warning("Sumsub 웹훅: 회원 없음 %s (%s)", external_user_id, event)
-        return
+        return None
+    before = user.kyc_status
 
     if event in ("applicantPending", "applicantOnHold"):
         _apply_kyc_status(user, "PENDING")
@@ -133,4 +135,5 @@ async def handle_webhook(session: AsyncSession, payload: dict) -> None:
         user.kyc_reject_reason = None
     else:
         logger.info("Sumsub 웹훅 무시: %s", event)
+    return user, before
 

@@ -16,8 +16,9 @@ from app.api.v1.auth import (
     _set_cookie,
 )
 from app.config import settings
+from app.deps import Sender
 from app.errors import AppError
-from app.services import auth, google_auth, tokens
+from app.services import auth, google_auth, notify, tokens
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +61,7 @@ async def google_login(
 async def google_callback(
     request: Request,
     session: Session,
+    sender: Sender,
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
@@ -96,6 +98,9 @@ async def google_callback(
         await session.rollback()
         return fail(exc.error_code)
 
+    if is_new:
+        await session.commit()
+        await notify.welcome(session, sender, user.id, "en")
     welcome = "welcome=true" if is_new else ""
     if user.is_2fa_enabled:
         await session.commit()

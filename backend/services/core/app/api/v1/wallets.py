@@ -17,9 +17,10 @@
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
-from app.deps import AdminUser, CurrentUser, Session
+from app.deps import AdminUser, CurrentUser, Sender, Session
+from app.models import User
 from app.schemas.wallet import (
     DepositCreate,
     DepositCreated,
@@ -37,8 +38,9 @@ from app.schemas.wallet import (
     WithdrawCreate,
     WithdrawCreated,
 )
-from app.services import payout_settings, wallet_history
+from app.services import notify, payout_settings, wallet_history
 from app.services import wallet as svc
+from app.services.announcement import request_locale
 from app.services.wallet import as_float
 
 logger = logging.getLogger(__name__)
@@ -106,7 +108,9 @@ async def create_deposit(body: DepositCreate, user: CurrentUser, session: Sessio
 
 
 @router.post("/wallets/me/withdraw", response_model=WithdrawCreated, summary="출금 신청 (관리자 승인 대기)")
-async def create_withdrawal(body: WithdrawCreate, user: CurrentUser, session: Session) -> WithdrawCreated:
+async def create_withdrawal(
+    body: WithdrawCreate, user: CurrentUser, session: Session, sender: Sender, request: Request
+) -> WithdrawCreated:
     """KYC 승인 회원만. 2FA를 켰으면 totp_code, 출금 이메일 인증을 켰으면 verification_code
     (POST /auth/email/send-verification purpose=WITHDRAW_REQUEST로 받은 코드)가 필요하다.
     신청 금액은 잔고에서 바로 빠지고, 회원이 받는 금액은 금액 - 네트워크 수수료다."""
@@ -120,6 +124,11 @@ async def create_withdrawal(body: WithdrawCreate, user: CurrentUser, session: Se
         totp_code=body.totp_code,
     )
     logger.info("출금 신청 #%s user=%s amount=%s fee=%s", req.id, user.id, req.amount, req.fee)
+    await notify.to_user(
+        session, sender, user, "withdrawal_requested",
+        {"recipient_email": user.email, "payout_id": req.id, "amount": notify.amount_text(req.amount)},
+        locale=request_locale(request.headers.get("accept-language")),
+    )
     return WithdrawCreated(
         request_id=req.id,
         amount=as_float(req.amount),
@@ -131,6 +140,20 @@ async def create_withdrawal(body: WithdrawCreate, user: CurrentUser, session: Se
 
 
 # ── 관리자: 입출금 승인 ─────────────────────────────────────
+
+
+async def _notify(session, sender, user_id, template_id: str, variables: dict) -> None:
+    user = await session.get(User, user_id)
+    if user is not None:
+        await notify.to_user(session, sender, user, template_id, variables)
+
+
+def _withdrawal_amounts(req) -> dict:
+    return {
+        "amount": notify.amount_text(req.amount),
+        "fee": notify.amount_text(req.fee),
+        "received_amount": notify.amount_text(req.amount - req.fee),
+    }
 
 
 @admin_router.get("/admin/wallets/requests/pending", summary="입출금 승인 대기 목록 (오래된 순)")
@@ -185,16 +208,25 @@ async def admin_summary(
 
 
 @admin_router.post("/admin/wallets/deposits/{request_id}/approve", response_model=RequestProcessed, summary="입금 승인 (지갑 잔고 반영)")
-async def approve_deposit(request_id: int, admin: AdminUser, session: Session) -> RequestProcessed:
+async def approve_deposit(request_id: int, admin: AdminUser, session: Session, sender: Sender) -> RequestProcessed:
     req = await svc.approve_deposit(session, admin, request_id)
     logger.info("입금 승인 #%s by %s amount=%s", req.id, admin.id, req.amount)
+    await _notify(session, sender, req.user_id, "deposit_confirmed", {
+        "amount": notify.amount_text(req.amount), "processed_at": notify.time_text(req.processed_at), "tx_id": req.tx_hash,
+    })
     return RequestProcessed(id=req.id, status=req.status, amount=as_float(req.amount), tx_hash=req.tx_hash)
 
 
 @admin_router.post("/admin/wallets/deposits/{request_id}/reject", response_model=RequestProcessed, summary="입금 반려")
-async def reject_deposit(request_id: int, body: DepositRejectBody, admin: AdminUser, session: Session) -> RequestProcessed:
+async def reject_deposit(
+    request_id: int, body: DepositRejectBody, admin: AdminUser, session: Session, sender: Sender
+) -> RequestProcessed:
     req = await svc.reject_deposit(session, admin, request_id, body.reason)
     logger.info("입금 반려 #%s by %s", req.id, admin.id)
+    await _notify(session, sender, req.user_id, "deposit_rejected", {
+        "amount": notify.amount_text(req.amount), "processed_at": notify.time_text(req.processed_at),
+        "tx_id": req.tx_hash, "reason": req.reject_reason,
+    })
     return RequestProcessed(
         id=req.id, status=req.status, amount=as_float(req.amount), tx_hash=req.tx_hash, reject_reason=req.reject_reason
     )
@@ -202,11 +234,14 @@ async def reject_deposit(request_id: int, body: DepositRejectBody, admin: AdminU
 
 @admin_router.post("/admin/wallets/withdrawals/{request_id}/approve", response_model=RequestProcessed, summary="출금 승인 (송금 TX hash 입력)")
 async def approve_withdrawal(
-    request_id: int, body: WithdrawalApproveBody, admin: AdminUser, session: Session
+    request_id: int, body: WithdrawalApproveBody, admin: AdminUser, session: Session, sender: Sender
 ) -> RequestProcessed:
     """회원 지갑 주소로 (금액 - 수수료)를 송금한 뒤 그 TX hash를 입력해 승인한다."""
     req = await svc.approve_withdrawal(session, admin, request_id, body.tx_hash)
     logger.info("출금 승인 #%s by %s amount=%s", req.id, admin.id, req.amount)
+    await _notify(session, sender, req.user_id, "withdrawal_confirmed", {
+        **_withdrawal_amounts(req), "processed_at": notify.time_text(req.processed_at), "tx_id": req.tx_hash,
+    })
     return RequestProcessed(
         id=req.id, status=req.status, amount=as_float(req.amount), fee=as_float(req.fee), tx_hash=req.tx_hash
     )
@@ -214,10 +249,13 @@ async def approve_withdrawal(
 
 @admin_router.post("/admin/wallets/withdrawals/{request_id}/reject", response_model=RequestProcessed, summary="출금 반려 (잔고 되돌림)")
 async def reject_withdrawal(
-    request_id: int, body: WithdrawalRejectBody, admin: AdminUser, session: Session
+    request_id: int, body: WithdrawalRejectBody, admin: AdminUser, session: Session, sender: Sender
 ) -> RequestProcessed:
     req = await svc.reject_withdrawal(session, admin, request_id, body.note)
     logger.info("출금 반려 #%s by %s", req.id, admin.id)
+    await _notify(session, sender, req.user_id, "withdrawal_rejected", {
+        **_withdrawal_amounts(req), "processed_at": notify.time_text(req.processed_at), "reason": req.rejected_reason,
+    })
     return RequestProcessed(
         id=req.id, status=req.status, amount=as_float(req.amount), fee=as_float(req.fee),
         reject_reason=req.rejected_reason,

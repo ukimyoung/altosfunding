@@ -32,7 +32,7 @@ from app.schemas.auth import (
     WithdrawEmailRequest,
     WithdrawEmailResponse,
 )
-from app.services import password, signup, two_factor, user_admin
+from app.services import notify, password, signup, two_factor, user_admin
 from app.services.email import EmailSender, get_email_sender
 from app.services.recaptcha import verify_recaptcha
 
@@ -183,12 +183,20 @@ async def regenerate_backup_codes(
 
 
 @router.post("/account/withdraw", response_model=OkResponse, summary="회원 탈퇴 (본인)")
-async def withdraw_account(user: CurrentUser, session: Session, response: Response) -> OkResponse:
+async def withdraw_account(
+    user: CurrentUser,
+    session: Session,
+    response: Response,
+    request: Request,
+    sender: Annotated[EmailSender, Depends(get_email_sender)],
+) -> OkResponse:
     """개인정보를 지우고 모든 기기의 로그인을 끊는다. 관리자 계정은 직접 탈퇴할 수 없다."""
     if user.role == "ADMIN":
         raise AppError(400, "admin_self_withdraw_forbidden", "Admin accounts cannot be withdrawn via this endpoint")
-    await user_admin.withdraw(session, user, "회원 본인 탈퇴", user.id)
+    name = notify.user_name(user)
+    email = await user_admin.withdraw(session, user, "회원 본인 탈퇴", user.id)
     await session.commit()
+    await notify.send(session, sender, email, "user_withdrawn", {"user_name": name}, locale=_locale(request))
     _delete_cookie(response, REFRESH_COOKIE)
     _delete_cookie(response, TWO_FACTOR_COOKIE)
     return OkResponse(message_key="auth.account_withdrawn")
