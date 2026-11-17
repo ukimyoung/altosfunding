@@ -57,6 +57,7 @@ class User(Base):
 
     agreed_to_terms: Mapped[bool] = mapped_column(server_default="false")
     subscribed_newsletter: Mapped[bool] = mapped_column(server_default="false")
+    newsletter_unsubscribed_at: Mapped[datetime | None]
 
     last_login_at: Mapped[datetime | None]
     last_login_ip: Mapped[str | None]

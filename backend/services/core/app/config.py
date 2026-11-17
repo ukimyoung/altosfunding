@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     # 비어 있으면 내부 작업 API를 막는다.
     system_api_key: str = ""
 
+    # Core의 공개 주소. 메일 본문 이미지 주소(/api/v1/files/{id})에 쓴다.
+    # 비어 있으면 Render가 넣어 주는 RENDER_EXTERNAL_URL, 그것도 없으면 요청 주소를 쓴다.
+    core_public_url: str = ""
+    render_external_url: str = ""
+    # 수동 발송 속도 (초당 통수). SES 계정 발송 한도(샌드박스 1, 기본 14)보다 낮게 둔다.
+    manual_email_rate_per_second: float = 10.0
+
     # Sumsub KYC. 비어 있으면 본인 인증 시작(토큰 발급)과 웹훅을 막는다. 상태 조회는 된다.
     sumsub_app_token: str = ""
     sumsub_secret_key: str = ""
