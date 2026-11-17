@@ -202,7 +202,7 @@ async def withdraw_account(
     """개인정보를 지우고 모든 기기의 로그인을 끊는다. 관리자 계정은 직접 탈퇴할 수 없다."""
     if user.role == "ADMIN":
         raise AppError(400, "admin_self_withdraw_forbidden", "Admin accounts cannot be withdrawn via this endpoint")
-    name, locale = notify.user_name(user), _locale(request)
+    name, locale = notify.user_name(user), user.locale or "en"  # 회원 메일 언어
     email = await user_admin.withdraw(session, user, "회원 본인 탈퇴", user.id)
     await session.commit()
     await notify.send(session, sender, email, "user_withdrawn", {"user_name": name}, locale=locale)

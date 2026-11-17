@@ -243,3 +243,26 @@ def test_register_saves_page_locale(client, sent_emails):
         and sent_emails[-1]["locale"] == "ko"
     )
     assert sent_emails[-1]["subject"] == "[Altos Funding] 알토스 펀딩 가입을 환영합니다"
+
+
+def test_member_requests_use_member_locale(client, admin_headers, trader, sent_emails):  # noqa: F811
+    """출금 인증코드·출금 신청 메일은 브라우저 언어가 아니라 회원 메일 언어로 보낸다."""
+    run_sql("update core.users set locale = 'ko', is_email_enabled = true where email = $1", TRADER)
+    dep = _deposit(client, trader, amount=100).json()["request_id"]
+    client.post(f"/api/v1/admin/wallets/deposits/{dep}/approve", headers=admin_headers)
+    en = {**trader, "Accept-Language": "en-US,en;q=0.9"}
+    res = client.post(
+        "/api/v1/auth/email/send-verification",
+        headers=en,
+        json={"email": TRADER, "purpose": "WITHDRAW_REQUEST"},
+    )
+    assert res.status_code == 201, res.text
+    code = sent_emails[-1]["code"]
+    res = _withdraw(client, en, amount=50, verification_code=code)
+    assert res.status_code == 200, res.text
+    rows = run_sql(
+        "select template_id, locale from core.email_logs"
+        " where template_id in ('withdraw_verification_code', 'withdrawal_requested')"
+    )
+    assert {r["template_id"] for r in rows} == {"withdraw_verification_code", "withdrawal_requested"}
+    assert all(r["locale"] == "ko" for r in rows)

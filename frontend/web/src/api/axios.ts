@@ -16,8 +16,11 @@ const getBrowserTimeZone = () => {
 
 const getCurrentLocale = (): Locale => {
   try {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('lang') === 'ko' ? 'ko' : 'en';
+    // 화면 언어: 주소의 ?lang= → 저장해 둔 언어(LocaleContext) → 영어
+    const lang =
+      new URLSearchParams(window.location.search).get('lang') ??
+      window.localStorage.getItem('altos.locale');
+    return lang === 'ko' ? 'ko' : 'en';
   } catch {
     return 'en';
   }

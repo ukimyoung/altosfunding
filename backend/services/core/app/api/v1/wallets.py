@@ -40,7 +40,6 @@ from app.schemas.wallet import (
 )
 from app.services import notify, payout_settings, wallet_history
 from app.services import wallet as svc
-from app.services.announcement import request_locale
 from app.services.wallet import as_float
 
 logger = logging.getLogger(__name__)
@@ -127,7 +126,6 @@ async def create_withdrawal(
     await notify.to_user(
         session, sender, user, "withdrawal_requested",
         {"recipient_email": user.email, "payout_id": req.id, "amount": notify.amount_text(req.amount)},
-        locale=request_locale(request.headers.get("accept-language")),
     )
     return WithdrawCreated(
         request_id=req.id,
