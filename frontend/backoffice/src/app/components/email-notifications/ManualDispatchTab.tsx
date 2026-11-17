@@ -155,6 +155,9 @@ export function ManualDispatchTab({ dark, onToast, t }: ManualDispatchTabProps) 
   const [searchPage, setSearchPage] = useState(1);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [pendingDraft, setPendingDraft] = useState<ManualEmailDraftResponse | null>(null);
+  // 최종 확인 창: 서버가 계산한 실제 발송·제외 인원
+  const confirmCount = pendingDraft?.recipient_summary.eligible ?? 0;
+  const confirmSkipped = pendingDraft?.recipient_summary.skipped ?? 0;
 
   const [targetType, setTargetType] = useState<DispatchTargetType>('all');
   const [manualEmails, setManualEmails] = useState('');
@@ -269,7 +272,8 @@ export function ManualDispatchTab({ dark, onToast, t }: ManualDispatchTabProps) 
         });
 
         if (!ignore) {
-          setAllUserTotal(response.total ?? 0);
+          // 마케팅 메일이면 수신거부 회원을 뺀 실제 발송 인원
+          setAllUserTotal(response.eligible ?? response.total ?? 0);
           setAllUserUnsubscribed(response.unsubscribed_count ?? 0);
         }
       } catch {
@@ -537,12 +541,12 @@ export function ManualDispatchTab({ dark, onToast, t }: ManualDispatchTabProps) 
     }
 
     try {
-      await sendDraftMutation.mutateAsync(pendingDraft.draft_id);
+      const result = await sendDraftMutation.mutateAsync(pendingDraft.draft_id);
       setShowConfirm(false);
       const message =
         sendTiming === 'immediate'
-          ? `${targetCount.toLocaleString()}명에게 이메일 발송 요청이 생성되었습니다.`
-          : `${schedDate} ${schedTime}에 발송 예약 요청이 생성되었습니다.`;
+          ? `${result.recipient_count.toLocaleString()}명에게 발송을 시작했습니다. 결과는 '발송 이력' 탭에서 확인할 수 있습니다.`
+          : `${schedDate} ${schedTime}에 ${result.recipient_count.toLocaleString()}명에게 발송하도록 예약했습니다.`;
 
       onToast(message, 'success');
       setPendingDraft(null);
@@ -1028,7 +1032,7 @@ export function ManualDispatchTab({ dark, onToast, t }: ManualDispatchTabProps) 
               />
               <span style={{ fontSize: 13, fontWeight: 600, color: t.accent }}>
                 전체 유저 {targetCount.toLocaleString()}명에게 발송됩니다
-                {!optEmergency && (
+                {optMarketing && !optEmergency && (
                   <span style={{ fontSize: 12, fontWeight: 500, color: '#DC2626', marginLeft: 8 }}>
                     (수신거부 {allUserUnsubscribedCount.toLocaleString()}명 자동 제외)
                   </span>
@@ -1705,9 +1709,15 @@ export function ManualDispatchTab({ dark, onToast, t }: ManualDispatchTabProps) 
               >
                 총{' '}
                 <strong style={{ fontSize: 18, color: t.accent }}>
-                  {targetCount.toLocaleString()}명
+                  {confirmCount.toLocaleString()}명
                 </strong>
                 에게
+                {confirmSkipped > 0 && (
+                  <span style={{ fontSize: 12, color: t.textHint }}>
+                    {' '}
+                    (수신거부·형식 오류·중복 {confirmSkipped.toLocaleString()}명 제외)
+                  </span>
+                )}
                 <br />
                 이메일을 발송하시겠습니까?
                 <br />

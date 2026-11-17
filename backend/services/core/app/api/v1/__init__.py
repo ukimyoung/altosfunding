@@ -11,8 +11,11 @@ from app.api.v1.contacts import admin_router as admin_contacts_router
 from app.api.v1.contacts import public_router as support_router
 from app.api.v1.email_logs import router as admin_email_logs_router
 from app.api.v1.email_templates import router as admin_email_templates_router
+from app.api.v1.files import router as files_router
 from app.api.v1.google import router as google_router
 from app.api.v1.kyc import router as kyc_router
+from app.api.v1.manual_email import router as admin_manual_email_router
+from app.api.v1.newsletter import router as newsletter_router
 from app.api.v1.rewards import admin_router as admin_rewards_router
 from app.api.v1.rewards import router as rewards_router
 from app.api.v1.wallets import admin_router as admin_wallets_router
@@ -36,3 +39,6 @@ router.include_router(wallets_router)
 router.include_router(admin_wallets_router)
 router.include_router(admin_email_templates_router)
 router.include_router(admin_email_logs_router)
+router.include_router(admin_manual_email_router)
+router.include_router(files_router)
+router.include_router(newsletter_router)

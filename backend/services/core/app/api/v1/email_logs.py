@@ -27,6 +27,9 @@ async def list_logs(
     group_by_batch: Annotated[
         bool, Query(description="같은 묶음(수동 발송)을 한 줄로")
     ] = False,
+    trace_id: Annotated[
+        str | None, Query(description="묶음 id — 한 묶음의 수신자별 이력")
+    ] = None,
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 20,
 ) -> dict:
@@ -39,6 +42,7 @@ async def list_logs(
         start_date=start_date,
         end_date=end_date,
         group_by_batch=group_by_batch,
+        trace_id=trace_id or None,
         page=page,
         page_size=page_size,
     )

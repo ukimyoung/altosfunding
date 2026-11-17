@@ -27,6 +27,7 @@ import { formatKstDateTime } from '../../utils/utils';
 import { AddTemplateModal } from '../../components/email-notifications/AddTemplateModal';
 import type { AddTemplateDraft } from '../../components/email-notifications/AddTemplateModal';
 import { ManualDispatchTab } from '../../components/email-notifications/ManualDispatchTab';
+import { EmailBatchDetailModal } from '../../components/email-notifications/EmailBatchDetailModal';
 import { EmailLogDetailModal } from '../../components/email-notifications/EmailLogDetailModal';
 import { useSearchManualEmailUnsubscribedRecipientsMutation } from '../../queries/manualEmail';
 import type { ManualEmailGrade, ManualEmailRecipientPreview } from '../../../api/manualEmail';
@@ -425,6 +426,13 @@ export function EmailNotificationPage() {
   const keywordFilter = searchParams.get('keyword') ?? '';
   const [keywordInput, setKeywordInput] = useState(keywordFilter);
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null);
+  // 묶음 보기(기본): 여러 명에게 보낸 메일(수동 발송 등)을 한 줄로. view=mail이면 메일마다 한 줄
+  const groupByBatch = searchParams.get('view') !== 'mail';
+  const [selectedBatch, setSelectedBatch] = useState<{
+    traceId: string;
+    subject: string;
+    templateName: string | null;
+  } | null>(null);
 
   const updateParams = (updates: Record<string, string | number | null | undefined>) => {
     const next = new URLSearchParams(searchParams);
@@ -484,8 +492,7 @@ export function EmailNotificationPage() {
       keyword: keywordFilter || undefined,
       start_date: dateFrom || undefined,
       end_date: dateTo || undefined,
-      // 지금은 메일마다 한 줄로 보여 준다 (수동 발송이 생기면 묶음 보기 추가)
-      group_by_batch: false,
+      group_by_batch: groupByBatch,
       page: historyPage,
       page_size: HISTORY_PAGE_SIZE,
     },
@@ -657,6 +664,8 @@ export function EmailNotificationPage() {
 
   const formatNotificationSendTiming = (sendMode: string, delayMinutes: number) => {
     if (sendMode === 'instant') return '즉시 발송';
+    if (sendMode === 'scheduled') return '예약 발송';
+    if (sendMode === 'manual') return '수동 발송';
     if (sendMode === 'delay' || sendMode === 'delayed') {
       if (delayMinutes === 0) return '즉시 발송';
 
@@ -1235,6 +1244,47 @@ export function EmailNotificationPage() {
                 <option value="SENT">성공</option>
                 <option value="FAILED">실패</option>
               </select>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  borderRadius: 8,
+                  border: `1px solid ${t.border}`,
+                  overflow: 'hidden',
+                }}
+              >
+                {[
+                  { value: 'batch', label: '묶음별', hint: '여러 명에게 보낸 메일을 한 줄로' },
+                  { value: 'mail', label: '메일별', hint: '메일 한 통마다 한 줄' },
+                ].map((option) => {
+                  const active = (option.value === 'batch') === groupByBatch;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      title={option.hint}
+                      onClick={() =>
+                        updateParams({
+                          view: option.value === 'batch' ? null : 'mail',
+                          page: 1,
+                          tab: 'history',
+                        })
+                      }
+                      style={{
+                        height: 34,
+                        padding: '0 14px',
+                        border: 'none',
+                        background: active ? t.accent : t.surface2,
+                        color: active ? '#fff' : t.textSec,
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1282,7 +1332,8 @@ export function EmailNotificationPage() {
           {notificationLogSummary && (
             <div style={{ padding: '0 24px 12px', display: 'flex', gap: 16, fontSize: 12, color: t.textSec }}>
               <span>
-                전체 <strong style={{ color: t.text }}>{notificationLogSummary.total.toLocaleString()}</strong>건
+                {groupByBatch ? '메일 ' : ''}전체{' '}
+                <strong style={{ color: t.text }}>{notificationLogSummary.total.toLocaleString()}</strong>건
               </span>
               <span>
                 성공 <strong style={{ color: '#16A34A' }}>{notificationLogSummary.sent.toLocaleString()}</strong>건
@@ -1337,8 +1388,21 @@ export function EmailNotificationPage() {
                   {notificationLogs.map((item) => (
                     <tr
                       key={item.id ?? item.trace_id ?? `${item.event_type}-${item.sent_at}`}
-                      onClick={() => item.id && setSelectedLogId(item.id)}
-                      style={{ borderBottom: `1px solid ${t.border}`, cursor: item.id ? 'pointer' : 'default' }}
+                      onClick={() => {
+                        if (item.id) {
+                          setSelectedLogId(item.id);
+                        } else if (item.trace_id) {
+                          setSelectedBatch({
+                            traceId: item.trace_id,
+                            subject: item.subject,
+                            templateName: item.template_name,
+                          });
+                        }
+                      }}
+                      style={{
+                        borderBottom: `1px solid ${t.border}`,
+                        cursor: item.id || item.trace_id ? 'pointer' : 'default',
+                      }}
                     >
                       <td style={{ padding: '16px', fontSize: 12, color: t.text }}>
                         <div>{item.subject || '-'}</div>
@@ -1350,7 +1414,15 @@ export function EmailNotificationPage() {
                         {item.event_name || (eventTypeNameMap.get(item.event_type) ?? item.event_type)}
                       </td>
                       <td style={{ padding: '16px', fontSize: 12, color: t.text }}>
-                        {item.recipient ?? `${item.total_count.toLocaleString()}명`}
+                        {item.recipient ?? (
+                          <>
+                            <div style={{ fontWeight: 600 }}>{item.total_count.toLocaleString()}명</div>
+                            <div style={{ marginTop: 4, fontSize: 11, color: t.textHint }}>
+                              성공 {item.success_count.toLocaleString()} · 실패{' '}
+                              {item.failed_count.toLocaleString()}
+                            </div>
+                          </>
+                        )}
                       </td>
                       <td style={{ padding: '16px' }}>
                         <span
@@ -1378,11 +1450,21 @@ export function EmailNotificationPage() {
                             fontSize: 11,
                             fontWeight: 600,
                             whiteSpace: 'nowrap',
-                            background: item.failed_count > 0 ? 'rgba(220,38,38,0.12)' : 'rgba(22,163,74,0.12)',
-                            color: item.failed_count > 0 ? '#DC2626' : '#16A34A',
+                            background:
+                              item.failed_count === 0
+                                ? 'rgba(22,163,74,0.12)'
+                                : item.success_count > 0
+                                  ? 'rgba(234,88,12,0.12)'
+                                  : 'rgba(220,38,38,0.12)',
+                            color:
+                              item.failed_count === 0
+                                ? '#16A34A'
+                                : item.success_count > 0
+                                  ? '#EA580C'
+                                  : '#DC2626',
                           }}
                         >
-                          {item.failed_count > 0 ? '실패' : '성공'}
+                          {item.failed_count === 0 ? '성공' : item.success_count > 0 ? '일부 실패' : '실패'}
                         </span>
                       </td>
                       <td
@@ -1421,6 +1503,16 @@ export function EmailNotificationPage() {
             </div>
           </div>
         </>
+      )}
+      {selectedBatch && (
+        <EmailBatchDetailModal
+          traceId={selectedBatch.traceId}
+          subject={selectedBatch.subject}
+          templateName={selectedBatch.templateName}
+          t={t}
+          onClose={() => setSelectedBatch(null)}
+          onSelectLog={(logId) => setSelectedLogId(logId)}
+        />
       )}
       {selectedLogId !== null && (
         <EmailLogDetailModal logId={selectedLogId} t={t} onClose={() => setSelectedLogId(null)} />

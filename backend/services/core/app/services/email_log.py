@@ -3,18 +3,25 @@
 이력은 app.services.email.LoggingEmailSender가 메일 한 통마다 남긴다.
 """
 
+import uuid
+
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
-from app.models import EmailLog, EmailTemplate, User
+from app.models import EmailLog, EmailTemplate, ManualEmailJob, User
 from app.services.wallet import day_range
 
 STATUSES = ("SENT", "FAILED")
 
 
-def _filters(event_type, status, keyword, start_date, end_date) -> list:
+def _filters(event_type, status, keyword, start_date, end_date, trace_id=None) -> list:
     conditions = []
+    if trace_id:
+        try:
+            conditions.append(EmailLog.batch_id == uuid.UUID(str(trace_id)))
+        except ValueError:
+            raise AppError(422, "invalid_trace_id", "묶음 id 형식이 올바르지 않습니다.") from None
     if event_type:
         conditions.append(EmailLog.template_id == event_type)
     if status:
@@ -44,7 +51,14 @@ async def _templates(session: AsyncSession, ids: set[str]) -> dict[str, EmailTem
     return {t.id: t for t in rows}
 
 
-def _template_fields(template: EmailTemplate | None) -> dict:
+# DB 템플릿이 없는 발송 (수동 발송 등)
+_BUILTIN_EVENTS = {"manual_send": ("수동 발송", "관리자가 직접 작성해 보낸 메일")}
+
+
+def _template_fields(template: EmailTemplate | None, template_id: str | None = None) -> dict:
+    builtin = _BUILTIN_EVENTS.get(template_id or "")
+    if template is None and builtin:
+        return {"template_name": builtin[0], "event_name": builtin[1], "send_mode": "manual", "delay_minutes": 0}
     return {
         "template_name": template.name if template else None,
         "event_name": template.description if template else None,
@@ -62,10 +76,11 @@ async def list_logs(
     start_date: str | None,
     end_date: str | None,
     group_by_batch: bool,
+    trace_id: str | None = None,
     page: int,
     page_size: int,
 ) -> dict:
-    conditions = _filters(event_type, status, keyword, start_date, end_date)
+    conditions = _filters(event_type, status, keyword, start_date, end_date, trace_id)
     summary_row = (
         await session.execute(
             select(
@@ -86,6 +101,7 @@ async def list_logs(
         stmt = (
             select(
                 EmailLog.batch_id,
+                func.min(EmailLog.id).label("first_id"),
                 func.min(EmailLog.template_id).label("template_id"),
                 func.min(EmailLog.subject).label("subject"),
                 func.count().label("total"),
@@ -106,8 +122,17 @@ async def list_logs(
             )
         ).all()
         templates = await _templates(session, {r.template_id for r in rows})
+        # 수동 발송 묶음은 회원 이름을 넣기 전의 원래 제목과 즉시/예약 여부를 보여 준다
+        jobs = {
+            j.id: j
+            for j in await session.scalars(
+                select(ManualEmailJob).where(ManualEmailJob.id.in_([r.batch_id for r in rows]))
+            )
+        } if rows else {}
         items = [
             {
+                # 한 통뿐인 묶음은 그 이력 id로 바로 상세를 연다
+                "id": r.first_id if r.total == 1 else None,
                 "trace_id": str(r.batch_id),
                 "event_type": r.template_id,
                 "subject": r.subject,
@@ -115,9 +140,11 @@ async def list_logs(
                 "total_count": r.total,
                 "success_count": r.sent,
                 "failed_count": r.failed,
-                "status": "FAILED" if r.failed else "SENT",
+                # 묶음 상태: 모두 성공 SENT, 모두 실패 FAILED, 섞여 있으면 PARTIAL
+                "status": "SENT" if not r.failed else ("FAILED" if not r.sent else "PARTIAL"),
                 "sent_at": r.sent_at.isoformat(),
-                **_template_fields(templates.get(r.template_id)),
+                **_template_fields(templates.get(r.template_id), r.template_id),
+                **_job_fields(jobs.get(r.batch_id)),
             }
             for r in rows
         ]
@@ -143,6 +170,12 @@ async def list_logs(
     }
 
 
+def _job_fields(job: ManualEmailJob | None) -> dict:
+    if job is None:
+        return {}
+    return {"subject": job.subject, "send_mode": "scheduled" if job.send_at else "instant"}
+
+
 def _log_item(log: EmailLog, template: EmailTemplate | None) -> dict:
     ok = log.status == "SENT"
     return {
@@ -161,7 +194,7 @@ def _log_item(log: EmailLog, template: EmailTemplate | None) -> dict:
         "success_count": 1 if ok else 0,
         "failed_count": 0 if ok else 1,
         "sent_at": log.created_at.isoformat(),
-        **_template_fields(template),
+        **_template_fields(template, log.template_id),
     }
 
 
@@ -194,6 +227,8 @@ async def list_event_types(session: AsyncSession) -> list[dict]:
         .distinct()
         .where(EmailLog.template_id.not_in(known) if known else True)
     )
-    events += [{"id": tid, "name": tid} for tid in sorted(extra)]
+    events += [
+        {"id": tid, "name": _BUILTIN_EVENTS.get(tid, (tid,))[0]} for tid in sorted(extra)
+    ]
     return events
 

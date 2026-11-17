@@ -90,17 +90,21 @@ export interface ListNotificationLogsParams {
   keyword?: string;
   start_date?: string;
   end_date?: string;
+  /** 같은 묶음(수동 발송 등)을 한 줄로 */
   group_by_batch?: boolean;
+  /** 한 묶음의 수신자별 이력 */
+  trace_id?: string;
   page?: number;
   page_size?: number;
 }
 
 export interface NotificationLog {
-  /** 한 통의 이력 id (group_by_batch=false일 때) */
-  id?: number;
+  /** 한 통의 이력 id (묶음 보기에서는 한 통뿐인 묶음만) */
+  id?: number | null;
   trace_id: string | null;
   recipient?: string | null;
-  status?: NotificationLogStatus;
+  /** 묶음 보기에서는 일부 실패면 PARTIAL */
+  status?: NotificationLogStatus | 'PARTIAL';
   error_message?: string | null;
   locale?: string | null;
   provider?: string;

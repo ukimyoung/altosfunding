@@ -13,3 +13,4 @@ httpx==0.28.1
 nh3==0.2.21
 boto3==1.35.81
 jinja2==3.1.6
+python-multipart==0.0.20
