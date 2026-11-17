@@ -70,16 +70,20 @@ async def _issue_code(
         raise AppError(429, "rate_limit_exceeded", "잠시 후 다시 요청해 주세요.")
 
     code = generate_numeric_code()
+    if purpose is VerificationPurpose.WITHDRAW_REQUEST:
+        ttl_seconds = settings.withdraw_code_ttl_seconds
+    else:
+        ttl_seconds = settings.email_code_ttl_minutes * 60
     verification = EmailVerification(
         email=email,
         purpose=purpose.value,
         code_hash=hash_code(code),
-        expires_at=now + timedelta(minutes=settings.email_code_ttl_minutes),
+        expires_at=now + timedelta(seconds=ttl_seconds),
     )
     session.add(verification)
     await session.commit()
     template_id = email_templates.VERIFICATION_TEMPLATE_IDS[purpose.value]
-    variables = {"verification_code": code, "expiry_minutes": settings.email_code_ttl_minutes}
+    variables = {"verification_code": code, "expiry_minutes": max(1, -(-ttl_seconds // 60))}
     mail = await email_template.render(session, template_id, locale, variables)
     try:
         if mail is None:  # 인증 메일은 항상 만들어지지만, 만약을 위해 실패로 처리한다.

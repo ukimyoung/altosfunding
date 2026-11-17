@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     # 이메일 인증코드 정책
     email_code_ttl_minutes: int = 30
     email_code_resend_cooldown_seconds: int = 60
+    # 출금 신청 인증코드는 짧게 둔다 (출금 화면의 재전송 대기 60초와 같게). 메일 문구는 분 단위(올림)로 보인다.
+    withdraw_code_ttl_seconds: int = 60
     email_code_max_attempts: int = 5
     # 인증을 마친 뒤 이 시간 안에 가입을 끝내야 한다.
     signup_verification_valid_minutes: int = 30
