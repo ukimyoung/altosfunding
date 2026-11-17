@@ -192,18 +192,20 @@ export function TransactionHistoryPage() {
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
+          gridTemplateColumns: 'repeat(3, 1fr)',
           gap: 16,
           marginBottom: 24,
         }}
       >
         <StatCard
           label="총 입금 금액"
+          accent="#16A34A"
           value={formatTotal(totalsQuery.data?.total_deposit_amount)}
           t={t}
         />
         <StatCard
           label="총 출금 금액"
+          accent="#2563EB"
           value={formatTotal(totalsQuery.data?.total_withdraw_amount)}
           t={t}
         />
@@ -483,14 +485,15 @@ export function TransactionHistoryPage() {
   );
 }
 
-// Stat Card Component (구매 내역 화면과 같은 형식)
+// Stat Card Component (입출금 승인 관리 화면 요약 카드와 같은 형식)
 interface StatCardProps {
   label: string;
   value: string;
-  t: { surface: string; border: string; text: string; textSec: string };
+  accent: string;
+  t: { surface: string; border: string; textSec: string };
 }
 
-function StatCard({ label, value, t }: StatCardProps) {
+function StatCard({ label, value, accent, t }: StatCardProps) {
   return (
     <div
       style={{
@@ -498,10 +501,11 @@ function StatCard({ label, value, t }: StatCardProps) {
         background: t.surface,
         borderRadius: 12,
         border: `1px solid ${t.border}`,
+        borderLeft: `4px solid ${accent}`,
       }}
     >
       <div style={{ fontSize: 11, color: t.textSec, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 28, fontWeight: 600, color: t.text }}>{value}</div>
+      <div style={{ fontSize: 28, fontWeight: 600, color: accent }}>{value}</div>
     </div>
   );
 }
