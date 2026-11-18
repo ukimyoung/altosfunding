@@ -516,7 +516,7 @@ export function ScheduleManagement({ dark, onToast }: ScheduleManagementProps) {
               <tr>
                 <th style={thStyle}>No.</th>
                 <th style={thStyle}>상품</th>
-                <th style={thStyle}>대회 이름 규칙</th>
+                <th style={thStyle}>대회 이름</th>
                 <th style={thStyle}>주기 / 기간</th>
                 <th style={thStyle}>시작 / 종료 (UTC)</th>
                 <th style={thStyle}>만든 회차</th>
@@ -542,7 +542,19 @@ export function ScheduleManagement({ dark, onToast }: ScheduleManagementProps) {
                     <div style={{ ...subStyle, fontFamily: MONO }}>{s.product_id}</div>
                   </td>
                   <td style={tdStyle}>
-                    <div style={{ fontFamily: MONO, fontSize: 12, whiteSpace: "normal", minWidth: 140 }}>{s.name_template}</div>
+                    {(() => {
+                      // 모집 중 대회가 있으면 그 이름, 없으면 다음에 만들 대회 이름을 규칙대로 바꿔 보여 준다.
+                      const pending = s.next_run_at && s.created_count > 0;
+                      const name = pending
+                        ? previewName(s.name_template, s.created_count, new Date(s.next_run_at!))
+                        : previewName(s.name_template, s.created_count + 1, new Date());
+                      return (
+                        <div style={{ fontWeight: 600, whiteSpace: "normal", minWidth: 160 }} title={pending ? "모집 중 대회 이름" : "다음 대회 이름 (예시)"}>
+                          {name ?? s.name_template}
+                        </div>
+                      );
+                    })()}
+                    <div style={{ ...subStyle, fontFamily: MONO }}>규칙: {s.name_template}</div>
                     {s.description && <div style={subStyle}>{s.description}</div>}
                   </td>
                   <td style={tdStyle}>
