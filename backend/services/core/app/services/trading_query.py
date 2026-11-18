@@ -241,7 +241,8 @@ async def admin_order_summary(session: AsyncSession, now: datetime | None = None
 
 
 def account_out(a: TradingAccount, product: Product | None, challenge: Challenge | None, user: User) -> dict:
-    revealed = a.provision_status == orders.DONE and a.status != "PENDING"
+    # 발급이 끝난 계좌는 대회 시작 전(PENDING, 거래 잠금)에도 본인에게 비밀번호를 보여 준다 (발급 메일에도 담겨 나간다).
+    revealed = a.provision_status == orders.DONE
     password = decrypt_text(a.password_encrypted) if revealed and a.password_encrypted else None
     return {
         "mt4_login": a.mt4_login,
