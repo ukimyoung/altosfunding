@@ -27,6 +27,7 @@ import { TransactionHistoryPage } from './pages/transactions/TransactionHistoryP
 import { LeaderboardPage } from './pages/leaderboards/LeaderboardPage';
 import { TransactionApprovalPage } from './pages/transactions/TransactionApprovalPage';
 import { CompetitionListPage } from './pages/competitions/CompetitionListPage';
+import { ScheduleManagementPage } from './pages/competitions/ScheduleManagementPage';
 import { RewardReferralPage } from './pages/reward-referrals/RewardReferralPage';
 import { CouponManagementPage } from './pages/coupons/CouponManagementPage';
 import { DemoOptionsManagementPage } from './pages/demo-options/DemoOptionsManagementPage';
@@ -97,6 +98,10 @@ export const router = createBrowserRouter([
       {
         path: appPath(ROUTE_BY_PAGE_ID['competition-list']),
         Component: CompetitionListPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['competition-schedule']),
+        Component: ScheduleManagementPage,
       },
       {
         path: appPath(ROUTE_BY_PAGE_ID['leaderboard']),
