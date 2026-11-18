@@ -32,6 +32,7 @@ type OrderRow = {
   userNickname: string;
   productName: string;
   quantity: number;
+  unitPrice: number;
   totalPrice: number;
   status: string;
   createdAt: string;
@@ -101,6 +102,12 @@ export function PurchaseHistoryPage() {
         userNickname: order.user_nickname,
         productName: order.product_name,
         quantity: order.quantity,
+        // 가격(단가): 서버 unit_price 우선, 없으면 금액 ÷ 수량으로 계산
+        unitPrice:
+          order.unit_price ??
+          (order.quantity > 0
+            ? Math.abs(order.total_price) / order.quantity
+            : Math.abs(order.total_price)),
         totalPrice: order.total_price,
         status: order.status,
         createdAt: order.created_at,
@@ -225,11 +232,13 @@ export function PurchaseHistoryPage() {
       {/* Table */}
       <DataTable
         columns={[
-          { key: 'orderId', label: '주문번호', width: '18%' },
-          { key: 'buyer', label: '구매자', width: '24%' },
-          { key: 'product', label: '상품', width: '20%' },
-          { key: 'amount', label: '금액', width: '14%' },
-          { key: 'paymentDate', label: '결제일', width: '14%' },
+          { key: 'orderId', label: '주문번호', width: '15%' },
+          { key: 'buyer', label: '구매자', width: '21%' },
+          { key: 'product', label: '상품', width: '15%' },
+          { key: 'unitPrice', label: <div style={{ textAlign: 'right' }}>가격</div>, width: '10%' },
+          { key: 'quantity', label: <div style={{ textAlign: 'center' }}>수량</div>, width: '7%' },
+          { key: 'amount', label: <div style={{ textAlign: 'right' }}>금액</div>, width: '11%' },
+          { key: 'paymentDate', label: '결제일', width: '12%' },
           { key: 'status', label: '상태' },
         ]}
         rows={visiblePurchases}
@@ -247,7 +256,12 @@ export function PurchaseHistoryPage() {
           borderRadius: 12,
           overflow: 'hidden',
         }}
-        tableStyle={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}
+        tableStyle={{
+          width: '100%',
+          minWidth: 1080,
+          borderCollapse: 'collapse',
+          tableLayout: 'fixed',
+        }}
         headerRowStyle={{
           background: t.surface2,
           height: 40,
@@ -292,6 +306,7 @@ export function PurchaseHistoryPage() {
         rowRenderer={(purchase: OrderRow) => {
           const statusConfig = getPurchaseStatusConfig(purchase.status);
           const isRefund = purchase.totalPrice < 0;
+          /* 상품 열에 단가 뱃지·수량을 함께 표시하던 방식 (1118 디자인에서 가격·수량 열로 분리)
           const unitPrice =
             purchase.quantity > 0
               ? Math.abs(purchase.totalPrice) / purchase.quantity
@@ -317,6 +332,8 @@ export function PurchaseHistoryPage() {
             color: '#7C6AF7',
             border: 'rgba(124,106,247,0.2)',
           };
+
+          */
 
           return (
             <>
@@ -349,6 +366,7 @@ export function PurchaseHistoryPage() {
                   {purchase.uid}
                 </div>
               </td>
+              {/* 이전 상품 열(단가 뱃지 × 수량 + 상품명) — 1118 디자인에서 가격·수량 열로 분리
               <td style={{ padding: '16px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                   <span
@@ -380,13 +398,45 @@ export function PurchaseHistoryPage() {
                   {purchase.productName}
                 </div>
               </td>
+              */}
+              {/* Product: 상품 이름만 표시 */}
+              <td style={{ padding: '16px', fontSize: 13, color: t.text, fontWeight: 500 }}>
+                {purchase.productName}
+              </td>
+              {/* Unit Price */}
               <td
                 style={{
                   padding: '16px',
+                  textAlign: 'right',
+                  fontSize: 13,
+                  color: t.textSec,
+                  fontFamily: "'DM Mono', monospace",
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {formatUsdMoney(purchase.unitPrice)}
+              </td>
+              {/* Quantity */}
+              <td
+                style={{
+                  padding: '16px',
+                  textAlign: 'center',
+                  fontSize: 13,
+                  color: t.textSec,
+                  fontFamily: "'DM Mono', monospace",
+                }}
+              >
+                {purchase.quantity.toLocaleString()}
+              </td>
+              <td
+                style={{
+                  padding: '16px',
+                  textAlign: 'right',
                   fontSize: 14,
-                  fontWeight: 500,
+                  fontWeight: 600,
                   color: isRefund ? '#DC2626' : t.text,
                   fontFamily: "'DM Mono', monospace",
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {isRefund ? '-' : ''}
