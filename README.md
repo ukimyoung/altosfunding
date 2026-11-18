@@ -12,10 +12,9 @@ altosfunding/
 │   └── shared/                   # 두 앱의 공용 코드
 ├── backend/
 │   ├── services/
-│   │   ├── core/                 # Core Backend (FastAPI, 공개 API)
+│   │   ├── core/                 # Core Backend (FastAPI, 공개 API) + Background Worker (python -m app.worker)
 │   │   ├── broker_gateway/       # Broker Gateway (FastAPI, MT4 연동, 내부 전용)
 │   │   └── notification_hub/     # Notification Hub (FastAPI, 이메일·푸시)
-│   └── worker/                   # Celery 워커 (비동기·주기 작업)
 ├── supabase/
 │   ├── config.toml               # Supabase CLI 설정
 │   ├── migrations/               # DB 마이그레이션 (develop → staging, main → production 자동 반영)

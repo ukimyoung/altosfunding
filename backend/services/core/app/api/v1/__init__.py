@@ -18,6 +18,7 @@ from app.api.v1.manual_email import router as admin_manual_email_router
 from app.api.v1.newsletter import router as newsletter_router
 from app.api.v1.rewards import admin_router as admin_rewards_router
 from app.api.v1.rewards import router as rewards_router
+from app.api.v1.system import router as admin_system_router
 from app.api.v1.wallets import admin_router as admin_wallets_router
 from app.api.v1.wallets import router as wallets_router
 
@@ -42,3 +43,4 @@ router.include_router(admin_email_logs_router)
 router.include_router(admin_manual_email_router)
 router.include_router(files_router)
 router.include_router(newsletter_router)
+router.include_router(admin_system_router)
