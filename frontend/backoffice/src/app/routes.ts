@@ -34,6 +34,7 @@ import { DemoOptionsManagementPage } from './pages/demo-options/DemoOptionsManag
 import { InquiryListPage } from './pages/inquiries/InquiryListPage';
 import { FaqListPage } from './pages/faq/FaqListPage';
 import { EmailNotificationPage } from './pages/email-notifications/EmailNotificationPage';
+import { Mt4LoginManagementPage } from './pages/mt4-logins/Mt4LoginManagementPage';
 import { NoticeListPage } from './pages/notice/NoticeListPage';
 import { MarketingPopupPage } from './pages/marketing-popups/MarketingPopupPage';
 import { ProfitSplitPage } from './pages/system/ProfitSplitPage';
@@ -182,6 +183,10 @@ export const router = createBrowserRouter([
       {
         path: appPath(ROUTE_BY_PAGE_ID['email-notification']),
         Component: EmailNotificationPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['mt4-login-management']),
+        Component: Mt4LoginManagementPage,
       },
       {
         path: appPath(ROUTE_BY_PAGE_ID['supported-languages']),
