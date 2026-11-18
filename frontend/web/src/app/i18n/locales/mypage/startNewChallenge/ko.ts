@@ -128,6 +128,6 @@ export const startNewChallengeKo: StartNewChallengeTranslations = {
   accountIssued: '발급 완료',
   accountIssueFailed: '발급 실패',
   accountIssueRefunded: '계좌 {n}개를 발급하지 못해 {amount} USDT를 총 자산으로 환불했습니다.',
-  credentialsByEmail: 'MT4 로그인 번호와 비밀번호는 메일로 보내 드렸습니다. 대회 시작 시각부터 거래할 수 있습니다.',
-  goToMyAccount: '내 계좌로 이동',
+  credentialsByEmail: '계좌가 준비되면 MT4 계좌 번호와 비밀번호를 메일로 보내 드립니다. 대회 시작 시각부터 거래할 수 있습니다.',
+  checkMyAccount: '내 계좌 확인하기',
 };

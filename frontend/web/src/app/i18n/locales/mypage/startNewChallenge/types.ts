@@ -136,5 +136,5 @@ export interface StartNewChallengeTranslations {
   accountIssueFailed: string;
   accountIssueRefunded: string;
   credentialsByEmail: string;
-  goToMyAccount: string;
+  checkMyAccount: string;
 }

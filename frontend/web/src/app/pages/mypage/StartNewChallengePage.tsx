@@ -629,11 +629,11 @@ export function StartNewChallengePage() {
               <button
                 onClick={() => {
                   setPurchaseResult(null);
-                  navigate('/my-page/my-account');
+                  navigate('/my-page/challenge');
                 }}
                 className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#0052FF] py-3 font-bold text-white transition-colors hover:bg-[#0066FF]"
               >
-                {text.goToMyAccount}
+                {text.checkMyAccount}
               </button>
             </div>
           </motion.div>

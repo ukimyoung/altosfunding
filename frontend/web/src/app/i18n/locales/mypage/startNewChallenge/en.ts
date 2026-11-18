@@ -132,6 +132,6 @@ export const startNewChallengeEn: StartNewChallengeTranslations = {
   accountIssued: 'Issued',
   accountIssueFailed: 'Failed',
   accountIssueRefunded: '{n} account(s) could not be issued and {amount} USDT was refunded to your Total Asset.',
-  credentialsByEmail: 'Your MT4 login and password have been sent by email. You can trade from the challenge start time.',
-  goToMyAccount: 'Go to My Account',
+  credentialsByEmail: 'Your MT4 account number and password will be emailed once the account is ready. You can trade from the challenge start time.',
+  checkMyAccount: 'Check My Account',
 };
