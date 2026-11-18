@@ -22,6 +22,7 @@ import {
   Ticket,
   MonitorSmartphone,
   Percent,
+  CalendarClock,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -64,6 +65,7 @@ export const NAV: NavSection[] = [
     sectionLabel: '대회',
     items: [
       { id: 'competition-list', label: '대회 목록', icon: Trophy },
+      { id: 'competition-schedule', label: '스케줄 관리', icon: CalendarClock },
       { id: 'leaderboard', label: 'Leaderboard', icon: Trophy, external: true },
     ],
   },
@@ -144,6 +146,7 @@ export const BC: Record<string, { parts: string[] }> = {
   'demo-product': { parts: ['챌린지 관리', '데모 상품'] },
   'ruleset-management': { parts: ['챌린지 관리', '룰셋 관리'] },
   'competition-list': { parts: ['대회', '대회 목록'] },
+  'competition-schedule': { parts: ['대회', '스케줄 관리'] },
   leaderboard: { parts: ['대회', 'Leaderboard'] },
   'member-list': { parts: ['트레이더 관리', '회원 목록'] },
   'member-detail': { parts: ['트레이더 관리', '회원 목록', '회원 정보 상세'] },
@@ -185,6 +188,7 @@ export const ROUTE_BY_PAGE_ID: Record<string, string> = {
   'demo-product': '/demo-product',
   'ruleset-management': '/ruleset-management',
   'competition-list': '/competition-list',
+  'competition-schedule': '/competition-schedule',
   leaderboard: '/leaderboard',
   'member-list': '/member-list',
   'member-detail': '/member-list/:memberId',
