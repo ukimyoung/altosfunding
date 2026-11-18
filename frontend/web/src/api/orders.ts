@@ -64,7 +64,7 @@ export interface Order {
   order_id: string;
   challenge_id: string;
   product_name: string;
-  type_code: string;
+  type_code: string | null;
   quantity: number;
   status: string;
   total_price: number;
