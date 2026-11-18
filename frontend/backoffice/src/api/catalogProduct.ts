@@ -30,6 +30,8 @@ export interface ListCatalogProductsParams {
   page?: number;
   size?: number;
   tier_type: CatalogProductTierType;
+  /** true면 활성 상품만 */
+  active_only?: boolean;
 }
 
 export interface ListCatalogProductsResponse {

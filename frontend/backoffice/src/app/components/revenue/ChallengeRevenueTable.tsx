@@ -6,6 +6,7 @@ import type {
   RevenueSearchState,
   RevenueThemeTokens,
 } from "../../types/revenue";
+import { CHALLENGE_REVENUE_FALLBACK_COLUMNS } from "../../constants/revenue";
 import { formatRevenueAmount, formatRevenueQuantity } from "../../utils/revenue";
 import { RevenueEmptyCell } from "./RevenueEmptyCell";
 
@@ -40,24 +41,18 @@ export function ChallengeRevenueTable({ state, rows, allRows, columns, summary, 
     borderBottom: `1px solid ${t.border}`,
   };
 
-  const fallbackColumns: ChallengeRevenueColumn[] = [
-    { product_id: "starter", label: "Starter", price_usdt: 100 },
-    { product_id: "professional", label: "Professional", price_usdt: 300 },
-    { product_id: "elite", label: "Elite", price_usdt: 500 },
-  ];
-  const visibleColumns = columns.length > 0 ? columns : fallbackColumns;
+  // 열은 Core 활성 챌린지 상품 기준(RevenuePage에서 전달). 상품을 못 불러온 경우에만 디자인 기본 4개.
+  const visibleColumns = columns.length > 0 ? columns : CHALLENGE_REVENUE_FALLBACK_COLUMNS;
 
   const total = summary ?? allRows.reduce<ChallengeRevenueSummary>((acc, r) => ({
     quantity: acc.quantity + r.totalQty,
     amount: acc.amount + r.totalAmt,
-    by_product: visibleColumns.reduce<ChallengeRevenueSummary["by_product"]>((next, column, index) => {
-      const legacyQty = index === 0 ? r.starterQty : index === 1 ? r.proQty : r.eliteQty;
-      const legacyAmt = index === 0 ? r.starterAmt : index === 1 ? r.proAmt : r.eliteAmt;
+    by_product: visibleColumns.reduce<ChallengeRevenueSummary["by_product"]>((next, column) => {
       const product = r.products[column.product_id];
       const current = acc.by_product[column.product_id] ?? { quantity: 0, amount: 0 };
       next[column.product_id] = {
-        quantity: current.quantity + (product?.quantity ?? legacyQty ?? 0),
-        amount: current.amount + (product?.amount ?? legacyAmt ?? 0),
+        quantity: current.quantity + (product?.quantity ?? 0),
+        amount: current.amount + (product?.amount ?? 0),
       };
       return next;
     }, { ...acc.by_product }),
@@ -85,7 +80,8 @@ export function ChallengeRevenueTable({ state, rows, allRows, columns, summary, 
             <th rowSpan={2} style={{ ...thBase, textAlign: "left", paddingLeft: 14, borderRight: `1px solid ${t.border}` }}>일자</th>
             {visibleColumns.map((column) => (
               <th key={column.product_id} colSpan={2} style={{ ...thBase, borderRight: `1px solid ${t.border}` }}>
-                {column.label} (${formatRevenueQuantity(column.price_usdt)})
+                {column.label}
+                {/* 이전 디자인: 티어명 옆 가격 표시 — {column.label} (${formatRevenueQuantity(column.price_usdt)}) */}
               </th>
             ))}
             <th colSpan={2} style={{ ...thBase }}>합계</th>
@@ -108,14 +104,12 @@ export function ChallengeRevenueTable({ state, rows, allRows, columns, summary, 
             rows.map(r => (
               <tr key={r.label} style={{ transition: "background 0.1s" }}>
                 <td style={{ ...dateCell, borderRight: `1px solid ${t.border}` }}>{r.label}</td>
-                {visibleColumns.map((column, index) => {
-                  const legacyQty = index === 0 ? r.starterQty : index === 1 ? r.proQty : r.eliteQty;
-                  const legacyAmt = index === 0 ? r.starterAmt : index === 1 ? r.proAmt : r.eliteAmt;
+                {visibleColumns.map((column) => {
                   const product = r.products[column.product_id];
                   return (
                     <Fragment key={`${r.label}-${column.product_id}`}>
-                      <td key={`${r.label}-${column.product_id}-qty`} style={numCell}>{formatRevenueQuantity(product?.quantity ?? legacyQty ?? 0)}</td>
-                      <td key={`${r.label}-${column.product_id}-amt`} style={{ ...numCell, borderRight: `1px solid ${t.border}` }}>{formatRevenueAmount(product?.amount ?? legacyAmt ?? 0)}</td>
+                      <td key={`${r.label}-${column.product_id}-qty`} style={numCell}>{formatRevenueQuantity(product?.quantity ?? 0)}</td>
+                      <td key={`${r.label}-${column.product_id}-amt`} style={{ ...numCell, borderRight: `1px solid ${t.border}` }}>{formatRevenueAmount(product?.amount ?? 0)}</td>
                     </Fragment>
                   );
                 })}

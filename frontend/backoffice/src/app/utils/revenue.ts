@@ -19,6 +19,12 @@ import type {
 export const formatRevenueAmount = (value: number) => "$" + value.toLocaleString("en-US");
 export const formatRevenueQuantity = (value: number) => value.toLocaleString("en-US");
 
+/** 상품명에서 'Challenge ' 접두어를 떼어 티어 이름으로 쓴다 (대회 목록·웹 Start New Challenge와 같은 규칙). */
+export function challengeTierLabel(name: string | null | undefined): string {
+  const trimmed = (name ?? "").trim();
+  return trimmed.replace(/^challenge\s+/i, "") || trimmed;
+}
+
 export function toSalesReportPeriod(period: RevenuePeriod): SalesReportPeriod {
   if (period === "주별") return "weekly";
   if (period === "월별") return "monthly";
@@ -65,7 +71,7 @@ export function mapChallengeSalesReport(response: ChallengeSalesReportResponse):
   });
 
   return {
-    columns: response.columns,
+    columns: response.columns.map((column) => ({ ...column, label: challengeTierLabel(column.label) })),
     rows,
     summary: response.summary,
   };
