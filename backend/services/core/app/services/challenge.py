@@ -347,7 +347,7 @@ async def offers(session: AsyncSession) -> list[dict]:
         .where(
             Challenge.product_id.in_([p.product_id for p in products]),
             Challenge.status == PENDING,
-            Challenge.current_participants < Challenge.group_size,
+            or_(Challenge.group_size.is_(None), Challenge.current_participants < Challenge.group_size),
         )
         .order_by(Challenge.start_at, Challenge.challenge_id)
     ):
@@ -427,7 +427,7 @@ async def create_schedule(session: AsyncSession, data: dict) -> ChallengeSchedul
 
 
 async def update_schedule(session: AsyncSession, schedule: ChallengeSchedule, data: dict) -> None:
-    nullable = {"max_occurrences", "next_run_at", "description", "interval_minutes", "duration_minutes"}
+    nullable = {"max_occurrences", "next_run_at", "description", "interval_minutes", "duration_minutes", "group_size"}
     if data.get("product_id"):
         await _require_product(session, data["product_id"])
     if data.get("status") == "COMPLETED":

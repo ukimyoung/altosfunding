@@ -24,7 +24,7 @@ class ChallengeSchedule(Base):
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     name_template: Mapped[str]
     product_id: Mapped[str] = mapped_column(ForeignKey("core.products.id"))
-    group_size: Mapped[int] = mapped_column(server_default="50")
+    group_size: Mapped[int | None]  # null = 정원 무제한
     interval_days: Mapped[int]
     interval_minutes: Mapped[int | None]
     duration_days: Mapped[int]
@@ -50,7 +50,7 @@ class Challenge(Base):
     product_id: Mapped[str] = mapped_column(ForeignKey("core.products.id"))
     challenge_schedule_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("core.challenge_schedules.id"))
     name: Mapped[str]
-    group_size: Mapped[int] = mapped_column(server_default="50")
+    group_size: Mapped[int | None]  # null = 정원 무제한
     duration_days: Mapped[int | None]
     duration_minutes: Mapped[int | None]
     current_participants: Mapped[int] = mapped_column(server_default="0")

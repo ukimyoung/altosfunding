@@ -317,3 +317,22 @@ def test_challenge_offers(client, admin, challenge_product):  # noqa: F811
     assert first["open_challenge"]["challenge_id"] == pending["id"]
     run_sql("update core.challenges set current_participants = group_size where status = 'PENDING'")
     assert client.get("/api/v1/challenges/products").json()["items"][0]["open_challenge"] is None
+    # 정원을 비우면(null) 무제한: 참가자가 많아도 계속 신청할 수 있다.
+    run_sql("update core.challenges set group_size = null, current_participants = 10000 where status = 'PENDING'")
+    open_challenge = client.get("/api/v1/challenges/products").json()["items"][0]["open_challenge"]
+    assert open_challenge["challenge_id"] == pending["id"] and open_challenge["group_size"] is None
+
+
+def test_schedule_without_group_size_is_unlimited(client, admin, challenge_product):  # noqa: F811
+    body = {"name_template": "Daily #{seq}", "product_id": challenge_product, "interval_days": 1, "duration_days": 1}
+    res = client.post("/api/v1/admin/schedules", headers=admin, json=body)
+    assert res.status_code == 200, res.text
+    schedule = res.json()
+    assert schedule["group_size"] is None
+    _run_jobs(_utc(2026, 11, 16, 10))
+    assert run_sql("select group_size from core.challenges")[0]["group_size"] is None
+    # 정원을 넣었다가 다시 비울 수 있다 (다음 대회부터 적용)
+    url = f"/api/v1/admin/schedules/{schedule['id']}"
+    assert client.patch(url, headers=admin, json={"group_size": 20}).json()["group_size"] == 20
+    assert client.patch(url, headers=admin, json={"group_size": None}).json()["group_size"] is None
+    assert client.post("/api/v1/admin/schedules", headers=admin, json={**body, "group_size": 0}).status_code == 422

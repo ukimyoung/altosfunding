@@ -11,7 +11,8 @@ export interface Product {
   /** MOST POPULAR 뱃지 표시 */
   is_most_popular: boolean;
   current_participants: number;
-  group_size: number;
+  /** 대회 정원. null이면 무제한 */
+  group_size: number | null;
   start_at: string;
 }
 
@@ -63,7 +64,8 @@ export interface ChallengeOfferRound {
   start_at: string;
   end_at: string;
   current_participants: number;
-  group_size: number;
+  /** 대회 정원. null이면 무제한 */
+  group_size: number | null;
 }
 
 /** Start New Challenge 카드 한 장 = 판매 중인 챌린지 상품 하나 */
