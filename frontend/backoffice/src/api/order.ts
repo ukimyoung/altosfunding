@@ -8,6 +8,8 @@ export interface ChallengeOrder {
   user_nickname: string;
   product_name: string;
   quantity: number;
+  /** 가격(단가, USDT). 없으면 화면에서 total_price ÷ quantity로 계산 */
+  unit_price?: number | null;
   total_price: number;
   payment_method: string;
   status: string;
