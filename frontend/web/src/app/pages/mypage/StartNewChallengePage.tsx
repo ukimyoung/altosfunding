@@ -405,7 +405,8 @@ export function StartNewChallengePage() {
       });
       await Promise.allSettled([refetchMyAsset(), refetchChallengeSummary()]);
 
-      setShowPaymentSuccessToast(true);
+      // 구매 완료 팝업이 결과를 보여 주므로 상단 '결제 완료' 토스트는 띄우지 않는다.
+      // setShowPaymentSuccessToast(true);
       setShowPaymentModal(false);
       resetDiscount();
       pollStartedAt.current = Date.now();
