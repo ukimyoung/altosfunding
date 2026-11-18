@@ -114,6 +114,7 @@ interface ScheduleForm {
 }
 
 /** 상품을 고르면 넣는 기본 대회 이름 규칙: "상품명 ({date})" → "Challenge Starter (2026-11-18)" */
+const LEGACY_TEMPLATE = "Daily #{seq} ({date})";
 const autoTemplate = (productName: string) => `${productName.replace(/[{}]/g, "").trim()} ({date})`;
 
 function toForm(schedule: ChallengeSchedule | null): ScheduleForm {
@@ -141,10 +142,20 @@ interface ScheduleModalProps {
 }
 
 function ScheduleModal({ t, schedule, products, saving, onClose, onSave }: ScheduleModalProps) {
-  const [form, setForm] = useState<ScheduleForm>(() => toForm(schedule));
-  // 관리자가 이름 규칙을 직접 고쳤으면 상품을 바꿔도 덮어쓰지 않는다 (수정 화면은 저장된 규칙을 직접 쓴 것으로 본다).
-  const [templateTouched, setTemplateTouched] = useState(schedule !== null);
   const nameOf = (id: string) => products.find(p => p.id === id)?.name ?? "";
+  // 수정 화면: 예전 기본값(Daily #{seq} ({date}))이거나 비어 있으면 '상품명 ({date})'로 바꿔 채운다.
+  const followsInitially = (() => {
+    if (!schedule) return true;
+    const name = nameOf(schedule.product_id);
+    return [LEGACY_TEMPLATE, "", name ? autoTemplate(name) : null].includes(schedule.name_template.trim());
+  })();
+  const [form, setForm] = useState<ScheduleForm>(() => {
+    const initial = toForm(schedule);
+    const name = nameOf(initial.product_id);
+    return followsInitially && name ? { ...initial, name_template: autoTemplate(name) } : initial;
+  });
+  // 관리자가 이름 규칙을 직접 고쳤으면 상품을 바꿔도 덮어쓰지 않는다.
+  const [templateTouched, setTemplateTouched] = useState(!followsInitially);
 
   function handleProductChange(productId: string) {
     setForm(prev => {
