@@ -707,26 +707,29 @@ export function ChallengeAccountPage() {
     },
   ];
 
-  const getProductCount = (amount: number) =>
-    challengeSummary?.by_product.find((product) => {
-      const normalizedProductName = product.product_name.replace(/[$,\s]/g, '');
-      const normalizedProductId = product.product_id.toUpperCase();
-      const amountText = String(amount);
+  // 계좌 유형별 개수: 상품명에서 'Challenge '를 뺀 이름(Starter·Professional·Elite·Prime)으로 센다.
+  // 같은 이름의 상품이 여러 개면 합산한다. 기존 서버 상품(PROD_EVAL_100 등)은 금액으로도 맞춘다.
+  const getAccountTypeCount = (typeName: string, legacyAmount?: number) =>
+    (challengeSummary?.by_product ?? [])
+      .filter((product) => {
+        if (formatChallengeProductName(product.product_name).toLowerCase() === typeName) {
+          return true;
+        }
+        if (legacyAmount === undefined) {
+          return false;
+        }
+        const amountText = String(legacyAmount);
+        return (
+          product.product_id.toUpperCase() === `PROD_EVAL_${amountText}` ||
+          product.product_name.replace(/[$,\s]/g, '').includes(amountText)
+        );
+      })
+      .reduce((sum, product) => sum + (product.count ?? 0), 0);
 
-      return (
-        normalizedProductId === `PROD_EVAL_${amountText}` ||
-        normalizedProductName.includes(amountText)
-      );
-    })?.count ?? 0;
-
-  const accountType100Count = getProductCount(100);
-  const accountType300Count = getProductCount(300);
-  const accountType500Count = getProductCount(500);
-  // Prime은 아직 서버 상품 코드가 정해지지 않아, 상품 ID나 이름에 'prime'이 들어간 상품을 센다.
-  const accountTypePrimeCount =
-    challengeSummary?.by_product.find((product) =>
-      `${product.product_id} ${product.product_name}`.toLowerCase().includes('prime'),
-    )?.count ?? 0;
+  const accountType100Count = getAccountTypeCount('starter', 100);
+  const accountType300Count = getAccountTypeCount('professional', 300);
+  const accountType500Count = getAccountTypeCount('elite', 500);
+  const accountTypePrimeCount = getAccountTypeCount('prime');
 
   return (
     <div className="p-8">
