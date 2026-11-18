@@ -226,12 +226,35 @@ def _tier_code(product: Product) -> str:
     return str(int(product.capital) // 1000)
 
 
+KST = dt.timezone(timedelta(hours=9))
+
+
+def _start_between(query: Select, date_from: str | None, date_to: str | None) -> Select:
+    """시작 시각이 한국 시간(GMT+9) 날짜 date_from ~ date_to(포함) 안에 드는 회차만 남긴다."""
+    if date_from:
+        query = query.where(Challenge.start_at >= datetime.combine(_parse_day(date_from), time(0, 0), tzinfo=KST))
+    if date_to:
+        end = datetime.combine(_parse_day(date_to), time(0, 0), tzinfo=KST) + timedelta(days=1)
+        query = query.where(Challenge.start_at < end)
+    return query
+
+
 async def grouped(
-    session: AsyncSession, *, status: str | None, date: str | None, page: int, size: int
+    session: AsyncSession,
+    *,
+    status: str | None,
+    date: str | None,
+    page: int,
+    size: int,
+    date_from: str | None = None,
+    date_to: str | None = None,
 ) -> tuple[list[dict], int]:
-    """같은 기간·상태의 회차를 한 줄로 묶고, 상품 등급별 참가자 수를 더한다 (백오피스 대회 목록)."""
+    """같은 기간·상태의 회차(상품마다 하나씩 생긴다)를 한 줄로 묶고, 상품별 참가자 수를 붙인다 (백오피스 대회 목록).
+
+    date는 기존 서버와 같은 UTC 시작일, date_from·date_to는 한국 시간 시작일 범위다.
+    """
     keys = select(Challenge.start_at, Challenge.end_at, Challenge.status)
-    keys = _start_on(keys, date)
+    keys = _start_between(_start_on(keys, date), date_from, date_to)
     if status:
         keys = keys.where(Challenge.status == status)
     keys = keys.group_by(Challenge.start_at, Challenge.end_at, Challenge.status)
@@ -244,16 +267,29 @@ async def grouped(
     items = []
     for start_at, end_at, group_status in groups:
         rows = await session.execute(
-            select(Product, func.sum(Challenge.current_participants))
+            select(Challenge, Product)
             .join(Product, Product.product_id == Challenge.product_id)
             .where(Challenge.start_at == start_at, Challenge.end_at == end_at, Challenge.status == group_status)
-            .group_by(Product.product_id)
+            .order_by(Product.capital, Product.product_id, Challenge.challenge_id)
         )
         participants: dict[str, int] = {}
-        for product, count in rows.all():
+        tiers: list[dict] = []
+        for challenge, product in rows.all():
+            count = int(challenge.current_participants or 0)
             code = _tier_code(product)
-            participants[code] = participants.get(code, 0) + int(count or 0)
-        items.append({"start_at": start_at, "end_at": end_at, "status": group_status, "participants": participants})
+            participants[code] = participants.get(code, 0) + count
+            tiers.append({
+                "challenge_id": challenge.challenge_id,
+                "product_id": product.product_id,
+                "product_name": product.name,
+                "capital": float(product.capital),
+                "participants": count,
+                "group_size": challenge.group_size,
+            })
+        items.append({
+            "start_at": start_at, "end_at": end_at, "status": group_status,
+            "participants": participants, "tiers": tiers,
+        })
     return items, total
 
 

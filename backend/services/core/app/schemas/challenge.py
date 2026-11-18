@@ -172,12 +172,23 @@ class ChallengePage(BaseModel):
     pages: int
 
 
+class ChallengeGroupedTier(BaseModel):
+    challenge_id: str
+    product_id: str
+    product_name: str
+    capital: float
+    participants: int
+    group_size: int | None
+
+
 class ChallengeGroupedItem(BaseModel):
     start_at: datetime
     end_at: datetime
     status: str
-    # 상품 type_code(예: '100', '300', '500')별 참가자 수
+    # 상품 type_code(예: '100', '300', '500')별 참가자 수 (기존 서버 형태)
     participants: dict[str, int]
+    # 묶인 회차를 상품 자본금 순으로 (백오피스 대회 목록의 티어별 참가자)
+    tiers: list[ChallengeGroupedTier] = []
 
 
 class ChallengeGroupedPage(BaseModel):
