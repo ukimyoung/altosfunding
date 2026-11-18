@@ -113,10 +113,13 @@ interface ScheduleForm {
   description: string;
 }
 
+/** 상품을 고르면 넣는 기본 대회 이름 규칙: "상품명 ({date})" → "Challenge Starter (2026-11-18)" */
+const autoTemplate = (productName: string) => `${productName.replace(/[{}]/g, "").trim()} ({date})`;
+
 function toForm(schedule: ChallengeSchedule | null): ScheduleForm {
   return {
     product_id: schedule?.product_id ?? "",
-    name_template: schedule?.name_template ?? "Daily #{seq} ({date})",
+    name_template: schedule?.name_template ?? "",
     interval_days: String(schedule?.interval_days ?? 1),
     duration_days: String(schedule?.duration_days ?? 1),
     start_time: schedule ? hhmm(schedule.start_time) : "22:00",
@@ -131,7 +134,7 @@ function toForm(schedule: ChallengeSchedule | null): ScheduleForm {
 interface ScheduleModalProps {
   t: Theme;
   schedule: ChallengeSchedule | null;
-  products: { id: string; label: string }[];
+  products: { id: string; label: string; name: string }[];
   saving: boolean;
   onClose: () => void;
   onSave: (payload: ScheduleInput) => void;
@@ -139,6 +142,21 @@ interface ScheduleModalProps {
 
 function ScheduleModal({ t, schedule, products, saving, onClose, onSave }: ScheduleModalProps) {
   const [form, setForm] = useState<ScheduleForm>(() => toForm(schedule));
+  // 관리자가 이름 규칙을 직접 고쳤으면 상품을 바꿔도 덮어쓰지 않는다 (수정 화면은 저장된 규칙을 직접 쓴 것으로 본다).
+  const [templateTouched, setTemplateTouched] = useState(schedule !== null);
+  const nameOf = (id: string) => products.find(p => p.id === id)?.name ?? "";
+
+  function handleProductChange(productId: string) {
+    setForm(prev => {
+      const followsProduct = !templateTouched || prev.name_template.trim() === "" || (prev.product_id !== "" && prev.name_template === autoTemplate(nameOf(prev.product_id)));
+      const name = nameOf(productId);
+      return {
+        ...prev,
+        product_id: productId,
+        name_template: followsProduct && name ? autoTemplate(name) : prev.name_template,
+      };
+    });
+  }
   const set = <K extends keyof ScheduleForm>(key: K, value: ScheduleForm[K]) => setForm(prev => ({ ...prev, [key]: value }));
 
   const inputStyle: React.CSSProperties = {
@@ -200,7 +218,7 @@ function ScheduleModal({ t, schedule, products, saving, onClose, onSave }: Sched
 
           <div>
             <label style={labelStyle}>챌린지 상품 *</label>
-            <select value={form.product_id} onChange={e => set("product_id", e.target.value)} style={{ ...inputStyle, cursor: "pointer" }}>
+            <select value={form.product_id} onChange={e => handleProductChange(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }}>
               <option value="">상품을 선택하세요</option>
               {products.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
             </select>
@@ -208,7 +226,7 @@ function ScheduleModal({ t, schedule, products, saving, onClose, onSave }: Sched
 
           <div>
             <label style={labelStyle}>대회 이름 규칙 *</label>
-            <input value={form.name_template} onChange={e => set("name_template", e.target.value)} placeholder="Daily #{seq} ({date})" style={inputStyle} />
+            <input value={form.name_template} onChange={e => { setTemplateTouched(true); set("name_template", e.target.value); }} placeholder="상품을 선택하면 '상품명 ({date})'로 채워집니다" style={inputStyle} />
             <p style={helperStyle}>
               {"{seq}"} 회차 번호, {"{date}"} 시작일(2026-11-18), {"{month}"} 시작 월, {"{day}"} 시작일(18), {"{weekday}"} 요일(Mon)
               <br />미리보기: <b style={{ color: preview ? t.text : "#DC2626" }}>{preview ?? "쓸 수 없는 항목이 있습니다"}</b>
@@ -427,6 +445,7 @@ export function ScheduleManagement({ dark, onToast }: ScheduleManagementProps) {
   const productOptions = (productsQuery.data?.items ?? []).map(p => ({
     id: p.product_id,
     label: `${p.product_id} · ${p.name ?? "-"}${p.is_active ? "" : " (비활성)"}`,
+    name: p.name ?? "",
   }));
 
   const counts = {
