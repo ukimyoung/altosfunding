@@ -22,13 +22,13 @@ import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import db
 from app.config import settings
-from app.models import WorkerHeartbeat
+from app.models import Challenge, ChallengeSchedule, Job, WorkerHeartbeat
 from app.services import challenge as challenge_svc
 from app.services import jobs
 from app.services import manual_email as manual_email_svc
@@ -80,6 +80,8 @@ class Worker:
         self.sessionmaker = sessionmaker
         self.stop = asyncio.Event()
         self.last: dict[str, dict] = {}
+        # 직전 상태 로그 이후 작업 큐 처리 건수 (job_queue는 5초마다 돌아서 따로 모은다)
+        self.jobs_since_report: dict[str, int] = {}
 
     async def _sleep(self, seconds: float) -> None:
         with contextlib.suppress(TimeoutError):
@@ -91,6 +93,9 @@ class Worker:
             try:
                 result = await fn()
                 self.last[name] = {"at": datetime.now(UTC).isoformat(), "ok": True, "result": result}
+                if name == "job_queue":
+                    for status, n in result.items():
+                        self.jobs_since_report[status] = self.jobs_since_report.get(status, 0) + n
                 if any(result.values()):
                     logger.info("%s: %s", name, result)
             except Exception as exc:
@@ -117,7 +122,58 @@ class Worker:
             expired = now - HEARTBEAT_RETENTION
             await session.execute(delete(WorkerHeartbeat).where(WorkerHeartbeat.last_seen_at < expired))
             await session.commit()
+            state = await self._state(session)
+        self._report(state)
         return {}
+
+    async def _state(self, session: AsyncSession) -> dict:
+        """상태 로그에 넣을 현재 DB 상태: 활성 스케줄, 모집 중·진행 중 대회, 대기 작업."""
+        row = (
+            await session.execute(
+                select(
+                    select(func.count()).where(ChallengeSchedule.status == "ACTIVE").scalar_subquery(),
+                    select(func.count()).where(Challenge.status == challenge_svc.PENDING).scalar_subquery(),
+                    select(func.count()).where(Challenge.status == challenge_svc.ACTIVE).scalar_subquery(),
+                    select(func.min(Challenge.start_at))
+                    .where(Challenge.status == challenge_svc.PENDING)
+                    .scalar_subquery(),
+                    select(func.count()).where(Job.status == jobs.PENDING).scalar_subquery(),
+                )
+            )
+        ).one()
+        return {
+            "schedules": row[0],
+            "pending_rounds": row[1],
+            "active_rounds": row[2],
+            "next_start": row[3],
+            "queued_jobs": row[4],
+        }
+
+    def _report(self, state: dict) -> None:
+        """주기마다 한 줄: 처리할 일이 없어도 Worker가 살아 있다는 것을 로그로 보여 준다."""
+
+        def result(name: str) -> str:
+            last = self.last.get(name)
+            if last is None:
+                return "-"
+            if not last["ok"]:
+                return "실패"
+            return ",".join(f"{k}={v}" for k, v in last["result"].items()) or "0"
+
+        next_start = state["next_start"]
+        logger.info(
+            "상태: 대회[%s] 예약메일[%s] 작업큐[%s] | 활성 스케줄 %d, 모집 중 대회 %d (다음 시작 %s), "
+            "진행 중 대회 %d, 대기 작업 %d",
+            result("challenges"),
+            result("manual_emails"),
+            ",".join(f"{k}={v}" for k, v in self.jobs_since_report.items()) or "0",
+            state["schedules"],
+            state["pending_rounds"],
+            f"{next_start:%Y-%m-%d %H:%M} UTC" if next_start else "없음",
+            state["active_rounds"],
+            state["queued_jobs"],
+        )
+        self.jobs_since_report = {}
 
     async def run(self) -> None:
         self.started_at = datetime.now(UTC)
