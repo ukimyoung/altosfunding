@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     # 비어 있으면 내부 작업 API를 막는다.
     system_api_key: str = ""
 
+    # Background Worker (python -m app.worker)
+    # 챌린지 회차·예약 메일을 확인하는 주기(초)
+    worker_tick_seconds: float = 60
+    # 작업 큐(core.jobs)를 확인하는 주기(초)
+    worker_poll_seconds: float = 5
+    # 한 번에 꺼내는 작업 수
+    worker_job_batch_size: int = 10
+    # RUNNING 작업이 이 시간(초)보다 오래 끝나지 않으면 Worker가 죽은 것으로 보고 다시 시도한다
+    worker_job_lease_seconds: int = 600
+
     # Core의 공개 주소. 메일 본문 이미지 주소(/api/v1/files/{id})에 쓴다.
     # 비어 있으면 Render가 넣어 주는 RENDER_EXTERNAL_URL, 그것도 없으면 요청 주소를 쓴다.
     core_public_url: str = ""

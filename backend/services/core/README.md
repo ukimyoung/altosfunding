@@ -99,10 +99,22 @@ TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/altos_te
 - 주기 작업 한 번 = 시작·종료 시각이 된 회차 상태 변경(PENDING→ACTIVE→CLOSED, 시작 못 하고 끝난 PENDING은 CANCELLED) + 때가 된 스케줄의 다음 회차 생성.
 - 스케줄마다 모집 중 회차는 하나. 그 회차가 시작되면 다음 회차를 만든다. 시작 = 직전 회차 시작일 + `interval_days`의 `start_time`, 종료 = 시작일 + `duration_days`의 `end_time` (모두 UTC, 기본 22:00 / 21:00).
 - `exclude_holiday`이면 주말과 휴장일을 건너뛰고 종료일도 영업일만 센다.
-- 아직 이 작업을 1분마다 불러 줄 스케줄러는 붙이지 않았다. 테스트 서버에서는 `run-due` 또는 `trigger`로 손으로 돌린다.
+- Background Worker가 1분마다 이 작업을 돌린다 (아래 'Background Worker'). 백오피스 '지금 실행'(`run-due`)은 즉시 확인용으로만 남겨 둔다.
 
 관리자 API는 `role=ADMIN` 계정만 쓸 수 있다. 첫 관리자는 가입 후 Supabase SQL Editor에서 `update core.users set role = 'ADMIN' where email = '...'`로 지정한다.
 아직 없는 기능: 회원별 파트너 실적(`partner-stats`)은 쿠폰 기능과 함께, 계좌 수·총자산은 트레이딩 계좌 기능과 함께 채운다.
+
+## Background Worker (`python -m app.worker`)
+Core와 같은 코드·같은 DB를 쓰는 Render Background Worker(`altosfunding-worker-sandbox`). Celery·Redis 없이 Postgres만 쓴다.
+- 1분마다(`WORKER_TICK_SECONDS`): 챌린지 회차 시작·종료·다음 회차 생성(`challenge.run_due_jobs`), 예약 수동 메일 발송(`manual_email.run_due_jobs`). 서로 따로 돌아서 메일을 오래 보내는 중에도 회차는 제때 바뀐다.
+- 5초마다(`WORKER_POLL_SECONDS`): 작업 큐 `core.jobs` 처리 (`app/services/jobs.py`).
+  - API는 `jobs.enqueue(session, kind, payload, dedupe_key=..., ref_type=..., ref_id=...)`로 넣고 커밋만 한다. 처리기는 `@jobs.handler("kind")`로 등록하고 `app/worker.py`의 `import_job_handlers()`에 모듈을 추가한다.
+  - `FOR UPDATE SKIP LOCKED`로 꺼내므로 Worker를 여러 개 띄워도 같은 작업을 두 번 잡지 않는다.
+  - 실패하면 30초·1분·2분…(최대 1시간) 뒤 재시도, `max_attempts`(기본 5)를 다 쓰면 FAILED. 재시도해도 소용없는 오류는 `PermanentJobError`. 시도마다 `core.job_attempts`에 기록.
+  - Worker가 처리 중에 죽어 RUNNING으로 10분(`WORKER_JOB_LEASE_SECONDS`) 넘게 남은 작업은 다시 시도한다. 그래서 처리기는 두 번 실행돼도 괜찮게(멱등) 만든다 (MT4 호출은 현재 상태를 먼저 확인).
+- 생존 기록: `core.worker_heartbeats`. 관리자 API `GET /api/v1/admin/system/worker`(살아 있는지, 마지막 실행 결과, 작업 수), `GET /api/v1/admin/system/jobs`(작업 목록).
+- 종료 신호(SIGTERM)를 받으면 진행 중인 반복을 마치고 끝낸다.
+- 로컬: `.env`에 `DATABASE_URL`을 넣고 `python -m app.worker`.
 
 ## 배포 (Render, 테스트용)
 `render.yaml`의 `altosfunding-core-sandbox` 서비스. Render 대시보드에서 Blueprint를 동기화하면 만들어지고, `DATABASE_URL`(Supabase staging Session pooler 연결 문자열) 등 `sync: false` 값을 입력해야 한다.

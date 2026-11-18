@@ -83,7 +83,7 @@ async def _truncate() -> None:
         await conn.execute(_CONTACT_CATEGORY_RESET)
         await conn.execute(_reward_policy_seed())
         await conn.execute(_wallet_config_seed())
-        await conn.execute("truncate core.contact_messages, core.announcements, core.announcement_categories, core.email_verifications, core.users, core.challenges, core.challenge_schedules, core.holidays, core.products, core.rulesets, core.platform_config_history restart identity cascade")
+        await conn.execute("truncate core.contact_messages, core.announcements, core.announcement_categories, core.email_verifications, core.users, core.challenges, core.challenge_schedules, core.holidays, core.products, core.rulesets, core.platform_config_history, core.jobs, core.worker_heartbeats restart identity cascade")
         await conn.execute("alter sequence core.wallet_request_id_seq restart")
         await conn.execute(_email_template_seed())
     finally:

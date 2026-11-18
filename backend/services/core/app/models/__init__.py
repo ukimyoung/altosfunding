@@ -3,6 +3,7 @@ from app.models.catalog import PlatformConfig, Product, Ruleset
 from app.models.challenge import Challenge, ChallengeSchedule, Holiday
 from app.models.contact import ContactCategory, ContactMessage
 from app.models.email_template import EmailLog, EmailTemplate, EmailTemplateContent
+from app.models.job import Job, JobAttempt, WorkerHeartbeat
 from app.models.manual_email import (
     ManualEmailDraft,
     ManualEmailJob,
@@ -38,6 +39,9 @@ __all__ = [
     "ContactMessage",
     "DepositRequest",
     "EmailLog",
+    "Job",
+    "JobAttempt",
+    "WorkerHeartbeat",
     "EmailTemplate",
     "EmailTemplateContent",
     "EmailVerification",
