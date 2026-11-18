@@ -46,6 +46,22 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 /** "22:00:00" → "22:00" */
 const hhmm = (value: string) => value.slice(0, 5);
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** Date를 "YYYY-MM-DD HH:MM" (UTC 기준 필드)로 */
+function ymdhm(d: Date) {
+  return `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())} ${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+}
+
+/** ISO 시각 → "YYYY-MM-DD HH:MM" (UTC) */
+const utcText = (iso: string) => ymdhm(new Date(iso));
+
+/** ISO 시각 → "YYYY-MM-DD HH:MM" (KST) */
+const kstText = (iso: string) => ymdhm(new Date(new Date(iso).getTime() + 9 * 3600 * 1000));
+
+/** datetime-local 입력값("2026-12-24T14:00")을 UTC 시각으로 보고 ISO로 바꾼다. */
+const utcInputToIso = (value: string) => `${value}:00Z`;
+
 /** UTC 시각(HH:MM)을 한국 시각으로 바꿔 보여 준다. 날짜가 넘어가면 (+1일)을 붙인다. */
 function kstLabel(utc: string) {
   const [h, m] = utc.split(":").map(Number);
@@ -236,7 +252,7 @@ function ScheduleModal({ t, schedule, products, saving, onClose, onSave }: Sched
             <input type="checkbox" checked={form.exclude_holiday} onChange={e => set("exclude_holiday", e.target.checked)} style={{ accentColor: ACCENT, width: 15, height: 15, marginTop: 2 }} />
             <span>
               주말·휴장일 제외
-              <span style={{ display: "block", fontSize: 11, color: t.textHint, marginTop: 2 }}>토·일과 아래 휴장일에는 대회를 시작하지 않고, 진행 기간도 영업일만 셉니다 (UTC 날짜 기준).</span>
+              <span style={{ display: "block", fontSize: 11, color: t.textHint, marginTop: 2 }}>토·일(UTC)과 아래 휴장 기간에는 대회를 시작하지 않고, 진행 기간도 영업일만 셉니다.</span>
             </span>
           </label>
 
@@ -260,7 +276,8 @@ function ScheduleModal({ t, schedule, products, saving, onClose, onSave }: Sched
 function HolidayCard({ t, onToast }: { t: Theme; onToast: ScheduleManagementProps["onToast"] }) {
   const thisYear = new Date().getFullYear();
   const [year, setYear] = useState(thisYear);
-  const [date, setDate] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [name, setName] = useState("");
   const holidaysQuery = useHolidaysQuery(year);
   const createMutation = useCreateHolidayMutation();
@@ -278,13 +295,14 @@ function HolidayCard({ t, onToast }: { t: Theme; onToast: ScheduleManagementProp
   const linkBtn = (color: string): React.CSSProperties => ({ background: "none", border: "none", cursor: busy ? "default" : "pointer", fontSize: 13, color, padding: 0, fontFamily: FONT, fontWeight: 500, opacity: busy ? 0.5 : 1 });
 
   async function handleAdd() {
-    if (!date) { alert("날짜를 선택해주세요."); return; }
+    if (!from || !to) { alert("휴장 시작(From)과 종료(To) 날짜·시각을 모두 선택해주세요."); return; }
+    if (to <= from) { alert("종료(To)는 시작(From)보다 뒤여야 합니다."); return; }
     if (!name.trim()) { alert("휴장일 이름을 입력해주세요."); return; }
     try {
-      await createMutation.mutateAsync({ date, name: name.trim() });
-      onToast("휴장일이 추가되었습니다.");
-      setDate(""); setName("");
-      const added = Number(date.slice(0, 4));
+      await createMutation.mutateAsync({ start_at: utcInputToIso(from), end_at: utcInputToIso(to), name: name.trim() });
+      onToast("휴장 기간이 추가되었습니다.");
+      setFrom(""); setTo(""); setName("");
+      const added = Number(from.slice(0, 4));
       if (added !== year) setYear(added);
     } catch (error) {
       onToast(getScheduleApiErrorMessage(error, "휴장일을 추가하지 못했습니다."), "warning");
@@ -301,7 +319,7 @@ function HolidayCard({ t, onToast }: { t: Theme; onToast: ScheduleManagementProp
   }
 
   async function handleDelete(h: Holiday) {
-    if (!window.confirm(`${h.date} ${h.name} 휴장일을 삭제하시겠습니까?`)) return;
+    if (!window.confirm(`${utcText(h.start_at)} ~ ${utcText(h.end_at)} (UTC) ${h.name} 휴장일을 삭제하시겠습니까?`)) return;
     try {
       await deleteMutation.mutateAsync(h.id);
       onToast("휴장일이 삭제되었습니다.");
@@ -315,15 +333,24 @@ function HolidayCard({ t, onToast }: { t: Theme; onToast: ScheduleManagementProp
       <div style={{ padding: "16px 20px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div>
           <span style={{ fontSize: 14, fontWeight: 700, color: t.text }}>휴장일</span>
-          <div style={{ fontSize: 11, color: t.textHint, marginTop: 2 }}>'주말·휴장일 제외'를 켠 스케줄은 이 날짜에 대회를 시작하지 않습니다 (UTC 날짜).</div>
+          <div style={{ fontSize: 11, color: t.textHint, marginTop: 2 }}>'주말·휴장일 제외'를 켠 스케줄은 대회 시작 시각이 이 기간에 걸리면 다음 영업일 같은 시각으로 미룹니다. 시각은 UTC로 입력합니다.</div>
         </div>
         <select value={year} onChange={e => setYear(Number(e.target.value))} style={{ ...inputStyle, cursor: "pointer" }}>
           {[thisYear - 1, thisYear, thisYear + 1].map(y => <option key={y} value={y}>{y}년</option>)}
         </select>
       </div>
 
-      <div style={{ padding: "14px 20px", borderBottom: `1px solid ${t.border}`, display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ ...inputStyle, width: 160 }} />
+      <div style={{ padding: "14px 20px", borderBottom: `1px solid ${t.border}`, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <input type="datetime-local" aria-label="휴장 시작 (UTC)" value={from} onChange={e => { setFrom(e.target.value); if (!to || to <= e.target.value) setTo(""); }} style={{ ...inputStyle, width: 200 }} />
+            <span style={{ color: t.textSec, fontSize: 13 }}>~</span>
+            <input type="datetime-local" aria-label="휴장 종료 (UTC)" value={to} min={from || undefined} onChange={e => setTo(e.target.value)} style={{ ...inputStyle, width: 200 }} />
+          </div>
+          <div style={{ fontSize: 11, color: t.textHint, marginTop: 4 }}>
+            From ~ To (UTC){from && to ? ` · KST ${kstText(utcInputToIso(from))} ~ ${kstText(utcInputToIso(to))}` : ""}
+          </div>
+        </div>
         <input value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === "Enter") void handleAdd(); }} placeholder="예: Christmas Day" maxLength={100} style={{ ...inputStyle, flex: 1, minWidth: 160 }} />
         <button onClick={() => void handleAdd()} disabled={busy} style={{ height: 36, padding: "0 14px", borderRadius: 8, border: "none", background: ACCENT, color: "#fff", fontSize: 13, fontWeight: 600, cursor: busy ? "default" : "pointer", display: "flex", alignItems: "center", gap: 6, fontFamily: FONT, opacity: busy ? 0.6 : 1 }}>
           <Plus size={14} /> 추가
@@ -333,7 +360,7 @@ function HolidayCard({ t, onToast }: { t: Theme; onToast: ScheduleManagementProp
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr>
-            <th style={thStyle}>날짜</th>
+            <th style={thStyle}>기간 (UTC)</th>
             <th style={thStyle}>이름</th>
             <th style={thStyle}>적용</th>
             <th style={thStyle}>관리</th>
@@ -348,7 +375,10 @@ function HolidayCard({ t, onToast }: { t: Theme; onToast: ScheduleManagementProp
             <tr><td colSpan={4} style={{ ...tdStyle, textAlign: "center", color: t.textHint, padding: "28px 14px" }}>{year}년에 등록된 휴장일이 없습니다.</td></tr>
           ) : holidays.map(h => (
             <tr key={h.id}>
-              <td style={{ ...tdStyle, fontFamily: MONO, color: h.is_active ? t.text : t.textHint }}>{h.date}</td>
+              <td style={{ ...tdStyle, color: h.is_active ? t.text : t.textHint }}>
+                <div style={{ fontFamily: MONO }}>{utcText(h.start_at)} ~ {utcText(h.end_at)}</div>
+                <div style={{ fontSize: 11, color: t.textHint, marginTop: 2 }}>KST {kstText(h.start_at)} ~ {kstText(h.end_at)}</div>
+              </td>
               <td style={{ ...tdStyle, color: h.is_active ? t.text : t.textHint }}>{h.name}</td>
               <td style={tdStyle}>
                 <button onClick={() => !busy && void handleToggle(h)} style={linkBtn(h.is_active ? "#16A34A" : t.textHint)}>{h.is_active ? "적용 중" : "꺼짐"}</button>

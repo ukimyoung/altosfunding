@@ -57,11 +57,19 @@ export interface ScheduleTriggerResult {
   schedule: ChallengeSchedule;
 }
 
+/** 휴장 기간 [start_at, end_at) (UTC ISO 문자열) */
 export interface Holiday {
   id: number;
-  date: string;
+  start_at: string;
+  end_at: string;
   name: string;
   is_active: boolean;
+}
+
+export interface HolidayInput {
+  start_at: string;
+  end_at: string;
+  name: string;
 }
 
 export const listSchedules = async (): Promise<ChallengeSchedulePage> => {
@@ -101,14 +109,14 @@ export const listHolidays = async (year: number): Promise<Holiday[]> => {
   return response.data;
 };
 
-export const createHoliday = async (payload: { date: string; name: string }): Promise<Holiday> => {
+export const createHoliday = async (payload: HolidayInput): Promise<Holiday> => {
   const response = await api.post<Holiday>('/v1/admin/holidays', payload);
   return response.data;
 };
 
 export const updateHoliday = async (
   id: number,
-  payload: { name?: string; is_active?: boolean },
+  payload: Partial<HolidayInput> & { is_active?: boolean },
 ): Promise<Holiday> => {
   const response = await api.patch<Holiday>(`/v1/admin/holidays/${id}`, payload);
   return response.data;
@@ -123,7 +131,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_product_tier: '챌린지 상품만 선택할 수 있습니다.',
   invalid_duration: '진행 기간은 1일 이상이어야 합니다.',
   invalid_name_template: '대회 이름 규칙 형식이 올바르지 않습니다.',
-  holiday_already_exists: '이미 등록된 날짜입니다.',
+  invalid_holiday_period: '종료 시각은 시작 시각보다 뒤여야 합니다.',
+  no_trading_day: '휴장 기간이 너무 길어 대회를 만들 수 있는 날이 없습니다.',
 };
 
 /** 스케줄·휴장일 API 오류를 화면에 보여 줄 문구로 바꾼다. */

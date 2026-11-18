@@ -1,4 +1,3 @@
-import datetime as dt
 from datetime import datetime, time
 
 from sqlalchemy import BigInteger, ForeignKey, Identity, func
@@ -11,7 +10,9 @@ class Holiday(Base):
     __tablename__ = "holidays"
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
-    date: Mapped[dt.date] = mapped_column(unique=True)
+    # 휴장 기간 [start_at, end_at) (UTC)
+    start_at: Mapped[datetime]
+    end_at: Mapped[datetime]
     name: Mapped[str]
     is_active: Mapped[bool] = mapped_column(server_default="true")
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

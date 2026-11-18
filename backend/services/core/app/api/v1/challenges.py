@@ -243,6 +243,7 @@ async def update_holiday(holiday_id: int, body: HolidayUpdate, admin: AdminUser,
     for field, value in body.model_dump(exclude_unset=True).items():
         if value is not None:
             setattr(holiday, field, value)
+    svc.check_holiday_period(holiday.start_at, holiday.end_at)
     await session.commit()
     await session.refresh(holiday)
     return HolidayOut.model_validate(holiday)
