@@ -3,6 +3,7 @@
 import asyncio
 import json
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 import pytest
@@ -340,6 +341,13 @@ def test_orders_are_private(client, admin_headers, buyer, round_, fake_mt4):  # 
     assert client.get(f"/api/v1/challenges/orders/{order['order_id']}", headers=other).status_code in (403, 404)
     mine = client.get("/api/v1/challenges/orders/me", headers=buyer).json()
     assert mine["total"] == 1 and mine["items"][0]["order_id"] == order["order_id"]
+    # 구매 내역 화면 필터: 상품명 검색, 기존 상태값 processing, 날짜(YYYYMMDD)
+    def find(**params):
+        return client.get("/api/v1/challenges/orders/me", headers=buyer, params=params).json()["total"]
+    assert find(search="Starter") == 1 and find(search="Elite") == 0
+    assert find(status="processing") == 1 and find(status="COMPLETED") == 0
+    today = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%Y%m%d")
+    assert find(start_date=today, end_date=today) == 1 and find(start_date="20000101", end_date="20000102") == 0
     assert client.get("/api/v1/admin/challenges/orders", headers=buyer).status_code == 403
 
 

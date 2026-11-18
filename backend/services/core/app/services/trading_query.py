@@ -81,7 +81,9 @@ async def _challenge_names(session: AsyncSession, ids: set[str]) -> dict[str, st
 def _status_filter(query: Select, status: str | None) -> Select:
     if not status or status.upper() == "ALL":
         return query
-    return query.where(ChallengeOrder.status == status.upper())
+    value = status.upper()
+    # 기존 서버 값 processing = 계좌 발급 중(PENDING)
+    return query.where(ChallengeOrder.status == ("PENDING" if value == "PROCESSING" else value))
 
 
 def _date_filter(query: Select, start_date: str | None, end_date: str | None) -> Select:
@@ -101,7 +103,13 @@ async def my_orders(
     query = _date_filter(_status_filter(query, status), start_date, end_date)
     if search and search.strip():
         kw = f"%{search.strip()}%"
-        query = query.where(or_(ChallengeOrder.product_name.ilike(kw), ChallengeOrder.id.ilike(kw)))
+        query = query.where(
+            or_(
+                ChallengeOrder.product_name.ilike(kw),
+                ChallengeOrder.id.ilike(kw),
+                ChallengeOrder.type_code == search.strip(),
+            )
+        )
     total = await session.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = list(
         await session.scalars(

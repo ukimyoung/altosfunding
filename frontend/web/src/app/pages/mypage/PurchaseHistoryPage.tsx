@@ -20,7 +20,11 @@ import { useLocale } from '@/app/i18n/LocaleContext';
 type PurchaseStatus = 'COMPLETED' | 'PENDING' | 'FAILED' | 'REFUNDED';
 type PurchaseStatusFilter = 'All' | 'COMPLETED' | 'PENDING' | 'FAILED' | 'REFUNDED';
 
-const formatChallengeTypeCode = (typeCode: string, labels: Record<string, string>) => {
+const formatChallengeTypeCode = (typeCode: string | null | undefined, labels: Record<string, string>) => {
+  if (!typeCode) {
+    return '-';
+  }
+
   const normalized = typeCode.trim().toUpperCase();
 
   if (normalized === 'LIVE' || normalized === 'DEMO') {
@@ -43,7 +47,11 @@ const toPurchaseHistoryItem = (order: Order, accountTypeLabels: Record<string, s
   quantity: order.quantity,
   amountPaid: order.total_price,
   status: order.status.trim().toUpperCase() as PurchaseStatus,
-  challengeType: formatChallengeTypeCode(order.type_code, accountTypeLabels),
+  // 챌린지 유형은 상품명에서 공통 접두어 'Challenge '를 뺀 이름 (예: Challenge Starter → Starter).
+  // 상품명이 없으면 기존 type_code 표시를 쓴다.
+  challengeType:
+    order.product_name?.trim().replace(/^challenge\s+/i, '') ||
+    formatChallengeTypeCode(order.type_code, accountTypeLabels),
   challengeId: order.challenge_id,
 });
 
@@ -190,9 +198,11 @@ export function PurchaseHistoryPage() {
       return {
         page: currentPage,
         size: itemsPerPage,
-        search: appliedSearchQuery
-          ? toApiSearchQuery(appliedSearchQuery, accountTypeLabels)
-          : undefined,
+        // 상품명(예: Starter)으로 검색하므로 입력값을 그대로 보낸다. 이전 type_code 변환은 쓰지 않음.
+        // search: appliedSearchQuery
+        //   ? toApiSearchQuery(appliedSearchQuery, accountTypeLabels)
+        //   : undefined,
+        search: appliedSearchQuery.trim() || undefined,
         status: statusFilter !== 'All' ? statusFilter : undefined,
         start_date: toApiDate(startDate),
         end_date: toApiDate(endDate),
