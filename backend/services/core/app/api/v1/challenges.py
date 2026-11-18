@@ -32,6 +32,7 @@ from app.schemas.challenge import (
     ScheduleUpdate,
 )
 from app.services import challenge as svc
+from app.services import challenge_order
 
 router = APIRouter(tags=["challenges"])
 
@@ -136,6 +137,7 @@ async def get_challenge(challenge_id: str, admin: AdminUser, session: Session) -
 async def start_challenge(challenge_id: str, admin: AdminUser, session: Session) -> ChallengeOut:
     challenge = await svc.get_challenge(session, challenge_id, lock=True)
     svc.start_challenge(challenge, _now())
+    await challenge_order.on_challenge_status_changed(session, challenge)
     await session.commit()
     return await _out(session, challenge)
 
@@ -147,6 +149,7 @@ async def close_challenge(
     """cancel_reason을 비우면 진행 중 회차를 종료(CLOSED)하고, 넣으면 그 사유로 취소(CANCELLED)한다."""
     challenge = await svc.get_challenge(session, challenge_id, lock=True)
     svc.close_challenge(challenge, _now(), body.cancel_reason if body else None)
+    await challenge_order.on_challenge_status_changed(session, challenge)
     await session.commit()
     return await _out(session, challenge)
 

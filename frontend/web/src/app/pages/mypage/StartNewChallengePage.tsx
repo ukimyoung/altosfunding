@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router';
 import { Toast } from '../../components/shared/Toast';
 import { SuccessNotification } from '../../components/shared/SuccessNotification';
 import { validateCoupon, type ValidateCouponResponse } from '@/api/coupons';
-import { completePayment } from '@/api/orders';
+import { completePayment, getMyOrder, type OrderDetail } from '@/api/orders';
 import type { ChallengeOffer, ChallengeOfferFunded, ChallengeOfferRules } from '@/api/products';
 import { useListChallengeOffersQuery } from '@/app/queries/products';
 import { useMyAssetQuery } from '@/app/queries/assets';
@@ -73,8 +73,13 @@ const toAccountType = (offer: ChallengeOffer): AccountType => ({
   isAvailable: Boolean(offer.open_challenge),
 });
 
-// 결제(지갑·쿠폰·주문 생성)는 Core에 아직 없다. 다음 단계에서 true로 바꾸면 아래 결제 모달 흐름이 동작한다.
-const PAYMENT_ENABLED = false;
+// 결제: Core가 통합 지갑에서 차감하고 주문을 만든 뒤 바로 응답한다. MT4 계좌는 Worker가 발급한다(발급 중 → 완료).
+const PAYMENT_ENABLED = true;
+// 쿠폰은 Core에 아직 없다. 기능이 들어오면 true로 바꾸면 결제 모달의 할인 코드 입력이 다시 보인다.
+const COUPON_ENABLED = false;
+// 결제 뒤 계좌 발급 상태를 확인하는 간격·최대 시간
+const ORDER_POLL_MS = 3000;
+const ORDER_POLL_LIMIT_MS = 3 * 60 * 1000;
 
 const formatUsdt = (amount: number) =>
   `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} USDT`;
@@ -162,6 +167,9 @@ export function StartNewChallengePage() {
   const [discountStatus, setDiscountStatus] = useState<'idle' | 'loading' | 'success' | 'error'>(
     'idle',
   );
+  // 결제 결과 (계좌 발급 진행 상황)
+  const [purchaseResult, setPurchaseResult] = useState<OrderDetail | null>(null);
+  const pollStartedAt = useRef<number>(0);
   const {
     data: challengeOffers,
     isLoading: isChallengeSummaryLoading,
@@ -208,6 +216,31 @@ export function StartNewChallengePage() {
 
     return () => clearTimeout(timer);
   }, [showPaymentSuccessToast]);
+
+  // 계좌 발급이 끝날 때까지 주문 상태를 다시 읽는다.
+  useEffect(() => {
+    if (!purchaseResult || purchaseResult.status !== 'PENDING') {
+      return;
+    }
+    if (Date.now() - pollStartedAt.current > ORDER_POLL_LIMIT_MS) {
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const latest = await getMyOrder(purchaseResult.order_id);
+        setPurchaseResult(latest);
+        if (latest.status !== 'PENDING') {
+          await refetchMyAsset();
+        }
+      } catch {
+        // 다음 주기에 다시 시도한다.
+        setPurchaseResult((prev) => (prev ? { ...prev } : prev));
+      }
+    }, ORDER_POLL_MS);
+
+    return () => clearTimeout(timer);
+  }, [purchaseResult, refetchMyAsset]);
 
   useEffect(() => {
     if (!showPaymentModal && !showInsufficientFundsToast) {
@@ -363,17 +396,20 @@ export function StartNewChallengePage() {
     try {
       setIsCompletingPayment(true);
 
-      await completePayment({
+      const order = await completePayment({
         challenge_id: selectedAccountData.challengeId,
-        mt4_login: 0,
         quantity,
-        ...(couponPreview?.coupon_code ? { coupon_code: couponPreview.coupon_code } : {}),
+        ...(COUPON_ENABLED && couponPreview?.coupon_code
+          ? { coupon_code: couponPreview.coupon_code }
+          : {}),
       });
-      await refetchMyAsset();
+      await Promise.allSettled([refetchMyAsset(), refetchChallengeSummary()]);
 
       setShowPaymentSuccessToast(true);
       setShowPaymentModal(false);
       resetDiscount();
+      pollStartedAt.current = Date.now();
+      setPurchaseResult(order);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       setApiErrorMessage(getPaymentErrorMessage(error, text.completePaymentError));
@@ -505,6 +541,105 @@ export function StartNewChallengePage() {
         )}
       </AnimatePresence>
 
+      {/* Purchase Result: 결제 뒤 MT4 계좌 발급 진행 상황 */}
+      <AnimatePresence>
+        {purchaseResult && (
+          <motion.div
+            initial={{ opacity: 0, y: -24, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -24, scale: 0.98 }}
+            transition={{ duration: 0.25 }}
+            className="fixed left-1/2 top-1/2 z-[60] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-xl border border-[#00FF94]/40 bg-[#0f0f17] shadow-2xl shadow-black/50"
+          >
+            <div className="border-b border-[#00FF94]/20 bg-[#00FF94]/5 p-6">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg border border-[#00FF94]/40 bg-[#00FF94]/10">
+                  <CheckCircle size={22} className="text-[#00FF94]" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xl font-bold text-white">{text.purchaseResultTitle}</h3>
+                  <p className="mt-1 truncate text-sm text-gray-400">
+                    {text.orderNumber} {purchaseResult.order_id}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4 p-6">
+              <p className="text-sm leading-6 text-gray-300">
+                {purchaseResult.status === 'PENDING'
+                  ? text.purchaseResultMsg
+                  : text.credentialsByEmail}
+              </p>
+
+              <div className="rounded-lg border border-[#2a2a3a] bg-[#16161f] p-4">
+                <div className="mb-3 flex items-center justify-between gap-4 text-sm">
+                  <span className="font-semibold text-white">{purchaseResult.product_name}</span>
+                  <span className="text-gray-400">x {purchaseResult.quantity}</span>
+                </div>
+                <ul className="space-y-2 text-sm">
+                  {purchaseResult.accounts.map((account, index) => (
+                    <li
+                      key={account.account_id}
+                      className="flex items-center justify-between gap-4"
+                    >
+                      <span className="text-gray-400">
+                        MT4 #{index + 1}
+                        {account.mt4_login ? (
+                          <span className="ml-2 font-mono text-white">{account.mt4_login}</span>
+                        ) : null}
+                      </span>
+                      {account.provision_status === 'DONE' ? (
+                        <span className="flex items-center gap-1 font-medium text-[#00FF94]">
+                          <Check size={14} />
+                          {text.accountIssued}
+                        </span>
+                      ) : account.provision_status === 'FAILED' ? (
+                        <span className="flex items-center gap-1 font-medium text-red-400">
+                          <X size={14} />
+                          {text.accountIssueFailed}
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-gray-400">
+                          <Loader2 size={14} className="animate-spin" />
+                          {text.accountIssuing}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {purchaseResult.refunded_quantity > 0 && (
+                <p className="rounded-lg border border-red-500/30 bg-red-950/30 p-3 text-xs leading-5 text-red-300">
+                  {text.accountIssueRefunded
+                    .replace('{n}', String(purchaseResult.refunded_quantity))
+                    .replace('{amount}', formatPrice(purchaseResult.refunded_amount))}
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-3 border-t border-[#1a1a24] p-5">
+              <button
+                onClick={() => setPurchaseResult(null)}
+                className="flex-1 rounded-lg bg-[#1a1a24] py-3 font-semibold text-gray-300 transition-colors hover:bg-[#242436] hover:text-white"
+              >
+                {text.close}
+              </button>
+              <button
+                onClick={() => {
+                  setPurchaseResult(null);
+                  navigate('/my-page/my-account');
+                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#0052FF] py-3 font-bold text-white transition-colors hover:bg-[#0066FF]"
+              >
+                {text.goToMyAccount}
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Payment Modal */}
       <AnimatePresence>
         {showPaymentModal && (
@@ -611,6 +746,7 @@ export function StartNewChallengePage() {
                           <span className="text-xs font-normal text-white/50">USDT</span>
                         </div>
                       </div>
+                      {COUPON_ENABLED && (
                       <div className="space-y-2">
                         <span className="flex items-center gap-1.5 text-xs font-medium text-gray-400">
                           <Tag size={12} />
@@ -676,6 +812,7 @@ export function StartNewChallengePage() {
                           </motion.p>
                         )}
                       </div>
+                      )}
                       {discountAmount > 0 && (
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-400">{text.discountAmount}</span>

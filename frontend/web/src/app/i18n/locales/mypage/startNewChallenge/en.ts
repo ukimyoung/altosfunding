@@ -124,4 +124,14 @@ export const startNewChallengeEn: StartNewChallengeTranslations = {
   paymentSuccessful: 'Payment Successful!',
   paymentSuccessMsg:
     'The challenge purchase has been completed. The amount has been deducted from your total asset balance.',
+
+  purchaseResultTitle: 'Purchase Complete',
+  purchaseResultMsg: 'Your MT4 challenge account is being issued. This usually takes less than a minute.',
+  orderNumber: 'Order No.',
+  accountIssuing: 'Issuing...',
+  accountIssued: 'Issued',
+  accountIssueFailed: 'Failed',
+  accountIssueRefunded: '{n} account(s) could not be issued and {amount} USDT was refunded to your Total Asset.',
+  credentialsByEmail: 'Your MT4 login and password have been sent by email. You can trade from the challenge start time.',
+  goToMyAccount: 'Go to My Account',
 };

@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.errors import AppError
 from app.models import Challenge, ChallengeSchedule, Holiday, Product, Ruleset
 from app.security import generate_human_code
+from app.services import challenge_order
 
 PENDING, ACTIVE, CLOSED, CANCELLED = "PENDING", "ACTIVE", "CLOSED", "CANCELLED"
 EXPIRED_REASON = "시작 시각이 지나기 전에 시작되지 않아 자동 취소"
@@ -577,7 +578,7 @@ async def advance_challenges(session: AsyncSession, now: datetime) -> dict[str, 
         .order_by(Challenge.start_at)
         .with_for_update(skip_locked=True)
     )
-    for challenge in due:
+    for challenge in list(due):
         if challenge.status == PENDING and challenge.end_at <= now:
             close_challenge(challenge, now, EXPIRED_REASON)
             counts["cancelled"] += 1
@@ -587,6 +588,7 @@ async def advance_challenges(session: AsyncSession, now: datetime) -> dict[str, 
         else:
             close_challenge(challenge, now)
             counts["closed"] += 1
+        await challenge_order.on_challenge_status_changed(session, challenge)
     await session.flush()
     return counts
 
@@ -614,6 +616,7 @@ async def run_due_jobs(session: AsyncSession, now: datetime | None = None) -> di
         # 첫 회차처럼 시작 시각이 이미 지났으면 바로 시작한다.
         if challenge.start_at <= now:
             start_challenge(challenge, now)
+            await challenge_order.on_challenge_status_changed(session, challenge)
             counts["started"] += 1
             next_challenge, _ = await run_schedule(session, schedule, now, holidays)
             created += 1 if next_challenge else 0

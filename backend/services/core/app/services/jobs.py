@@ -18,6 +18,14 @@ Core API는 enqueue()로 작업을 넣기만 하고, Render Background Worker(ap
         ...
 
 처리기 안에서 DB를 바꾸면 처리기와 같은 트랜잭션으로 작업 상태와 함께 커밋된다.
+처리기가 중간에 session.commit()을 해도 된다 (외부 호출 전에 진행 상황을 남길 때).
+
+재시도를 다 써서(또는 PermanentJobError로) 최종 실패할 때 할 일은 on_failed로 등록한다.
+작업을 FAILED로 바꾸는 트랜잭션 안에서 불린다 (예: 계좌 발급 실패 → 자동 환불).
+
+    @jobs.on_failed("mt4.create_account")
+    async def refund(session: AsyncSession, job: Job, error: str) -> None:
+        ...
 """
 
 import logging
@@ -40,7 +48,9 @@ RETRY_MAX_SECONDS = 3600
 DEFAULT_LEASE_SECONDS = 600
 
 Handler = Callable[[AsyncSession, Job], Awaitable[dict | None]]
+FailureHandler = Callable[[AsyncSession, Job, str], Awaitable[None]]
 _handlers: dict[str, Handler] = {}
+_failure_handlers: dict[str, FailureHandler] = {}
 
 
 class PermanentJobError(Exception):
@@ -55,6 +65,28 @@ def handler(kind: str) -> Callable[[Handler], Handler]:
         return fn
 
     return register
+
+
+def on_failed(kind: str) -> Callable[[FailureHandler], FailureHandler]:
+    def register(fn: FailureHandler) -> FailureHandler:
+        if kind in _failure_handlers and _failure_handlers[kind] is not fn:
+            raise RuntimeError(f"실패 처리기가 이미 등록돼 있습니다: {kind}")
+        _failure_handlers[kind] = fn
+        return fn
+
+    return register
+
+
+async def _run_failure_handler(session: AsyncSession, job: Job, error: str) -> None:
+    """최종 실패 처리. 처리기가 실패하면 그 변경만 되돌리고 로그를 남긴다 (작업은 FAILED로 끝낸다)."""
+    fn = _failure_handlers.get(job.kind)
+    if fn is None:
+        return
+    try:
+        async with session.begin_nested():
+            await fn(session, job, error)
+    except Exception:
+        logger.exception("실패 처리기 오류: id=%s kind=%s", job.id, job.kind)
 
 
 def registered_kinds() -> list[str]:
@@ -172,6 +204,7 @@ async def _finish_failure(session: AsyncSession, job_id: int, error: str, perman
     if permanent or job.attempts >= job.max_attempts:
         job.status, job.finished_at = FAILED, now
         attempt_status = FAILED
+        await _run_failure_handler(session, job, error)
     else:
         job.status, job.run_at = PENDING, now + retry_delay(job.attempts)
         attempt_status = "RETRY"
@@ -234,6 +267,7 @@ async def release_stale(
         job.last_error, job.locked_by, job.locked_at = error, None, None
         if job.attempts >= job.max_attempts:
             job.status, job.finished_at = FAILED, now
+            await _run_failure_handler(session, job, error)
         else:
             job.status, job.run_at = PENDING, now + retry_delay(job.attempts)
     await session.commit()

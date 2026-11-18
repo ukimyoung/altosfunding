@@ -141,6 +141,16 @@ services:
       # 로컬 웹(로컬 개발 서버)에서 Google 로그인을 시험할 수 있게 허용
       - key: FRONTEND_ALLOWED_ORIGINS
         value: https://local.altosfunding.com:5173
+      # MT4 API (Tools For Brokers). 챌린지 계좌 발급·거래 잠금에 쓴다. 호출은 Worker가 한다.
+      # demo: 챌린지·데모 서버(mexn-mt4-alto-demo), live: 펀디드·라이브 서버(mexn-mt4-alto). 주소는 https://... 까지만 넣는다.
+      - key: MT4_DEMO_BASE_URL
+        sync: false
+      - key: MT4_DEMO_API_KEY
+        sync: false
+      - key: MT4_LIVE_BASE_URL
+        sync: false
+      - key: MT4_LIVE_API_KEY
+        sync: false
       # Google 로그인. 비어 있으면 /api/v1/auth/google/* 는 503을 돌려준다.
       - key: GOOGLE_CLIENT_ID
         sync: false
@@ -152,7 +162,7 @@ services:
   # ── Background Worker ───────────────────────────────────────
   # Core와 같은 코드·같은 DB로 `python -m app.worker`를 돌린다 (HTTP 포트 없음).
   # - 1분마다: 챌린지 회차 시작·종료 처리와 다음 회차 자동 생성, 예약 수동 메일 발송
-  # - 5초마다: 작업 큐(core.jobs) 처리 (실패 시 재시도, 이력은 core.job_attempts)
+  # - 5초마다: 작업 큐(core.jobs) 처리 (챌린지 MT4 계좌 발급·거래 잠금·발급 메일, 실패 시 재시도, 이력은 core.job_attempts)
   # - 상태 확인: Core의 GET /api/v1/admin/system/worker (관리자 로그인 필요)
   # DB·메일 설정은 Core 서비스의 값을 그대로 가져온다 (fromService). Core 값을 바꾸면 Worker도 다시 배포한다.
   - type: worker
@@ -209,6 +219,27 @@ services:
         value: Altos Funding
       - key: WEB_BASE_URL
         value: https://altosfunding-web-sandbox.onrender.com
+      # MT4 API 값도 Core에서 가져온다 (사용자는 Core에만 입력).
+      - key: MT4_DEMO_BASE_URL
+        fromService:
+          type: web
+          name: altosfunding-core-sandbox
+          envVarKey: MT4_DEMO_BASE_URL
+      - key: MT4_DEMO_API_KEY
+        fromService:
+          type: web
+          name: altosfunding-core-sandbox
+          envVarKey: MT4_DEMO_API_KEY
+      - key: MT4_LIVE_BASE_URL
+        fromService:
+          type: web
+          name: altosfunding-core-sandbox
+          envVarKey: MT4_LIVE_BASE_URL
+      - key: MT4_LIVE_API_KEY
+        fromService:
+          type: web
+          name: altosfunding-core-sandbox
+          envVarKey: MT4_LIVE_API_KEY
       # 예약 메일 속 이미지·수신거부 링크의 주소. Worker에는 공개 주소가 없어서 Core 주소를 직접 적는다.
       - key: CORE_PUBLIC_URL
         value: https://altosfunding-core-sandbox.onrender.com

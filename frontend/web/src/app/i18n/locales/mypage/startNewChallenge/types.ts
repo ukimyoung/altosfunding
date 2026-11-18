@@ -126,4 +126,15 @@ export interface StartNewChallengeTranslations {
   // Success toast
   paymentSuccessful: string;
   paymentSuccessMsg: string;
+
+  // Purchase result (MT4 account issuance)
+  purchaseResultTitle: string;
+  purchaseResultMsg: string;
+  orderNumber: string;
+  accountIssuing: string;
+  accountIssued: string;
+  accountIssueFailed: string;
+  accountIssueRefunded: string;
+  credentialsByEmail: string;
+  goToMyAccount: string;
 }
