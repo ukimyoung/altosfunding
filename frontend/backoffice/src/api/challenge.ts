@@ -1,15 +1,29 @@
 import api from './axios';
 
+export interface ChallengeGroupedTier {
+  challenge_id: string;
+  product_id: string;
+  product_name: string;
+  capital: number;
+  participants: number;
+  group_size: number | null;
+}
+
 export interface ChallengeGroupedItem {
   start_at: string;
   end_at: string;
   status: string;
   participants: Record<string, number>;
+  /** 같은 기간에 묶인 상품별 회차 (자본금 순) */
+  tiers?: ChallengeGroupedTier[];
 }
 
 export interface ChallengeGroupedParams {
   status?: string | null;
   date?: string | null;
+  /** 시작일 범위 (한국 시간, YYYY-MM-DD) */
+  date_from?: string | null;
+  date_to?: string | null;
   page?: number;
   size?: number;
 }

@@ -244,6 +244,17 @@ def test_lists_summary_grouped(client, admin, challenge_product):  # noqa: F811
 
     grouped = client.get("/api/v1/admin/challenges/grouped?status=ACTIVE", headers=admin).json()
     assert grouped["total"] == 1 and grouped["items"][0]["participants"] == {"100": 7}
+    tier = grouped["items"][0]["tiers"][0]
+    assert tier["product_id"] == challenge_product and tier["participants"] == 7 and tier["group_size"] == 30
+    # 날짜 범위는 한국 시간 시작일 기준 (UTC 11-16 22:00 시작 = 한국 11-17 07:00)
+    url = "/api/v1/admin/challenges/grouped"
+    assert [i["status"] for i in client.get(f"{url}?date_from=2026-11-18", headers=admin).json()["items"]] == [
+        "PENDING"
+    ]
+    only_first = client.get(f"{url}?date_from=2026-11-17&date_to=2026-11-17", headers=admin).json()
+    assert [i["status"] for i in only_first["items"]] == ["ACTIVE"]
+    assert client.get(f"{url}?date_to=2026-11-16", headers=admin).json()["total"] == 0
+    assert client.get(f"{url}?date_from=bad", headers=admin).status_code == 400
 
     # 로그인 없이 볼 수 있다.
     summary = client.get("/api/v1/challenges/summary").json()

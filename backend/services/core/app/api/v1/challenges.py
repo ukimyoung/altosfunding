@@ -88,11 +88,15 @@ async def challenge_grouped(
     admin: AdminUser,
     session: Session,
     status: ChallengeStatus | None = None,
-    date: str | None = None,
+    date: Annotated[str | None, Query(description="시작일 (YYYYMMDD 또는 YYYY-MM-DD, UTC)")] = None,
+    date_from: Annotated[str | None, Query(description="시작일 범위 시작 (한국 시간, YYYY-MM-DD)")] = None,
+    date_to: Annotated[str | None, Query(description="시작일 범위 끝, 포함 (한국 시간, YYYY-MM-DD)")] = None,
     page: Page = 1,
     size: Size = 20,
 ) -> ChallengeGroupedPage:
-    items, total = await svc.grouped(session, status=status, date=date, page=page, size=size)
+    items, total = await svc.grouped(
+        session, status=status, date=date, date_from=date_from, date_to=date_to, page=page, size=size
+    )
     return ChallengeGroupedPage(items=items, total=total, page=page, size=size, pages=_pages(total, size))
 
 
