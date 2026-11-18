@@ -194,11 +194,11 @@ def test_purchase_issue_start_close(client, admin_headers, buyer, round_, fake_m
     issued = [m for m in sent_emails if m["purpose"] == "challenge_account_issued"]
     assert len(issued) == 2 and all(m["email"] == BUYER for m in issued)
 
-    # 대회 시작 전: 비밀번호는 보이지 않는다
+    # 대회 시작 전(거래 잠금)에도 발급된 계좌 비밀번호는 본인에게 보인다
     accounts = client.get("/api/v1/accounts", headers=buyer, params={"tier": "CHALLENGE"}).json()
     assert accounts["total"] == 2
     assert {a["status"] for a in accounts["items"]} == {"PENDING"}
-    assert all(a["mt4_password"] is None and a["mt4_server"] == "MexnLimited-Demo" and a["product_name"] == "Challenge Starter" for a in accounts["items"])
+    assert all(a["mt4_password"] and a["mt4_server"] == "MexnLimited-Demo" and a["product_name"] == "Challenge Starter" for a in accounts["items"])
     summary = client.get("/api/v1/accounts/challenge-summary", headers=buyer).json()
     assert summary["total_challenges"] == 2 and summary["by_product"][0]["count"] == 2
     # my-asset 경로가 계좌 상세 경로와 겹치지 않는다
