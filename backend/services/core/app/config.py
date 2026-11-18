@@ -64,6 +64,18 @@ class Settings(BaseSettings):
     # 수동 발송 속도 (초당 통수). SES 계정 발송 한도(샌드박스 1, 기본 14)보다 낮게 둔다.
     manual_email_rate_per_second: float = 10.0
 
+    # MT4 API (Tools For Brokers). 요청마다 X-API-KEY 헤더로 키를 보낸다.
+    # demo: 챌린지·데모 계좌 서버(mexn-mt4-alto-demo), live: 펀디드·라이브 계좌 서버(mexn-mt4-alto)
+    # 비어 있으면 계좌 발급 작업이 "설정되지 않음"으로 재시도하다가 환불된다.
+    mt4_demo_base_url: str = ""
+    mt4_demo_api_key: str = ""
+    mt4_live_base_url: str = ""
+    mt4_live_api_key: str = ""
+    mt4_http_timeout_seconds: float = 20
+    # 계좌 발급 메일·화면에 보여 주는 MT4 서버 이름
+    mt4_demo_server_name: str = "MexnLimited-Demo"
+    mt4_live_server_name: str = "MexnLimited-Live"
+
     # Sumsub KYC. 비어 있으면 본인 인증 시작(토큰 발급)과 웹훅을 막는다. 상태 조회는 된다.
     sumsub_app_token: str = ""
     sumsub_secret_key: str = ""

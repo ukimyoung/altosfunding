@@ -142,6 +142,7 @@ async def _post_journal(
     reference_type: str,
     reference_id: int | str,
     created_by: uuid.UUID | None = None,
+    reversed_entry_id: int | None = None,
 ) -> JournalEntry:
     lines = [ln for ln in lines if ln.debit > 0 or ln.credit > 0]
     if len(lines) < 2:
@@ -154,6 +155,8 @@ async def _post_journal(
         reference_type=reference_type,
         reference_id=str(reference_id),
         created_by=created_by,
+        is_reversal=reversed_entry_id is not None,
+        reversed_entry_id=reversed_entry_id,
     )
     session.add(entry)
     await session.flush()
@@ -193,7 +196,7 @@ async def _change_balance(
     description: str,
     journal: JournalEntry,
     reference_type: str,
-    reference_id: int,
+    reference_id: int | str,
     tx_hash: str | None = None,
 ) -> WalletTransaction:
     """잔고를 바꾸고 이력을 남긴다. wallet은 with_for_update로 잠근 상태여야 한다."""

@@ -44,14 +44,14 @@ HEARTBEAT_RETENTION = timedelta(days=1)
 
 def import_job_handlers() -> None:
     """작업 처리기를 등록하는 모듈을 불러온다. 처리기를 새로 만들면 여기에 추가한다."""
-    # 예: from app.jobs import mt4  # noqa: F401
+    from app.jobs import mt4  # noqa: F401
 
 
 # ── 주기 작업 ───────────────────────────────────────────────
 
 
 async def run_challenges(session: AsyncSession) -> dict:
-    counts = await challenge_svc.run_due_jobs(session)
+    counts = await challenge_svc.run_due_jobs(session)  # 계좌 잠금 해제·잠금 작업도 여기서 넣는다
     await session.commit()
     return counts
 
