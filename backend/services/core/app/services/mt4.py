@@ -72,6 +72,15 @@ def _error_text(resp: httpx.Response) -> tuple[str, Any]:
     return str(body), body
 
 
+def normalize_base_url(url: str) -> str:
+    """환경변수에 Swagger 화면 주소(…/index.html, …/swagger)를 넣어도 API 주소(https://호스트)로 맞춘다."""
+    url = (url or "").strip().rstrip("/")
+    for suffix in ("/index.html", "/swagger/index.html", "/swagger", "/api/mt4", "/api"):
+        if url.lower().endswith(suffix):
+            url = url[: -len(suffix)].rstrip("/")
+    return url
+
+
 @dataclass
 class CreatedAccount:
     login: int
@@ -80,7 +89,7 @@ class CreatedAccount:
 class Mt4Client:
     def __init__(self, server: str, base_url: str, api_key: str, transport: httpx.AsyncBaseTransport | None = None):
         self.server = server
-        self.base_url = base_url.rstrip("/")
+        self.base_url = normalize_base_url(base_url)
         self.api_key = api_key
         self._transport = transport
 
@@ -115,6 +124,10 @@ class Mt4Client:
             return resp.json()
         except ValueError:
             return resp.text
+
+    async def server_time(self) -> Any:
+        """연결 확인용: MT4 서버 시각. 주소가 틀리면 404, API 키가 틀리면 401/403."""
+        return await self._call("server_time", "GET", "/api/mt4/server/time")
 
     async def get_account(self, login: int) -> dict | None:
         """계좌 정보. 없으면 None. (명세상 없는 계좌는 404, 일부 서버는 400을 준다)"""

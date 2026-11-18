@@ -6,6 +6,7 @@ Core API와 같은 코드·같은 DB를 쓰고, 사람이 누르지 않아도 �
   (백오피스 '지금 실행'과 같은 app.services.challenge.run_due_jobs).
 - 예약 수동 메일: 1분마다 예약 시각이 된 발송 작업을 보낸다 (app.services.manual_email.run_due_jobs).
 - 작업 큐(core.jobs): 몇 초마다 실행할 작업을 꺼내 처리한다 (app.services.jobs).
+- MT4 연결 확인: 시작할 때와 10분마다 실제 브로커 API(서버 시각)를 불러 주소·API 키가 맞는지 로그로 남긴다.
 - 생존 기록: core.worker_heartbeats에 마지막 실행 시각과 결과를 남긴다 (GET /api/v1/admin/system/worker).
 
 주기 작업은 각자 따로 돈다. 수동 메일을 오래 보내는 중에도 챌린지 회차는 제때 바뀐다.
@@ -30,7 +31,7 @@ from app import db
 from app.config import settings
 from app.models import Challenge, ChallengeSchedule, Job, WorkerHeartbeat
 from app.services import challenge as challenge_svc
-from app.services import jobs
+from app.services import jobs, mt4
 from app.services import manual_email as manual_email_svc
 from app.services.email import get_email_sender
 from app.services.files import public_base_url
@@ -40,6 +41,8 @@ logger = logging.getLogger("app.worker")
 WORKER_ID = f"{socket.gethostname()}-{os.getpid()}"
 # 이보다 오래 소식이 없는 Worker 기록은 지운다.
 HEARTBEAT_RETENTION = timedelta(days=1)
+# MT4 브로커 API 연결 확인 주기 (시작할 때 한 번, 이후 10분마다)
+MT4_CHECK_SECONDS = 600
 
 
 def import_job_handlers() -> None:
@@ -58,6 +61,27 @@ async def run_challenges(session: AsyncSession) -> dict:
 
 async def run_manual_emails(session: AsyncSession) -> dict:
     return await manual_email_svc.run_due_jobs(session, get_email_sender(), public_base_url(""))
+
+
+async def check_mt4() -> dict:
+    """실제 MT4 브로커 API에 닿는지 확인한다 (환경변수 주소·API 키). 결과는 로그와 생존 기록에 남는다.
+
+    계좌 발급은 이 확인과 상관없이 작업 큐에서 실제 API를 부른다. 설정이 안 된 서버는 건너뛴다.
+    """
+    result: dict[str, str] = {}
+    for server in (mt4.DEMO, mt4.LIVE):
+        client = mt4.client_for(server)
+        if not client.base_url or not client.api_key:
+            result[server] = "미설정"
+            continue
+        try:
+            reply = await client.server_time()
+            result[server] = "OK"
+            logger.info("MT4 %s 연결 OK: %s (서버 시각 %s)", server, client.base_url, reply)
+        except mt4.Mt4Error as exc:
+            result[server] = f"실패 HTTP {exc.status}" if exc.status else "실패 응답 없음"
+            logger.error("MT4 %s 연결 실패: %s → %s", server, client.base_url, exc)
+    return result
 
 
 async def run_job_queue(sessionmaker: async_sessionmaker[AsyncSession]) -> dict:
@@ -162,11 +186,12 @@ class Worker:
 
         next_start = state["next_start"]
         logger.info(
-            "상태: 대회[%s] 예약메일[%s] 작업큐[%s] | 활성 스케줄 %d, 모집 중 대회 %d (다음 시작 %s), "
+            "상태: 대회[%s] 예약메일[%s] 작업큐[%s] MT4[%s] | 활성 스케줄 %d, 모집 중 대회 %d (다음 시작 %s), "
             "진행 중 대회 %d, 대기 작업 %d",
             result("challenges"),
             result("manual_emails"),
             ",".join(f"{k}={v}" for k, v in self.jobs_since_report.items()) or "0",
+            result("mt4"),
             state["schedules"],
             state["pending_rounds"],
             f"{next_start:%Y-%m-%d %H:%M} UTC" if next_start else "없음",
@@ -183,6 +208,7 @@ class Worker:
             self._every("manual_emails", tick, lambda: self._session_task(run_manual_emails)),
             self._every("job_queue", settings.worker_poll_seconds, lambda: run_job_queue(self.sessionmaker)),
             self._every("heartbeat", tick, self.heartbeat),
+            self._every("mt4", MT4_CHECK_SECONDS, check_mt4),
         ]
         logger.info("Worker 시작: %s (주기 %ss, 작업 큐 %ss)", WORKER_ID, tick, settings.worker_poll_seconds)
         await asyncio.gather(*loops)

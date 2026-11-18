@@ -372,3 +372,32 @@ def test_worker_start_unlocks_accounts(client, buyer, round_, fake_mt4):
     assert counts["started"] == 1
     _work()
     assert fake_mt4.accounts[POOL_START]["isReadOnly"] is False
+
+
+def test_mt4_base_url_and_connection_check(monkeypatch):
+    """Swagger 화면 주소를 넣어도 API 주소로 맞추고, Worker 연결 확인은 실제 API 경로·X-API-KEY로 부른다."""
+    from app import worker
+
+    assert mt4.normalize_base_url("https://mexn-mt4-alto-demo.tfb-api.com/index.html") == "https://mexn-mt4-alto-demo.tfb-api.com"
+    assert mt4.normalize_base_url("https://h.example.com/swagger/") == "https://h.example.com"
+    assert mt4.normalize_base_url("https://h.example.com/") == "https://h.example.com"
+
+    seen = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append((request.url.host, request.url.path, request.headers.get("X-API-KEY")))
+        if request.headers.get("X-API-KEY") != "good":
+            return httpx.Response(403, json={"message": "Forbidden"})
+        return httpx.Response(200, json="2026-11-18T00:00:00")
+
+    monkeypatch.setattr(settings, "mt4_demo_base_url", "https://demo.example.com/index.html")
+    monkeypatch.setattr(settings, "mt4_demo_api_key", "good")
+    monkeypatch.setattr(settings, "mt4_live_base_url", "https://live.example.com")
+    monkeypatch.setattr(settings, "mt4_live_api_key", "bad")
+    mt4.set_transport(httpx.MockTransport(handler))
+    try:
+        result = asyncio.run(worker.check_mt4())
+    finally:
+        mt4.set_transport(None)
+    assert result == {"demo": "OK", "live": "실패 HTTP 403"}
+    assert seen == [("demo.example.com", "/api/mt4/server/time", "good"), ("live.example.com", "/api/mt4/server/time", "bad")]
