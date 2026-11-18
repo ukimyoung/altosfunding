@@ -86,7 +86,8 @@ async def _set_login_status(session: AsyncSession, account: TradingAccount, logi
     await session.execute(
         stmt.on_conflict_do_update(
             index_elements=[Mt4Login.mt4_server, Mt4Login.mt4_login],
-            set_={"status": status, "reason": reason},
+            # 관리자가 등록한 번호였더라도 발급 과정에서 실제로 쓰였거나 MT4에 생겼으면 시스템 기록으로 바꾼다.
+            set_={"status": status, "reason": reason, "source": "SYSTEM", "created_by": None},
         )
     )
 

@@ -90,5 +90,8 @@ class Mt4Login(Base):
     account_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.trading_accounts.id"))
     status: Mapped[str]
     reason: Mapped[str | None]
+    # SYSTEM: 발급 과정에서 자동 기록 / ADMIN: 관리자가 블랙리스트로 등록·전환 (20261118060000)
+    source: Mapped[str] = mapped_column(server_default="SYSTEM")
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

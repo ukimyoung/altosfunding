@@ -23,6 +23,7 @@ import {
   MonitorSmartphone,
   Percent,
   CalendarClock,
+  Ban,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -109,6 +110,7 @@ export const NAV: NavSection[] = [
       { id: 'inquiry', label: '문의하기', icon: MessageCircle },
       { id: 'faq', label: 'FAQ', icon: HelpCircle },
       { id: 'email-notification', label: '이메일/알림 관리', icon: Mail },
+      { id: 'mt4-login-management', label: '계좌 관리', icon: Ban },
       { id: 'profit-split-settings', label: '수익 분배 / 출금 수수료 설정', icon: Percent },
     ],
   },
@@ -169,6 +171,7 @@ export const BC: Record<string, { parts: string[] }> = {
   inquiry: { parts: ['운영 관리', '문의하기'] },
   faq: { parts: ['운영 관리', 'FAQ'] },
   'email-notification': { parts: ['운영 관리', '이메일/알림 관리'] },
+  'mt4-login-management': { parts: ['운영 관리', '계좌 관리'] },
   'profit-split-settings': { parts: ['운영 관리', '수익 분배 / 출금 수수료 설정'] },
   // 출시 시점 제외 faq, inquiry, review, promotions
   // faq: { parts: ['지원', 'FAQ'] },
@@ -210,6 +213,7 @@ export const ROUTE_BY_PAGE_ID: Record<string, string> = {
   inquiry: '/inquiry',
   faq: '/faq',
   'email-notification': '/email-notification',
+  'mt4-login-management': '/mt4-login-management',
   'profit-split-settings': '/profit-split-settings',
   // 출시 시점 제외 faq, inquiry, review, promotions
   // faq: '/faq',
