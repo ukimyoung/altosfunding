@@ -147,6 +147,11 @@ const formatChallengeAccountType = (
   return labels[code.replace(/^\$/, '')] ?? `$${code.replace(/^\$/, '')}`;
 };
 
+// 계좌 유형은 상품명에서 공통 접두어 'Challenge '를 뺀 이름 (예: Challenge Starter → Starter).
+// 상품명이 없으면 기존 type_code 표시를 쓴다.
+const formatChallengeProductName = (productName: string | null | undefined) =>
+  productName?.trim().replace(/^challenge\s+/i, '') || '';
+
 const formatStatusDisplay = (status: string) => status.trim() || '-';
 const formatStatusLabel = (status: string) =>
   status
@@ -351,7 +356,9 @@ export function ChallengeAccountPage() {
       return {
         account_id: item.account_id,
         mt4Login: item.mt4_login,
-        accountType: formatChallengeAccountType(item.type_code, accountTypeLabels),
+        accountType:
+          formatChallengeProductName(item.product_name) ||
+          formatChallengeAccountType(item.type_code, accountTypeLabels),
         startDate: formatDateTimeByBrowserTimeZone(item.start_date || '') || '-',
         endDate: formatDateTimeByBrowserTimeZone(item.end_date || '') || '-',
         rawStartDate: item.start_date || undefined,

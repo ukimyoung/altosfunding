@@ -57,6 +57,7 @@ export interface AccountListItem {
   account_id: string;
   user_id: string;
   product_id: string;
+  product_name?: string | null;
   status: AccountStatus | string;
   tier: AccountTier | string;
   type_code: string;
