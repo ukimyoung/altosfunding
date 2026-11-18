@@ -31,7 +31,8 @@ def _check_template(value: str) -> str:
 class ScheduleCreate(BaseModel):
     name_template: str = Field(min_length=1, max_length=200)
     product_id: str
-    group_size: int = Field(default=50, gt=0)
+    # 비우면(null) 정원 무제한
+    group_size: int | None = Field(default=None, gt=0)
     interval_days: int = Field(ge=0)
     duration_days: int = Field(ge=0)
     start_time: time = time(22, 0)
@@ -81,7 +82,7 @@ class ScheduleOut(BaseModel):
     id: int
     name_template: str
     product_id: str
-    group_size: int
+    group_size: int | None
     interval_days: int
     interval_minutes: int | None
     duration_days: int
@@ -122,7 +123,8 @@ class ChallengeCreate(BaseModel):
     product_id: str
     challenge_schedule_id: int | None = None
     name: str = Field(min_length=1, max_length=200)
-    group_size: int = Field(default=50, gt=0)
+    # 비우면(null) 정원 무제한
+    group_size: int | None = Field(default=None, gt=0)
     start_at: datetime
     end_at: datetime
 
@@ -145,7 +147,7 @@ class ChallengeOut(BaseModel):
     product_id: str
     challenge_schedule_id: int | None
     name: str
-    group_size: int
+    group_size: int | None
     status: str
     start_at: datetime
     end_at: datetime
@@ -191,7 +193,7 @@ class ChallengeSummaryItem(BaseModel):
     type_code: str | None
     is_most_popular: bool
     current_participants: int
-    group_size: int
+    group_size: int | None
     start_at: datetime
 
 
@@ -237,7 +239,7 @@ class OfferRound(BaseModel):
     start_at: datetime
     end_at: datetime
     current_participants: int
-    group_size: int
+    group_size: int | None
 
 
 class ChallengeOffer(BaseModel):

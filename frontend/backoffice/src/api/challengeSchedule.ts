@@ -10,7 +10,8 @@ export interface ChallengeSchedule {
   id: number;
   name_template: string;
   product_id: string;
-  group_size: number;
+  /** 대회 정원. null이면 무제한 */
+  group_size: number | null;
   interval_days: number;
   interval_minutes: number | null;
   duration_days: number;
@@ -39,7 +40,7 @@ export interface ChallengeSchedulePage {
 export interface ScheduleInput {
   name_template: string;
   product_id: string;
-  group_size: number;
+  group_size: number | null;
   interval_days: number;
   duration_days: number;
   start_time: string;

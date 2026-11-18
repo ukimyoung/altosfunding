@@ -106,7 +106,7 @@ function toForm(schedule: ChallengeSchedule | null): ScheduleForm {
     start_time: schedule ? hhmm(schedule.start_time) : "22:00",
     end_time: schedule ? hhmm(schedule.end_time) : "21:00",
     exclude_holiday: schedule?.exclude_holiday ?? true,
-    group_size: String(schedule?.group_size ?? 50),
+    group_size: schedule?.group_size != null ? String(schedule.group_size) : "",
     max_occurrences: schedule?.max_occurrences != null ? String(schedule.max_occurrences) : "",
     description: schedule?.description ?? "",
   };
@@ -140,7 +140,7 @@ function ScheduleModal({ t, schedule, products, saving, onClose, onSave }: Sched
     const intOf = (value: string) => (value.trim() === "" ? NaN : Number(value));
     const interval = intOf(form.interval_days);
     const duration = intOf(form.duration_days);
-    const groupSize = intOf(form.group_size);
+    const groupSize = form.group_size.trim() === "" ? null : intOf(form.group_size);
     const maxOcc = form.max_occurrences.trim() === "" ? null : intOf(form.max_occurrences);
     if (!form.product_id) { alert("챌린지 상품을 선택해주세요."); return; }
     if (!form.name_template.trim()) { alert("대회 이름 규칙을 입력해주세요."); return; }
@@ -148,7 +148,7 @@ function ScheduleModal({ t, schedule, products, saving, onClose, onSave }: Sched
     if (!Number.isInteger(interval) || interval < 0) { alert("생성 주기는 0 이상의 정수로 입력해주세요."); return; }
     if (!Number.isInteger(duration) || duration < 1) { alert("진행 기간은 1일 이상으로 입력해주세요."); return; }
     if (!/^\d{2}:\d{2}$/.test(form.start_time) || !/^\d{2}:\d{2}$/.test(form.end_time)) { alert("시작·종료 시각을 입력해주세요."); return; }
-    if (!Number.isInteger(groupSize) || groupSize < 1) { alert("그룹 인원은 1 이상의 정수로 입력해주세요."); return; }
+    if (groupSize !== null && (!Number.isInteger(groupSize) || groupSize < 1)) { alert("그룹 인원은 1 이상의 정수로 입력하거나 비워두세요."); return; }
     if (maxOcc !== null && (!Number.isInteger(maxOcc) || maxOcc < 1)) { alert("최대 회차는 1 이상의 정수로 입력하거나 비워두세요."); return; }
     if (schedule && maxOcc !== null && maxOcc < schedule.created_count) {
       alert(`이미 ${schedule.created_count}회차까지 만들었습니다. 최대 회차는 그 이상이어야 합니다.`); return;
@@ -221,9 +221,9 @@ function ScheduleModal({ t, schedule, products, saving, onClose, onSave }: Sched
               <p style={helperStyle}>{kstLabel(form.end_time)}</p>
             </div>
             <div>
-              <label style={labelStyle}>그룹 인원 *</label>
-              <input type="number" min="1" step="1" value={form.group_size} onChange={e => set("group_size", e.target.value)} style={inputStyle} />
-              <p style={helperStyle}>대회 한 그룹의 정원</p>
+              <label style={labelStyle}>그룹 인원</label>
+              <input type="number" min="1" step="1" value={form.group_size} onChange={e => set("group_size", e.target.value)} placeholder="비우면 무제한" style={inputStyle} />
+              <p style={helperStyle}>대회 하나의 정원. 비우면 인원 제한 없이 참가</p>
             </div>
             <div>
               <label style={labelStyle}>최대 회차</label>
@@ -525,7 +525,7 @@ export function ScheduleManagement({ dark, onToast }: ScheduleManagementProps) {
                   </td>
                   <td style={{ ...tdStyle, fontFamily: MONO }}>
                     {s.created_count}{s.max_occurrences != null ? ` / ${s.max_occurrences}` : ""}
-                    <div style={{ ...subStyle, fontFamily: FONT }}>그룹 {s.group_size}명</div>
+                    <div style={{ ...subStyle, fontFamily: FONT }}>{s.group_size != null ? `정원 ${s.group_size}명` : "정원 무제한"}</div>
                   </td>
                   <td style={tdStyle}>
                     {s.status !== "ACTIVE" ? <span style={{ color: t.textHint }}>-</span>
