@@ -1,5 +1,6 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import axios from "axios";
+import { listCatalogProducts } from "@/api/catalogProduct";
 import { getChallengeSalesReport, getFundedSalesReport } from "@/api/revenue";
 import { ChallengeRevenueTable } from "../../components/revenue/ChallengeRevenueTable";
 import { FundedRevenueTable } from "../../components/revenue/FundedRevenueTable";
@@ -19,6 +20,7 @@ import type {
 } from "../../types/revenue";
 import {
   buildSalesReportParams,
+  challengeTierLabel,
   mapChallengeSalesReport,
   mapFundedSalesReport,
 } from "../../utils/revenue";
@@ -70,6 +72,8 @@ export function RevenuePage() {
   const [cPeriod, setCPeriod] = useState<RevenuePeriod | null>(null);
   const [cState,  setCState]  = useState<RevenueSearchState>("idle");
   const [cRows,   setCRows]   = useState<ChallengeRevenueRow[]>([]);
+  // 티어 열: Core 활성 챌린지 상품 기준 (고정 4개 하드코딩 대신)
+  const [productColumns, setProductColumns] = useState<ChallengeRevenueColumn[]>([]);
   const [cColumns, setCColumns] = useState<ChallengeRevenueColumn[]>([]);
   const [cSummary, setCSummary] = useState<ChallengeRevenueSummary | null>(null);
   const [cPage,   setCPage]   = useState(1);
@@ -85,6 +89,28 @@ export function RevenuePage() {
   const [fTraderPct, setFTraderPct] = useState(80);
   const [fCompanyPct, setFCompanyPct] = useState(20);
   const [fPage,   setFPage]   = useState(1);
+
+  useEffect(() => {
+    let cancelled = false;
+    listCatalogProducts({ tier_type: "CHALLENGE", active_only: true, page: 1, size: 100 })
+      .then((res) => {
+        if (cancelled) return;
+        setProductColumns(
+          res.items.map((product) => ({
+            product_id: product.product_id,
+            label: challengeTierLabel(product.name) || product.product_id,
+            price_usdt: product.price_usdt ?? 0,
+          })),
+        );
+      })
+      .catch(() => {
+        // 상품 목록을 못 불러오면 디자인 기본 열(Starter·Professional·Elite·Prime)로 표시
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // 조회 결과에 열 정보가 있으면 그 기준, 없으면 활성 상품 기준
+  const challengeColumns = cColumns.length > 0 ? cColumns : productColumns;
 
   const cPagedRows = cRows.slice((cPage - 1) * REVENUE_PAGE_SIZE, cPage * REVENUE_PAGE_SIZE);
   const fPagedRows = fRows.slice((fPage - 1) * REVENUE_PAGE_SIZE, fPage * REVENUE_PAGE_SIZE);
@@ -178,7 +204,7 @@ export function RevenuePage() {
             t={t}
           />
           <div style={{ borderRadius: 8, border: `1px solid ${t.border}`, overflow: "hidden" }}>
-            <ChallengeRevenueTable state={cState} rows={cPagedRows} allRows={cRows} columns={cColumns} summary={cSummary} query={cQuery} t={t} />
+            <ChallengeRevenueTable state={cState} rows={cPagedRows} allRows={cRows} columns={challengeColumns} summary={cSummary} query={cQuery} t={t} />
           </div>
           {cState === "results" && (
             <RevenuePagination total={cRows.length} page={cPage} onPage={setCPage} t={t} />

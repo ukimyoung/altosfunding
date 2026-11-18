@@ -1,6 +1,14 @@
-import type { ChallengeRevenueDailyRow, FundedRevenueDailyRow, RevenuePeriod } from "../types/revenue";
+import type { ChallengeRevenueColumn, ChallengeRevenueDailyRow, FundedRevenueDailyRow, RevenuePeriod } from "../types/revenue";
 
 export const REVENUE_PAGE_SIZE = 10;
+
+/** Core 상품 목록을 못 불러왔을 때만 쓰는 디자인 기본 열 (Make 1114) */
+export const CHALLENGE_REVENUE_FALLBACK_COLUMNS: ChallengeRevenueColumn[] = [
+  { product_id: "starter", label: "Starter", price_usdt: 100 },
+  { product_id: "professional", label: "Professional", price_usdt: 300 },
+  { product_id: "elite", label: "Elite", price_usdt: 500 },
+  { product_id: "prime", label: "Prime", price_usdt: 1000 },
+];
 
 export const REVENUE_PERIODS: RevenuePeriod[] = ["주별", "월별", "연별"];
 
