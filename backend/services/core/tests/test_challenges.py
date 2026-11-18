@@ -15,6 +15,12 @@ def _utc(*args) -> datetime:
     return datetime(*args, tzinfo=UTC)
 
 
+def _day(y, m, d):
+    """하루 전체 휴장 기간 (UTC 00:00 ~ 다음날 00:00)."""
+    start = _utc(y, m, d)
+    return [(start, start + dt.timedelta(days=1))]
+
+
 def _sched(**extra):
     base = {"interval_days": 1, "interval_minutes": None, "duration_days": 1, "duration_minutes": None,
             "start_time": time(22, 0), "end_time": time(21, 0), "exclude_holiday": True}
@@ -28,37 +34,51 @@ def test_next_start_skips_weekend_and_holiday():
     s = _sched()
     # 2026-11-20은 금요일. 다음 시작은 토·일을 건너뛰고 월요일 22:00.
     last = SimpleNamespace(start_at=_utc(2026, 11, 20, 22), end_at=_utc(2026, 11, 23, 21))
-    assert svc.compute_next_start_at(s, last, _utc(2026, 11, 21), set()) == _utc(2026, 11, 23, 22)
+    assert svc.compute_next_start_at(s, last, _utc(2026, 11, 21), []) == _utc(2026, 11, 23, 22)
     # 월요일이 휴장일이면 화요일
-    assert svc.compute_next_start_at(s, last, _utc(2026, 11, 21), {dt.date(2026, 11, 23)}) == _utc(2026, 11, 24, 22)
+    assert svc.compute_next_start_at(s, last, _utc(2026, 11, 21), _day(2026, 11, 23)) == _utc(2026, 11, 24, 22)
     # 휴장일 제외를 끄면 토요일에도 시작
-    assert svc.compute_next_start_at(_sched(exclude_holiday=False), last, _utc(2026, 11, 21), set()) == _utc(
+    assert svc.compute_next_start_at(_sched(exclude_holiday=False), last, _utc(2026, 11, 21), []) == _utc(
         2026, 11, 21, 22
     )
 
 
 def test_end_counts_trading_days():
     # 금요일 22:00 시작, 1일 → 월요일 21:00 (주말은 세지 않음)
-    assert svc.compute_end_at(_sched(), _utc(2026, 11, 20, 22), set()) == _utc(2026, 11, 23, 21)
+    assert svc.compute_end_at(_sched(), _utc(2026, 11, 20, 22), []) == _utc(2026, 11, 23, 21)
     # 5일 → 다음 주 금요일 21:00
-    assert svc.compute_end_at(_sched(duration_days=5), _utc(2026, 11, 20, 22), set()) == _utc(2026, 11, 27, 21)
-    assert svc.compute_end_at(_sched(exclude_holiday=False), _utc(2026, 11, 20, 22), set()) == _utc(2026, 11, 21, 21)
+    assert svc.compute_end_at(_sched(duration_days=5), _utc(2026, 11, 20, 22), []) == _utc(2026, 11, 27, 21)
+    assert svc.compute_end_at(_sched(exclude_holiday=False), _utc(2026, 11, 20, 22), []) == _utc(2026, 11, 21, 21)
     # 테스트용 분 단위
-    assert svc.compute_end_at(_sched(duration_minutes=30), _utc(2026, 11, 20, 22), set()) == _utc(2026, 11, 20, 22, 30)
+    assert svc.compute_end_at(_sched(duration_minutes=30), _utc(2026, 11, 20, 22), []) == _utc(2026, 11, 20, 22, 30)
 
 
 def test_interval_zero_starts_after_previous_end():
     last = SimpleNamespace(start_at=_utc(2026, 11, 16, 22), end_at=_utc(2026, 11, 20, 21))
     # 금요일 21:00에 끝나면 같은 날 22:00에 다음 회차 시작
-    assert svc.compute_next_start_at(_sched(interval_days=0), last, _utc(2026, 11, 17), set()) == _utc(2026, 11, 20, 22)
+    assert svc.compute_next_start_at(_sched(interval_days=0), last, _utc(2026, 11, 17), []) == _utc(2026, 11, 20, 22)
     # 그날이 휴장일이면 다음 영업일(월요일)
-    holidays = {dt.date(2026, 11, 20)}
+    holidays = _day(2026, 11, 20)
     assert svc.compute_next_start_at(_sched(interval_days=0), last, _utc(2026, 11, 17), holidays) == (
         _utc(2026, 11, 23, 22)
     )
     # start_time이 종료 시각보다 이르면 다음 날로
     early = _sched(interval_days=0, start_time=time(9, 0), exclude_holiday=False)
-    assert svc.compute_next_start_at(early, last, _utc(2026, 11, 17), set()) == _utc(2026, 11, 21, 9)
+    assert svc.compute_next_start_at(early, last, _utc(2026, 11, 17), []) == _utc(2026, 11, 21, 9)
+
+
+def test_holiday_period_uses_time_of_day():
+    s = _sched()
+    last = SimpleNamespace(start_at=_utc(2026, 12, 22, 22), end_at=_utc(2026, 12, 23, 21))
+    # 12-23(수) 22:00 시작 예정. 휴장 12-23 14:00 ~ 12-24 13:00에 걸리므로 다음 날 22:00
+    period = [(_utc(2026, 12, 23, 14), _utc(2026, 12, 24, 13))]
+    assert svc.compute_next_start_at(s, last, _utc(2026, 12, 23), period) == _utc(2026, 12, 24, 22)
+    # 휴장이 22:00 전에 끝나면 그대로
+    short = [(_utc(2026, 12, 23, 14), _utc(2026, 12, 23, 22))]
+    assert svc.compute_next_start_at(s, last, _utc(2026, 12, 23), short) == _utc(2026, 12, 23, 22)
+    # 종료일 계산: 12-24 21:00이 휴장 기간이면 그날은 세지 않는다
+    closed = [(_utc(2026, 12, 24, 14), _utc(2026, 12, 25, 13))]
+    assert svc.compute_end_at(s, _utc(2026, 12, 23, 22), closed) == _utc(2026, 12, 25, 21)
 
 
 def test_render_name():
@@ -177,12 +197,21 @@ def test_catch_up_skips_missed_rounds(client, admin, challenge_product):  # noqa
 
 
 def test_holidays_api_and_effect(client, admin, challenge_product):  # noqa: F811
-    res = client.post("/api/v1/admin/holidays", headers=admin, json={"date": "2026-11-16", "name": "Test"})
+    res = client.post("/api/v1/admin/holidays", headers=admin,
+                      json={"start_at": "2026-11-16T14:00:00Z", "end_at": "2026-11-17T13:00:00Z", "name": "Test"})
     assert res.status_code == 200, res.text
-    holiday_id = res.json()["id"]
+    body = res.json()
+    holiday_id = body["id"]
+    assert body["start_at"].startswith("2026-11-16T14:00") and body["end_at"].startswith("2026-11-17T13:00")
+    # 종료가 시작보다 이르면 거절
     assert client.post("/api/v1/admin/holidays", headers=admin,
-                       json={"date": "2026-11-16", "name": "Dup"}).status_code == 409
-    assert len(client.get("/api/v1/admin/holidays?year=2026", headers=admin).json()) == 1
+                       json={"start_at": "2026-11-16T14:00:00Z", "end_at": "2026-11-16T14:00:00Z",
+                             "name": "Bad"}).status_code == 422
+    # 연말~연초 기간은 두 해 모두에 나온다
+    client.post("/api/v1/admin/holidays", headers=admin,
+                json={"start_at": "2026-12-31T00:00:00Z", "end_at": "2027-01-02T00:00:00Z", "name": "NY"})
+    assert len(client.get("/api/v1/admin/holidays?year=2026", headers=admin).json()) == 2
+    assert len(client.get("/api/v1/admin/holidays?year=2027", headers=admin).json()) == 1
 
     _schedule(client, admin, challenge_product)
     _run_jobs(_utc(2026, 11, 16, 10))
@@ -190,6 +219,9 @@ def test_holidays_api_and_effect(client, admin, challenge_product):  # noqa: F81
 
     res = client.patch(f"/api/v1/admin/holidays/{holiday_id}", headers=admin, json={"is_active": False})
     assert res.json()["is_active"] is False
+    res = client.patch(f"/api/v1/admin/holidays/{holiday_id}", headers=admin,
+                       json={"end_at": "2026-11-16T10:00:00Z"})
+    assert res.status_code == 422
     assert client.delete(f"/api/v1/admin/holidays/{holiday_id}", headers=admin).status_code == 204
 
 

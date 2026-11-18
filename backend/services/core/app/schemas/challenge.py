@@ -1,7 +1,6 @@
 """챌린지 회차·스케줄·휴장일 스키마. 필드 이름과 기본값은 기존 서버와 같다."""
 
-import datetime as dt
-from datetime import datetime, time
+from datetime import UTC, datetime, time
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -23,6 +22,14 @@ def _check_template(value: str) -> str:
     if unknown:
         raise ValueError(f"name_template에 쓸 수 없는 항목: {', '.join(sorted(unknown))}")
     return value
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    """시각대가 없는 값은 UTC로 보고, 있는 값은 UTC로 바꾼다. 초 아래는 버린다."""
+    if value is None:
+        return None
+    value = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return value.replace(second=0, microsecond=0)
 
 
 # ── 스케줄 ──────────────────────────────────────────────────
@@ -274,21 +281,31 @@ class JobRunResponse(BaseModel):
 
 
 class HolidayCreate(BaseModel):
-    date: dt.date
+    """휴장 기간 [start_at, end_at). 시각대가 없으면 UTC로 본다."""
+
+    start_at: datetime
+    end_at: datetime
     name: str = Field(min_length=1, max_length=100)
     is_active: bool = True
 
+    _utc = field_validator("start_at", "end_at")(_as_utc)
+
 
 class HolidayUpdate(BaseModel):
+    start_at: datetime | None = None
+    end_at: datetime | None = None
     name: str | None = Field(default=None, min_length=1, max_length=100)
     is_active: bool | None = None
+
+    _utc = field_validator("start_at", "end_at")(_as_utc)
 
 
 class HolidayOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    date: dt.date
+    start_at: datetime
+    end_at: datetime
     name: str
     is_active: bool
 

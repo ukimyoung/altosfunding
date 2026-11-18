@@ -10,7 +10,7 @@ import {
   updateHoliday,
   updateSchedule,
 } from '@/api/challengeSchedule';
-import type { ScheduleInput } from '@/api/challengeSchedule';
+import type { HolidayInput, ScheduleInput } from '@/api/challengeSchedule';
 import { challengeQueryKeys } from './challenges';
 
 export const scheduleQueryKeys = {
@@ -71,7 +71,7 @@ export function useTriggerScheduleMutation() {
 export function useCreateHolidayMutation() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: (payload: { date: string; name: string }) => createHoliday(payload),
+    mutationFn: (payload: HolidayInput) => createHoliday(payload),
     onSuccess: invalidate,
   });
 }
@@ -79,7 +79,7 @@ export function useCreateHolidayMutation() {
 export function useUpdateHolidayMutation() {
   const invalidate = useInvalidate();
   return useMutation({
-    mutationFn: ({ id, ...payload }: { id: number; name?: string; is_active?: boolean }) =>
+    mutationFn: ({ id, ...payload }: { id: number } & Partial<HolidayInput> & { is_active?: boolean }) =>
       updateHoliday(id, payload),
     onSuccess: invalidate,
   });

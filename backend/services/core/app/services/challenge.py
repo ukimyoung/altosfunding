@@ -5,7 +5,9 @@
 - 다음 회차 시작 = 직전 회차 시작일 + interval_days 일의 start_time (UTC).
   interval_days가 0이면 직전 회차 종료일의 start_time (종료 뒤 바로 시작).
 - 종료 = 시작일 + duration_days 일의 end_time (UTC).
-- exclude_holiday가 켜져 있으면 주말(토·일)과 휴장일을 건너뛴다. 종료일도 영업일만 센다.
+- exclude_holiday가 켜져 있으면 주말(토·일, UTC)과 휴장 기간을 건너뛴다.
+  시작 시각이 주말·휴장 기간에 걸리면 다음 영업일 같은 시각으로 미룬다.
+  진행 기간(일)은 그날 종료 시각이 주말·휴장 기간이 아닌 날만 센다.
 - 회차 번호({seq})는 스케줄의 created_count + 1.
 
 기존 서버와 다른 점: 서버가 오래 멈춰 있다가 다시 돌면, 이미 끝났어야 할 회차를 만들었다가
@@ -32,29 +34,36 @@ MAX_CATCH_UP = 1000
 # ── 날짜 계산 ───────────────────────────────────────────────
 
 
-def is_trading_day(day: dt.date, holidays: set[dt.date]) -> bool:
-    return day.weekday() < 5 and day not in holidays
+# 휴장 기간 [시작, 종료) 목록 (UTC)
+Closures = list[tuple[datetime, datetime]]
 
 
-def next_trading_datetime(value: datetime, holidays: set[dt.date]) -> datetime:
-    """value가 주말·휴장일이면 같은 시각으로 다음 영업일로 옮긴다."""
-    while not is_trading_day(value.date(), holidays):
+def is_trading_time(value: datetime, holidays: Closures) -> bool:
+    """value가 평일(UTC)이고 어떤 휴장 기간에도 들지 않으면 True."""
+    return value.weekday() < 5 and not any(start <= value < end for start, end in holidays)
+
+
+def next_trading_datetime(value: datetime, holidays: Closures) -> datetime:
+    """value가 주말·휴장 기간이면 같은 시각으로 다음 영업일로 옮긴다."""
+    for _ in range(3660):
+        if is_trading_time(value, holidays):
+            return value
         value += timedelta(days=1)
-    return value
+    raise AppError(422, "no_trading_day", "휴장 기간이 너무 길어 대회를 만들 수 있는 날이 없습니다.")
 
 
 def _at(day: dt.date, at: time) -> datetime:
     return datetime.combine(day, at, tzinfo=UTC)
 
 
-def compute_end_at(schedule: ChallengeSchedule, start_at: datetime, holidays: set[dt.date]) -> datetime:
+def compute_end_at(schedule: ChallengeSchedule, start_at: datetime, holidays: Closures) -> datetime:
     if schedule.duration_minutes is not None:
         return start_at + timedelta(minutes=schedule.duration_minutes)
     day = start_at.date()
     remaining = schedule.duration_days
     while remaining > 0:
         day += timedelta(days=1)
-        if not schedule.exclude_holiday or is_trading_day(day, holidays):
+        if not schedule.exclude_holiday or is_trading_time(_at(day, schedule.end_time), holidays):
             remaining -= 1
     end_at = _at(day, schedule.end_time)
     # 시작과 같은 날 end_time이 더 이르면 하루 뒤로 (duration_days=0인 경우만 해당)
@@ -66,7 +75,7 @@ def compute_end_at(schedule: ChallengeSchedule, start_at: datetime, holidays: se
 
 
 def compute_next_start_at(
-    schedule: ChallengeSchedule, last: Challenge | None, now: datetime, holidays: set[dt.date]
+    schedule: ChallengeSchedule, last: Challenge | None, now: datetime, holidays: Closures
 ) -> datetime:
     if schedule.interval_minutes is not None:
         base = last.start_at if last else now
@@ -95,8 +104,11 @@ def render_name(template: str, seq: int, start_at: datetime) -> str:
     )
 
 
-async def active_holidays(session: AsyncSession) -> set[dt.date]:
-    return set(await session.scalars(select(Holiday.date).where(Holiday.is_active.is_(True))))
+async def active_holidays(session: AsyncSession) -> Closures:
+    rows = await session.execute(
+        select(Holiday.start_at, Holiday.end_at).where(Holiday.is_active.is_(True)).order_by(Holiday.start_at)
+    )
+    return [(start, end) for start, end in rows]
 
 
 # ── 회차 ────────────────────────────────────────────────────
@@ -458,7 +470,7 @@ async def list_schedules(
 
 
 async def run_schedule(
-    session: AsyncSession, schedule: ChallengeSchedule, now: datetime, holidays: set[dt.date]
+    session: AsyncSession, schedule: ChallengeSchedule, now: datetime, holidays: Closures
 ) -> tuple[Challenge | None, str | None]:
     """스케줄의 다음 회차를 하나 만든다. 만들지 않았으면 (None, 이유)를 돌려준다."""
     if schedule.status == "COMPLETED" or (
@@ -578,13 +590,20 @@ async def run_due_jobs(session: AsyncSession, now: datetime | None = None) -> di
 async def list_holidays(session: AsyncSession, year: int | None) -> list[Holiday]:
     query = select(Holiday)
     if year:
-        query = query.where(Holiday.date >= dt.date(year, 1, 1), Holiday.date <= dt.date(year, 12, 31))
-    return list(await session.scalars(query.order_by(Holiday.date)))
+        # 그 해와 겹치는 기간 (연말~연초 기간은 두 해 모두에 나온다)
+        year_start = datetime(year, 1, 1, tzinfo=UTC)
+        year_end = datetime(year + 1, 1, 1, tzinfo=UTC)
+        query = query.where(Holiday.start_at < year_end, Holiday.end_at > year_start)
+    return list(await session.scalars(query.order_by(Holiday.start_at)))
+
+
+def check_holiday_period(start_at: datetime, end_at: datetime) -> None:
+    if end_at <= start_at:
+        raise AppError(422, "invalid_holiday_period", "종료 시각은 시작 시각보다 뒤여야 합니다.")
 
 
 async def create_holiday(session: AsyncSession, data: dict) -> Holiday:
-    if await session.scalar(select(Holiday.id).where(Holiday.date == data["date"])):
-        raise AppError(409, "holiday_already_exists", "이미 등록된 날짜입니다.")
+    check_holiday_period(data["start_at"], data["end_at"])
     holiday = Holiday(**data)
     session.add(holiday)
     await session.flush()
