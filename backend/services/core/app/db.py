@@ -39,7 +39,12 @@ def get_engine() -> AsyncEngine:
         if settings.database_null_pool:
             kwargs["poolclass"] = NullPool
         else:
-            kwargs.update(pool_size=5, max_overflow=5, pool_pre_ping=True)
+            kwargs.update(
+                pool_size=settings.db_pool_size,
+                max_overflow=settings.db_max_overflow,
+                pool_timeout=settings.db_pool_timeout,
+                pool_pre_ping=True,
+            )
         _engine = create_async_engine(settings.database_url, **kwargs)
         _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)
     return _engine
