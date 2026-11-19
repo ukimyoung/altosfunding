@@ -62,6 +62,11 @@ export interface AdminAccount {
   user_email: string;
   user_grade: string;
   mt4_password: string | null;
+  // Core 응답에만 있는 값 (기존 서버에는 없음)
+  product_name?: string | null;
+  leverage?: number | null;
+  mt4_server?: string | null;
+  provision_status?: string | null;
 }
 
 export interface ListAccountsResponse {

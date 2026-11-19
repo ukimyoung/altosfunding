@@ -240,3 +240,50 @@ class FundedSalesReport(BaseModel):
     size: int
     pages: int
     summary: FundedSalesSummary
+
+
+# ── 관리자: 트레이딩 계좌 (트레이더 관리 > 계좌 관리) ─────────
+
+
+class AdminAccount(AccountDetail):
+    user_uid: str
+    provision_error: str | None = None
+    issued_at: datetime | None = None
+
+
+class AdminAccountPage(BaseModel):
+    items: list[AdminAccount]
+    total: int
+    page: int
+    size: int
+    pages: int
+
+
+class AdminAccountStats(BaseModel):
+    tier: str
+    total_accounts: int
+    # 진행중 = 대회가 시작돼 거래 중인 ACTIVE 계좌
+    in_progress_accounts: int
+    total_capital: float
+
+
+class AdminTrade(BaseModel):
+    deal_id: int
+    date: datetime
+    symbol: str
+    action: str
+    volume: float
+    price: float
+    profit: float
+    fee: float
+    swap: float
+    entry: str
+    comment: str | None
+
+
+class AdminTradePage(BaseModel):
+    items: list[AdminTrade]
+    total: int
+    page: int
+    size: int
+    pages: int

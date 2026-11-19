@@ -29,6 +29,7 @@ class FakeMt4:
         self.create_then_timeout = 0  # 계좌는 만들고 응답은 타임아웃으로 끊을 횟수
         self.balance_errors: list[int] = []
         self.api_key_seen: set[str] = set()
+        self.open_positions: dict[int, list[dict]] = {}  # 계좌별 미결 포지션
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.api_key_seen.add(request.headers.get("X-API-KEY", ""))
@@ -62,6 +63,8 @@ class FakeMt4:
                 return httpx.Response(self.balance_errors.pop(0), json={"code": "MtServerError"})
             self.accounts[login]["balance"] += body["value"]
             return httpx.Response(200, json={"orderId": 5000 + login % 1000})
+        if parts[4:] == ["orders", "open"] and request.method == "GET":
+            return httpx.Response(200, json=self.open_positions.get(login, []))
         if parts[4:] == ["readonly"]:
             self.accounts[login]["isReadOnly"] = body["value"]
             return httpx.Response(200)

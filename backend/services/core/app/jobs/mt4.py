@@ -1,6 +1,6 @@
 """MT4 작업 처리기 (Worker가 core.jobs에서 꺼내 실행한다).
 
-mt4.provision_challenge_account — 챌린지 계좌 1개 발급
+mt4.provision_challenge_account — 챌린지·데모 계좌 1개 발급 (데모는 주문·대회 없이 바로 거래 가능, 발급 메일 없음)
   1) MT4 번호 할당: 상품 범위(mt4_login_pool_start~end)에서 카운터(last_mt4_login)를 원자적으로 +1 하고,
      core.mt4_account_issued_history에 RESERVED로 기록(번호마다 한 줄, 중복 불가) → MT4 GET이 404면 확정.
      MT4에 이미 있으면 BLACKLISTED로 남기고 다음 번호. 범위를 넘으면 실패(환불).
@@ -175,7 +175,8 @@ async def _ensure_created(
             account.password_encrypted = encrypt_text(generate_password())
             account.investor_password_encrypted = encrypt_text(generate_password())
         challenge = await session.get(Challenge, account.challenge_id) if account.challenge_id else None
-        read_only = not (challenge is not None and challenge.status == "ACTIVE")
+        # 데모 계좌(대회 없음)는 바로 거래할 수 있게 만든다. 챌린지는 대회가 진행 중일 때만.
+        read_only = account.challenge_id is not None and not (challenge is not None and challenge.status == "ACTIVE")
         account.mt4_create_attempted_at = _now()
         await session.commit()
         login = account.mt4_login
@@ -234,9 +235,11 @@ async def _ensure_capital(session: AsyncSession, client: mt4.Mt4Client, account:
             return
     account.capital_deposit_attempted_at = _now()
     await session.commit()
-    order_id = await client.balance_operation(
-        account.mt4_login, float(account.capital), f"Challenge {account.challenge_id or ''} capital".strip()
+    comment = (
+        f"Challenge {account.challenge_id} capital" if account.challenge_id
+        else f"{account.tier.title()} initial capital"
     )
+    order_id = await client.balance_operation(account.mt4_login, float(account.capital), comment)
     account.capital_order_id = order_id
     account.capital_deposited_at = _now()
     await session.commit()

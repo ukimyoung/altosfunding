@@ -270,6 +270,8 @@ def account_out(a: TradingAccount, product: Product | None, challenge: Challenge
         "mt4_server": mt4.server_name(a.mt4_server),
         "mt4_password": password,
         "order_id": a.order_id,
+        # 데모 계좌는 회원이 고른 레버리지 (기존 서버의 leverage_override와 같은 뜻)
+        "leverage_override": a.leverage if a.tier == "DEMO" else None,
     }
 
 
@@ -314,7 +316,6 @@ async def my_account(session: AsyncSession, user: User, account_id: uuid.UUID) -
     return {
         **out,
         "leverage": a.leverage,
-        "leverage_override": None,
         "available_balance": 0.0,
         "total_completed_payout": 0.0,
         "session_id": a.challenge_id,

@@ -6,6 +6,7 @@ import { DataTable } from '../shared/DataTable';
 import { UserTypeBadge } from '../shared/Badge';
 import { AcctStatusBadge } from './AccountStatusBadge';
 import { formatKstDateTime, formatSignedUsdMoney, formatUsdMoney } from '../../utils/utils';
+import { challengeTierLabel } from '../../utils/revenue';
 
 const emptyValue = '-';
 
@@ -109,7 +110,10 @@ const getListStatus = (status: AccountStatus) => {
 
 const toAccountListTableRow = (account: AdminAccount): AccountListTableRow => {
   const id = getAccountId(account);
-  const accountType = formatAccountType(account.type_code);
+  // Core는 상품명('Challenge ' 제외)을 계좌 유형으로 보여 준다. 상품명이 없으면 기존처럼 type_code.
+  const accountType = account.product_name
+    ? challengeTierLabel(account.product_name)
+    : formatAccountType(account.type_code);
   const profit = formatSignedUsdMoney(account.total_profit);
   const balance = formatUsdMoney(account.balance);
   const period = formatAccountPeriod(account);
@@ -136,7 +140,7 @@ const toAccountListTableRow = (account: AdminAccount): AccountListTableRow => {
     accountNumber: id,
     user: display(account.user_name),
     email: display(account.user_email),
-    userType: account.user_grade.toUpperCase() === 'VIP' ? 'VIP' : 'Normal',
+    userType: (account.user_grade ?? '').toUpperCase() === 'VIP' ? 'VIP' : 'Normal',
     accountType,
     capital: formatUsdMoney(account.capital),
     balance,
@@ -147,7 +151,10 @@ const toAccountListTableRow = (account: AdminAccount): AccountListTableRow => {
     issuedDate: formatKstDateTime(account.created_at),
     initialBalance: formatUsdMoney(account.capital),
     currentBalance: balance,
-    leverage: account.leverage_override === null ? emptyValue : `x${account.leverage_override}`,
+    leverage: (() => {
+      const value = account.leverage_override ?? account.leverage;
+      return value === null || value === undefined ? emptyValue : `x${value}`;
+    })(),
     status: getListStatus(account.status),
     rawStatus: account.status,
   };

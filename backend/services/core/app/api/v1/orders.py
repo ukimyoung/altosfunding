@@ -7,6 +7,7 @@
     GET  /accounts                           내 트레이딩 계좌 목록
     GET  /accounts/challenge-summary         내 챌린지 계좌 요약
     GET  /accounts/{account_id}              내 계좌 상세
+    POST /demo/accounts                      데모 계좌 만들기 (Worker가 MT4 계좌 발급)
 관리자
     GET  /admin/challenges/orders            전체구매/결제이력
     GET  /admin/challenges/orders/summary    요약 카드
@@ -19,6 +20,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Header, Query
+from pydantic import BaseModel, Field
 
 from app.deps import AdminUser, CurrentUser, Sender, Session
 from app.schemas.trading import (
@@ -36,7 +38,7 @@ from app.schemas.trading import (
     OrderPage,
     SalesPeriod,
 )
-from app.services import challenge_order, notify
+from app.services import challenge_order, demo_account, notify
 from app.services import trading_query as q
 from app.services.wallet import as_float, get_wallet
 
@@ -128,6 +130,39 @@ async def my_challenge_summary(user: CurrentUser, session: Session) -> Challenge
 @router.get("/accounts/{account_id:uuid}", response_model=AccountDetail, summary="내 계좌 상세")
 async def my_account(account_id: uuid.UUID, user: CurrentUser, session: Session) -> AccountDetail:
     return AccountDetail(**await q.my_account(session, user, account_id))
+
+
+# ── 사용자: 데모 계좌 ───────────────────────────────────────
+
+
+class DemoAccountCreateRequest(BaseModel):
+    # 기존 웹은 DEMO_STD를 보낸다. Core 상품코드가 아니면 사용 중인 첫 데모 상품을 쓴다.
+    product_id: str | None = Field(None, description="데모 상품코드 (비우면 사용 중인 첫 데모 상품)")
+    capital: float = Field(gt=0, description="초기 가상 자본금 (GET /demo/options의 선택지)")
+    leverage: int = Field(gt=0, description="레버리지 (GET /demo/options의 선택지)")
+
+
+class DemoAccountOut(BaseModel):
+    account_id: str
+    mt4_login: int | None
+    tier: str
+    status: str
+    # QUEUED: 발급 중 → DONE: 발급 완료(ACTIVE)
+    provision_status: str
+    capital: float
+    leverage_override: int | None
+    product_id: str
+
+
+@router.post("/demo/accounts", response_model=DemoAccountOut, status_code=201, summary="데모 계좌 만들기")
+async def create_demo_account(body: DemoAccountCreateRequest, user: CurrentUser, session: Session) -> DemoAccountOut:
+    """바로 응답하고 MT4 계좌는 Worker가 만든다 (보통 수 초). 발급 상태는 GET /accounts?tier=DEMO 로 확인한다."""
+    account = await demo_account.create(session, user, body.product_id, body.capital, body.leverage)
+    return DemoAccountOut(
+        account_id=str(account.id), mt4_login=account.mt4_login, tier=account.tier, status=account.status,
+        provision_status=account.provision_status, capital=float(account.capital),
+        leverage_override=account.leverage, product_id=account.product_id,
+    )
 
 
 # ── 관리자 ──────────────────────────────────────────────────
