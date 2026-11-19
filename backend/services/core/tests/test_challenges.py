@@ -144,7 +144,7 @@ def test_schedule_generates_and_advances_rounds(client, admin, challenge_product
 
     # 월요일 10:00 첫 실행: 오늘 22:00 시작, 화요일 21:00 종료인 1회차가 모집 중이 된다.
     counts = _run_jobs(_utc(2026, 11, 16, 10))
-    assert counts == {"created": 1, "started": 0, "closed": 0, "cancelled": 0}
+    assert counts == {"created": 1, "started": 0, "closed": 0, "cancelled": 0, "failed": 0}
     rows = _challenges()
     assert [(r["name"], r["status"]) for r in rows] == [("Daily #1 (2026-11-16)", "PENDING")]
     assert rows[0]["start_at"] == _utc(2026, 11, 16, 22) and rows[0]["end_at"] == _utc(2026, 11, 17, 21)
@@ -153,14 +153,14 @@ def test_schedule_generates_and_advances_rounds(client, admin, challenge_product
     assert _run_jobs(_utc(2026, 11, 16, 12))["created"] == 0
 
     # 22:00이 지나면 1회차가 시작되고 2회차가 모집에 들어간다.
-    assert _run_jobs(_utc(2026, 11, 16, 22, 1)) == {"created": 1, "started": 1, "closed": 0, "cancelled": 0}
+    assert _run_jobs(_utc(2026, 11, 16, 22, 1)) == {"created": 1, "started": 1, "closed": 0, "cancelled": 0, "failed": 0}
     rows = _challenges()
     assert [(r["name"], r["status"]) for r in rows] == [
         ("Daily #1 (2026-11-16)", "ACTIVE"), ("Daily #2 (2026-11-17)", "PENDING")]
 
     # 화요일 21:00 → 1회차 종료, 22:00 → 2회차 시작·3회차 생성
     assert _run_jobs(_utc(2026, 11, 17, 21, 1))["closed"] == 1
-    assert _run_jobs(_utc(2026, 11, 17, 22, 1)) == {"created": 1, "started": 1, "closed": 0, "cancelled": 0}
+    assert _run_jobs(_utc(2026, 11, 17, 22, 1)) == {"created": 1, "started": 1, "closed": 0, "cancelled": 0, "failed": 0}
     assert [r["status"] for r in _challenges()] == ["CLOSED", "ACTIVE", "PENDING"]
 
     detail = client.get(f"/api/v1/admin/schedules/{s['id']}", headers=admin).json()
@@ -170,7 +170,7 @@ def test_schedule_generates_and_advances_rounds(client, admin, challenge_product
 def test_first_round_in_past_starts_now_and_max_occurrences(client, admin, challenge_product):  # noqa: F811
     s = _schedule(client, admin, challenge_product, max_occurrences=2)
     # 23:00에 처음 돌면 오늘 22:00 회차를 만들어 바로 시작하고, 다음 회차까지 만든다.
-    assert _run_jobs(_utc(2026, 11, 16, 23)) == {"created": 2, "started": 1, "closed": 0, "cancelled": 0}
+    assert _run_jobs(_utc(2026, 11, 16, 23)) == {"created": 2, "started": 1, "closed": 0, "cancelled": 0, "failed": 0}
     assert [r["status"] for r in _challenges()] == ["ACTIVE", "PENDING"]
     detail = client.get(f"/api/v1/admin/schedules/{s['id']}", headers=admin).json()
     assert detail["status"] == "COMPLETED" and detail["created_count"] == 2
@@ -379,3 +379,30 @@ def test_schedule_without_group_size_is_unlimited(client, admin, challenge_produ
     assert client.patch(url, headers=admin, json={"group_size": 20}).json()["group_size"] == 20
     assert client.patch(url, headers=admin, json={"group_size": None}).json()["group_size"] is None
     assert client.post("/api/v1/admin/schedules", headers=admin, json={**body, "group_size": 0}).status_code == 422
+
+
+def test_one_failing_round_does_not_block_others(client, admin, challenge_product, monkeypatch):  # noqa: F811
+    """한 회차의 계좌 처리가 실패해도 다른 회차 시작·다음 회차 생성은 진행되고, 실패한 회차는 다음 주기에 다시 시도된다."""
+    _schedule(client, admin, challenge_product, name_template="A #{seq}")
+    _schedule(client, admin, challenge_product, name_template="B #{seq}")
+    assert _run_jobs(_utc(2026, 11, 16, 10))["created"] == 2
+
+    original = svc.challenge_order.on_challenge_status_changed
+
+    async def flaky(session, challenge):
+        if challenge.name.startswith("A") and challenge.status == "ACTIVE":
+            raise RuntimeError("계좌 잠금 해제 작업을 넣지 못함")
+        return await original(session, challenge)
+
+    monkeypatch.setattr(svc.challenge_order, "on_challenge_status_changed", flaky)
+    counts = _run_jobs(_utc(2026, 11, 16, 22, 1))
+    assert counts == {"created": 1, "started": 1, "closed": 0, "cancelled": 0, "failed": 1}
+    status = {r["name"]: r["status"] for r in _challenges()}
+    assert status == {"A #1": "PENDING", "B #1": "ACTIVE", "B #2": "PENDING"}
+
+    # 원인이 고쳐지면 다음 주기에 밀린 회차가 시작되고 다음 회차가 만들어진다.
+    monkeypatch.setattr(svc.challenge_order, "on_challenge_status_changed", original)
+    counts = _run_jobs(_utc(2026, 11, 16, 22, 2))
+    assert counts == {"created": 1, "started": 1, "closed": 0, "cancelled": 0, "failed": 0}
+    status = {r["name"]: r["status"] for r in _challenges()}
+    assert status == {"A #1": "ACTIVE", "A #2": "PENDING", "B #1": "ACTIVE", "B #2": "PENDING"}

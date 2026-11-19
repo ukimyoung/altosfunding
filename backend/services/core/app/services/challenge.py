@@ -15,6 +15,7 @@
 """
 
 import datetime as dt
+import logging
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 
@@ -25,6 +26,8 @@ from app.errors import AppError
 from app.models import Challenge, ChallengeSchedule, Holiday, Product, Ruleset
 from app.security import generate_human_code
 from app.services import challenge_order
+
+logger = logging.getLogger(__name__)
 
 PENDING, ACTIVE, CLOSED, CANCELLED = "PENDING", "ACTIVE", "CLOSED", "CANCELLED"
 EXPIRED_REASON = "시작 시각이 지나기 전에 시작되지 않아 자동 취소"
@@ -566,7 +569,7 @@ async def run_schedule(
 
 async def advance_challenges(session: AsyncSession, now: datetime) -> dict[str, int]:
     """시작·종료 시각이 된 회차의 상태를 바꾼다."""
-    counts = {"started": 0, "closed": 0, "cancelled": 0}
+    counts = {"started": 0, "closed": 0, "cancelled": 0, "failed": 0}
     due = await session.scalars(
         select(Challenge)
         .where(
@@ -579,16 +582,25 @@ async def advance_challenges(session: AsyncSession, now: datetime) -> dict[str, 
         .with_for_update(skip_locked=True)
     )
     for challenge in list(due):
-        if challenge.status == PENDING and challenge.end_at <= now:
-            close_challenge(challenge, now, EXPIRED_REASON)
-            counts["cancelled"] += 1
-        elif challenge.status == PENDING:
-            start_challenge(challenge, now)
-            counts["started"] += 1
-        else:
-            close_challenge(challenge, now)
-            counts["closed"] += 1
-        await challenge_order.on_challenge_status_changed(session, challenge)
+        challenge_id = challenge.challenge_id
+        try:
+            # 회차마다 세이브포인트: 한 회차의 계좌 처리가 실패해도 다른 회차·다음 회차 생성은 진행한다.
+            # 실패한 회차는 상태가 그대로(PENDING/ACTIVE) 남아 다음 주기에 다시 시도된다.
+            async with session.begin_nested():
+                if challenge.status == PENDING and challenge.end_at <= now:
+                    close_challenge(challenge, now, EXPIRED_REASON)
+                    key = "cancelled"
+                elif challenge.status == PENDING:
+                    start_challenge(challenge, now)
+                    key = "started"
+                else:
+                    close_challenge(challenge, now)
+                    key = "closed"
+                await challenge_order.on_challenge_status_changed(session, challenge)
+            counts[key] += 1
+        except Exception:
+            logger.exception("대회 %s 상태 변경 실패 — 다음 주기에 다시 시도", challenge_id)
+            counts["failed"] += 1
     await session.flush()
     return counts
 
@@ -609,16 +621,29 @@ async def run_due_jobs(session: AsyncSession, now: datetime | None = None) -> di
     )
     created = 0
     for schedule in list(schedules):
-        challenge, _ = await run_schedule(session, schedule, now, holidays)
+        schedule_id = schedule.id
+        next_challenge = None
+        try:
+            # 스케줄마다 세이브포인트: 한 스케줄이 실패해도 다른 스케줄의 회차는 만든다.
+            async with session.begin_nested():
+                challenge, _ = await run_schedule(session, schedule, now, holidays)
+                started = False
+                # 첫 회차처럼 시작 시각이 이미 지났으면 바로 시작한다.
+                if challenge is not None and challenge.start_at <= now:
+                    start_challenge(challenge, now)
+                    await challenge_order.on_challenge_status_changed(session, challenge)
+                    started = True
+                    # 바로 시작했으면 다음 회차도 만든다.
+                    next_challenge, _ = await run_schedule(session, schedule, now, holidays)
+        except Exception:
+            logger.exception("스케줄 %s 회차 생성 실패 — 다음 주기에 다시 시도", schedule_id)
+            counts["failed"] += 1
+            continue
         if challenge is None:
             continue
         created += 1
-        # 첫 회차처럼 시작 시각이 이미 지났으면 바로 시작한다.
-        if challenge.start_at <= now:
-            start_challenge(challenge, now)
-            await challenge_order.on_challenge_status_changed(session, challenge)
+        if started:
             counts["started"] += 1
-            next_challenge, _ = await run_schedule(session, schedule, now, holidays)
             created += 1 if next_challenge else 0
     return {"created": created, **counts}
 

@@ -33,7 +33,7 @@ import traceback
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -103,6 +103,10 @@ def retry_delay(attempts: int) -> timedelta:
     return timedelta(seconds=min(seconds, RETRY_MAX_SECONDS))
 
 
+# supabase/migrations/20261118010000_core_job_queue.sql 의 jobs_dedupe_active_idx 조건과 같아야 한다.
+_DEDUPE_INDEX_WHERE = text(f"dedupe_key IS NOT NULL AND status IN ('{PENDING}', '{RUNNING}')")
+
+
 # ── 넣기 ────────────────────────────────────────────────────
 
 
@@ -139,7 +143,10 @@ async def enqueue(
     if dedupe_key is not None:
         stmt = stmt.on_conflict_do_nothing(
             index_elements=[Job.dedupe_key],
-            index_where=Job.dedupe_key.is_not(None) & Job.status.in_([PENDING, RUNNING]),
+            # 부분 유니크 인덱스(jobs_dedupe_active_idx)의 조건을 상수로 그대로 적는다.
+            # 바인드 파라미터로 보내면 같은 연결에서 6번째 실행부터 Postgres가 일반 계획(generic plan)을
+            # 써서 인덱스를 찾지 못하고 'no unique or exclusion constraint matching' 오류가 난다.
+            index_where=_DEDUPE_INDEX_WHERE,
         )
     job_id = await session.scalar(stmt.returning(Job.id))
     if job_id is None:
