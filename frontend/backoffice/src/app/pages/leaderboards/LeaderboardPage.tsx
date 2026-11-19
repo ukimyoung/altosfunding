@@ -18,6 +18,7 @@ import {
 } from '../../queries/challenges';
 import type { ChallengeSummaryStatsResponse, DailyLeaderboardEntry } from '../../../api/challenge';
 import type { LeaderboardStats, LeaderboardStatus, RankEntry, VipEntry } from '../../types/leaderboard';
+import { formatKstDateTime } from '../../utils/utils';
 
 type ToastState = {
   message: string;
@@ -79,7 +80,7 @@ function mapNormalEntries(
     platform: 'MT4',
     accountStatus: entry.account_status,
     productName: entry.product_name,
-    profitRate: entry.profit_rate,
+    profitRate: roundRate(entry.profit_rate),
     profit: entry.profit,
     isPassed: entry.is_passed,
     approvalStatus: toApprovalStatus(entry.account_status, approvedIds, failedIds, entry.account_id),
@@ -94,7 +95,7 @@ function mapVipEntries(entries: DailyLeaderboardEntry[], approvedIds: string[]):
     platform: 'MT4',
     accountStatus: entry.account_status,
     productName: entry.product_name,
-    profitRate: entry.profit_rate,
+    profitRate: roundRate(entry.profit_rate),
     profit: entry.profit,
     profitTarget: null,
     isPassed: entry.is_passed,
@@ -126,6 +127,25 @@ function getDefaultVipSelection(entries: DailyLeaderboardEntry[]) {
     ...getServerApprovedIds(entries),
     ...entries.filter((entry) => entry.is_passed).map((entry) => entry.account_id),
   ]);
+}
+
+function roundRate(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+/** 대회 종료 시각(cutoff_at)이 지났으면 종료 시점 기준, 아니면 최근 잔고 기준이라고 안내한다. */
+function getBasisText(summary?: ChallengeSummaryStatsResponse) {
+  const cutoffs = (summary?.challenges ?? [])
+    .map((challenge) => challenge.cutoff_at ?? challenge.end_at)
+    .filter((value): value is string => Boolean(value));
+  if (!cutoffs.length) return null;
+
+  const latest = cutoffs.reduce((a, b) => (new Date(a) > new Date(b) ? a : b));
+  const label = `${formatKstDateTime(latest)} (KST)`;
+  if (new Date(latest).getTime() <= Date.now()) {
+    return `대회 종료 시점 ${label} 기준 수익률 순위`;
+  }
+  return `진행 중 · 최근 잔고 기준 수익률 순위 (종료 예정 ${label})`;
 }
 
 function mergeUnique(ids: string[]) {
@@ -299,6 +319,7 @@ export function LeaderboardPage() {
 
   const stats = useMemo(() => mapSummaryStats(summaryData), [summaryData]);
   const status = useMemo(() => mapSummaryStatus(summaryData), [summaryData]);
+  const basisText = useMemo(() => getBasisText(summaryData), [summaryData]);
 
   const updateNormalSelected = (nextValue: string[] | ((prev: string[]) => string[])) => {
     setNormalSelectedByDate((prev) => {
@@ -532,6 +553,7 @@ export function LeaderboardPage() {
         currentDate={currentDate}
         status={status}
         participantCount={stats.totalParticipants}
+        basisText={basisText}
         onDateChange={handleDateChange}
         onInvalidDateSelect={handleInvalidDateSelect}
       />

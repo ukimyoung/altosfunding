@@ -9,6 +9,8 @@ interface LeaderboardDateNavProps {
   currentDate: string;
   status: LeaderboardStatus | null;
   participantCount: number;
+  /** 수익률 기준 안내 (예: 대회 종료 시점 기준) */
+  basisText?: string | null;
   onDateChange: (date: string) => void;
   onInvalidDateSelect?: (date: string) => void;
   // onEndCompetition: () => void;
@@ -19,6 +21,7 @@ export function LeaderboardDateNav({
   currentDate,
   status,
   participantCount,
+  basisText,
   onDateChange,
   onInvalidDateSelect,
   // onEndCompetition,
@@ -203,6 +206,11 @@ export function LeaderboardDateNav({
         {/* Participant Count */}
         {/* <span style={{ fontSize: 13, color: t.textHint }}>{participantCount}명 참여</span> */}
       </div>
+
+      {/* 수익률 기준 시각 */}
+      {basisText ? (
+        <span style={{ fontSize: 12, color: t.textSec }}>{basisText}</span>
+      ) : null}
 
       {/* End Competition Button */}
       {/*

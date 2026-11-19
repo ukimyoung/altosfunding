@@ -51,7 +51,10 @@ export interface DailyLeaderboardEntry {
   profit_rate: number;
   account_status: string;
   participant_status: string;
-  snapshot_ts: string;
+  /** 수익률 계산에 쓴 잔고 시각 (없으면 자본금 기준) */
+  snapshot_ts: string | null;
+  /** END: 대회 종료 시각 기준, LATEST: 진행 중이라 최근 값 기준 */
+  basis?: 'END' | 'LATEST';
   is_passed: boolean;
   rank: number;
 }
@@ -78,6 +81,10 @@ export interface ChallengeSummaryChallenge {
   id: string;
   name: string;
   status: string;
+  start_at?: string;
+  end_at?: string;
+  /** 수익률 기준 시각 (대회 종료 시각, 관리자가 먼저 종료했으면 그 시각) */
+  cutoff_at?: string;
 }
 
 export interface ChallengeSummaryStats {
