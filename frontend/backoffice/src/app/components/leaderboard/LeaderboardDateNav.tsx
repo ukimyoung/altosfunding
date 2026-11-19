@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useEffect, useMemo, useRef } from 'react';
-import { useActiveChallengeDatesQuery } from '../../queries/challenges';
+import { useLeaderboardEndDatesQuery } from '../../queries/challenges';
 import { LeaderboardStatus } from '../../types/leaderboard';
 import { STATUS_CONFIG } from '../../constants/leaderboard';
 
@@ -27,7 +27,8 @@ export function LeaderboardDateNav({
   // onEndCompetition,
 }: LeaderboardDateNavProps) {
   const dateInputRef = useRef<HTMLInputElement>(null);
-  const { data: activeDates = [] } = useActiveChallengeDatesQuery();
+  // 날짜 = 대회 종료일 (한국 시간)
+  const { data: activeDates = [] } = useLeaderboardEndDatesQuery();
 
   const t = {
     surface: dark ? '#0F1829' : '#ffffff',

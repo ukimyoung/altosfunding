@@ -1,4 +1,6 @@
-"""백오피스 대회 > Leaderboard. 같은 날(UTC 시작일) 시작한 대회 참가 계좌를 수익률 순으로 줄 세운다.
+"""백오피스 대회 > Leaderboard. 같은 날(한국 시간 종료일) 끝나는 대회 참가 계좌를 수익률 순으로 줄 세운다.
+
+화면 왼쪽 위 날짜 = 대회 종료일 (한국 시간, 대회 목록 화면의 종료일 표시와 같은 기준).
 
 수익률 = (평가금액 − 자본금) ÷ 자본금 × 100.
 - 끝난 대회(종료 시각이 지남): 종료 시각 시점의 평가금액. 종료 시각 이전의 마지막 잔고 스냅샷과
@@ -17,14 +19,14 @@
 
 import math
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Challenge, Product, Ruleset, TradingAccount, TradingAccountEquitySnapshot, User
-from app.services.challenge import CANCELLED, _start_on
+from app.services.challenge import CANCELLED, KST, _parse_day
 
 VIP_GRADES = ("VIP", "VVIP")
 GRADES = ("NORMAL", *VIP_GRADES)
@@ -41,12 +43,29 @@ def _cohort(grade: str | None) -> str:
     return "VIP" if grade in VIP_GRADES else "NORMAL"
 
 
+def _kst_day_bounds(date: str) -> tuple[datetime, datetime]:
+    start = datetime.combine(_parse_day(date), time(0, 0), tzinfo=KST)
+    return start, start + timedelta(days=1)
+
+
 async def challenges_on(session: AsyncSession, date: str, product_id: str | None = None) -> list[Challenge]:
-    """UTC 시작일이 date인 대회 (취소된 대회 제외)."""
-    query = _start_on(select(Challenge), date).where(Challenge.status != CANCELLED)
+    """종료일(한국 시간)이 date인 대회 (취소된 대회 제외)."""
+    start, end = _kst_day_bounds(date)
+    query = select(Challenge).where(
+        Challenge.end_at >= start, Challenge.end_at < end, Challenge.status != CANCELLED
+    )
     if product_id:
         query = query.where(Challenge.product_id == product_id)
     return list(await session.scalars(query.order_by(Challenge.start_at, Challenge.challenge_id)))
+
+
+async def end_dates(session: AsyncSession) -> list[str]:
+    """대회가 끝나는 날짜 목록 (한국 시간 YYYYMMDD, 최근 순, 취소 제외). Leaderboard 날짜 이동용."""
+    day = func.to_char(func.timezone("Asia/Seoul", Challenge.end_at), "YYYYMMDD")
+    rows = await session.scalars(
+        select(day).where(Challenge.status != CANCELLED).group_by(day).order_by(day.desc())
+    )
+    return list(rows)
 
 
 async def _snapshots_before_end(session: AsyncSession, account_ids: list[uuid.UUID]) -> dict:

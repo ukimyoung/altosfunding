@@ -1,6 +1,6 @@
-"""백오피스 대회 > Leaderboard: 수익률 순위 (종료된 대회는 종료 시각 기준)."""
+"""백오피스 대회 > Leaderboard: 종료일(한국 시간)이 같은 대회 계좌의 수익률 순위 (종료된 대회는 종료 시각 기준)."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from tests.conftest import run_sql
 from tests.test_admin_users import admin_headers  # noqa: F401
@@ -16,6 +16,11 @@ from tests.test_login import member  # noqa: F401
 
 URL = "/api/v1/admin/challenges/leaderboard/daily"
 STATS = "/api/v1/admin/challenges/summary-stats"
+KST = timezone(timedelta(hours=9))
+
+
+def _kst_day(value: datetime) -> str:
+    return value.astimezone(KST).strftime("%Y%m%d")
 
 
 def _setup(client, admin_headers, buyer, round_):  # noqa: F811
@@ -28,10 +33,10 @@ def _setup(client, admin_headers, buyer, round_):  # noqa: F811
     assert _join(client, buyer, round_["challenge_id"], quantity=3).status_code == 201
     _work()
     start = datetime.now(UTC) - timedelta(days=2)
-    run_sql("update core.challenges set start_at = $1, end_at = $2 where id = $3",
-            start, datetime.now(UTC) + timedelta(days=1), round_["challenge_id"])
+    end = datetime.now(UTC) + timedelta(days=1)
+    run_sql("update core.challenges set start_at = $1, end_at = $2 where id = $3", start, end, round_["challenge_id"])
     assert client.post(f"/api/v1/admin/challenges/{round_['challenge_id']}/start", headers=admin_headers).status_code == 200
-    return start.strftime("%Y%m%d")
+    return _kst_day(end)
 
 
 def _set_equity(login, equity, at):
@@ -69,9 +74,15 @@ def test_leaderboard_ranks_by_profit_rate(client, admin_headers, buyer, round_, 
     assert top["rank"] == 1 and top["basis"] == "LATEST" and top["profit"] == 20000 and top["capital"] == 100000
     assert top["product_name"] == "Challenge Starter" and top["user_grade"] == "NORMAL"
 
+    # 시작일·다른 종료일로는 나오지 않는다
+    start_day = _kst_day(now - timedelta(days=2))
+    assert client.get(URL, headers=admin_headers, params={"date": start_day}).json()["total"] == 0
+    assert client.get("/api/v1/admin/challenges/leaderboard/end-dates", headers=admin_headers).json() == [date]
+
     # 종료: 종료 시각 이전 값만 쓴다
     end = now - timedelta(hours=1)
     run_sql("update core.challenges set end_at = $1 where id = $2", end, round_["challenge_id"])
+    date = _kst_day(end)
     _snapshot(a, 130000, end - timedelta(minutes=10))
     _snapshot(a, 50000, end + timedelta(minutes=10))  # 종료 뒤 → 무시
     _set_equity(a, 50000, now)
