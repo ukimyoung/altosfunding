@@ -22,6 +22,7 @@ export const rewardKo: RewardTranslations = {
   colStatus: '상태',
 
   referee: '피추천인',
+  referralFirstPurchase: '피추천인 첫 구매. (구매자 : {email})',
   fundedPayoutPayBack: '펀딩 출금 페이백',
 
   rewardAmount: '금액',

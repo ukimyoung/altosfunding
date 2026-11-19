@@ -108,6 +108,7 @@ const mapMyRewardToHistory = (reward: MyReward): RewardHistory => ({
   status: getRewardStatus(reward.status),
   type: getRewardType(reward.type),
   rejection_reason: reward.rejection_reason ?? null,
+  purchaserEmail: reward.source_user_email ?? null,
 });
 
 export function RewardDashboardPage() {

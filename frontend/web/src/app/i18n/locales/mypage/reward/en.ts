@@ -22,6 +22,7 @@ export const rewardEn: RewardTranslations = {
   colStatus: 'Status',
 
   referee: 'Referee',
+  referralFirstPurchase: 'First purchase by a referred user. (Purchaser: {email})',
   fundedPayoutPayBack: 'Funded Payout Pay Back',
 
   rewardAmount: 'Amount',

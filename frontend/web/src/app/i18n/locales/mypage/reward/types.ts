@@ -24,6 +24,8 @@ export interface RewardTranslations {
 
   // Dynamic description content
   referee: string;
+  /** 추천인 리워드 설명. {email} = 구매자(피추천인) 이메일 */
+  referralFirstPurchase: string;
   fundedPayoutPayBack: string;
 
   // Mobile card
