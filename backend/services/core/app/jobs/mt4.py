@@ -65,7 +65,10 @@ def mt4_name(user: User) -> str:
 
 
 def _is_ours(info: dict, account: TradingAccount, user: User) -> bool:
-    """MT4에 있는 계좌가 이 발급 건으로 만든 것인지 (생성 때 email·comment(회원번호)를 넣는다)."""
+    """MT4에 있는 계좌가 이 발급 건으로 만든 것인지 (생성 때 회원 email을 넣는다).
+
+    comment에는 상품명을 넣으므로 회원 구분에 쓸 수 없다. 예전에 comment에 회원번호를 넣어 만든 계좌는 회원번호로도 확인한다.
+    """
     email = str(info.get("email") or "").strip().lower()
     comment = str(info.get("comment") or "").strip()
     return (bool(email) and email == user.email.lower()) or (bool(comment) and comment == user.uid)
@@ -189,7 +192,7 @@ async def _ensure_created(
                 password=decrypt_text(account.password_encrypted),
                 investor_password=decrypt_text(account.investor_password_encrypted),
                 email=user.email,
-                comment=user.uid,
+                comment=product.name,
                 pool_start=product.mt4_login_pool_start,
                 pool_end=product.mt4_login_pool_end,
                 read_only=read_only,

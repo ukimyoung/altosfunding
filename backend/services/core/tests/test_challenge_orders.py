@@ -185,7 +185,7 @@ def test_purchase_issue_start_close(client, admin_headers, buyer, round_, fake_m
     for login in logins:
         acc = fake_mt4.accounts[login]
         assert acc["balance"] == 100000 and acc["isReadOnly"] is True
-        assert acc["comment"] and acc["email"] == BUYER
+        assert acc["comment"] == "Challenge Starter" and acc["email"] == BUYER
         assert acc["name"] == "김 철수".encode("cp949").decode("latin-1")
         assert acc["pool"] == {"loginsPoolStart": POOL_START, "loginsPoolEnd": POOL_START + 9}
     assert fake_mt4.api_key_seen == {"demo-key"}

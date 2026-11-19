@@ -185,6 +185,7 @@ def test_create_demo_account(client, admin_headers, buyer, fake_mt4):  # noqa: F
     mt4_acc = fake_mt4.accounts[30000001]
     assert mt4_acc["isReadOnly"] is False and mt4_acc["balance"] == 50000 and mt4_acc["leverage"] == 200
     assert mt4_acc["group"] == "demo\\demo"
+    assert mt4_acc["comment"] == "Demo Standard"  # comment = 상품명
 
     # 관리자 데모 계좌관리
     page = client.get(URL, headers=admin_headers, params={"tier": "DEMO"}).json()
