@@ -70,10 +70,14 @@ class AccountListItem(BaseModel):
     type_code: str | None
     is_read_only: bool
     capital: float
-    # 잔고·평가금액은 MT4 데이터 수집 기능이 들어오기 전까지 자본금으로 보여 준다.
+    # 잔고·평가금액은 Worker가 MT4에서 수집한 최근 값. 수집 전이면 자본금(발급 완료) 또는 0.
     balance: float
     equity: float
+    # 실현 수익 = 잔고 − 자본금 (기존 서버처럼 청산된 거래 기준)
     total_profit: float = 0
+    # 미실현 포함 수익 = 평가금액 − 자본금
+    floating_profit: float = 0
+    equity_updated_at: datetime | None = None
     promoted_at: datetime | None = None
     failed_reason: str | None = None
     reason: str | None = None
@@ -268,15 +272,21 @@ class AdminAccountStats(BaseModel):
 
 
 class AdminTrade(BaseModel):
-    deal_id: int
-    date: datetime
+    """MT4에서 수집한 청산 거래 한 건 (기존 서버 TradeOut과 같은 필드 + 청산가·진입 시각)."""
+
+    deal_id: int  # MT4 주문번호
+    date: datetime  # 청산 시각
     symbol: str
-    action: str
+    action: str  # BUY | SELL
     volume: float
-    price: float
+    price: float  # 진입가
+    close_price: float | None = None
+    open_time: datetime | None = None
     profit: float
-    fee: float
+    fee: float  # 수수료 (commission과 같은 값, 기존 화면 호환)
+    commission: float = 0
     swap: float
+    taxes: float = 0
     entry: str
     comment: str | None
 
@@ -287,3 +297,8 @@ class AdminTradePage(BaseModel):
     page: int
     size: int
     pages: int
+
+
+# 웹 내 계좌 거래내역도 같은 모양이다.
+AccountTrade = AdminTrade
+AccountTradePage = AdminTradePage

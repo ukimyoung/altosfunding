@@ -3,7 +3,7 @@
 GET /admin/accounts                       계좌 목록 (tier·상태·상품·기간 필터, 계좌번호·이름·이메일 검색)
 GET /admin/accounts-stats                 계좌 수 통계 (전체·진행중)
 GET /admin/accounts/{account_id}          계좌 상세 (계좌 UUID 또는 MT4 번호)
-GET /admin/accounts/{account_id}/trades   거래내역 — MT4 데이터 수집 기능 전까지 빈 목록
+GET /admin/accounts/{account_id}/trades   거래내역 (Worker가 MT4에서 수집한 청산 거래)
 POST /admin/accounts/{account_id}/freeze    비활성 (PENDING·ACTIVE → INACTIVE, 미결 포지션 있으면 거절)
 POST /admin/accounts/{account_id}/unfreeze  활성 복귀 (INACTIVE → 대회 상태에 맞는 원래 상태)
 POST /admin/accounts/{account_id}/ban       영구정지 (사유 필수, 되돌릴 수 없음)
@@ -11,6 +11,7 @@ POST /admin/accounts/{account_id}/ban       영구정지 (사유 필수, 되돌�
 상태 변경 후 MT4 거래 잠금(ReadOnly)은 Worker가 맞춘다. 이력: core.trading_account_status_history
 """
 
+import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Query
@@ -24,6 +25,7 @@ from app.schemas.trading import (
     AdminTradePage,
 )
 from app.services import account_admin as svc
+from app.services import mt4_ingest
 from app.services.trading_query import pages
 
 router = APIRouter(tags=["admin-accounts"])
@@ -65,9 +67,10 @@ async def get_account(account_id: str, admin: AdminUser, session: Session) -> Ad
 
 @router.get("/admin/accounts/{account_id}/trades", response_model=AdminTradePage, summary="계좌 거래내역")
 async def account_trades(account_id: str, admin: AdminUser, session: Session, page: Page = 1, size: Size = 20) -> AdminTradePage:
-    """MT4 거래 데이터 수집 기능이 아직 없어서 빈 목록을 돌려준다 (계좌가 없으면 404)."""
-    await svc.get_account(session, account_id)
-    return AdminTradePage(items=[], total=0, page=page, size=size, pages=0)
+    """청산된 매수·매도 거래, 청산 시각 최신순 (계좌가 없으면 404). 계좌 UUID 또는 MT4 번호."""
+    account = await svc.get_account(session, account_id)
+    items, total = await mt4_ingest.closed_trades(session, uuid.UUID(account["account_id"]), page=page, size=size)
+    return AdminTradePage(items=items, total=total, page=page, size=size, pages=pages(total, size))
 
 
 class FreezeRequest(BaseModel):

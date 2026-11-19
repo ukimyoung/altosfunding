@@ -112,6 +112,11 @@ Core와 같은 코드·같은 DB를 쓰는 Render Background Worker(`altosfundin
   - `FOR UPDATE SKIP LOCKED`로 꺼내므로 Worker를 여러 개 띄워도 같은 작업을 두 번 잡지 않는다.
   - 실패하면 30초·1분·2분…(최대 1시간) 뒤 재시도, `max_attempts`(기본 5)를 다 쓰면 FAILED. 재시도해도 소용없는 오류는 `PermanentJobError`. 시도마다 `core.job_attempts`에 기록.
   - Worker가 처리 중에 죽어 RUNNING으로 10분(`WORKER_JOB_LEASE_SECONDS`) 넘게 남은 작업은 다시 시도한다. 그래서 처리기는 두 번 실행돼도 괜찮게(멱등) 만든다 (MT4 호출은 현재 상태를 먼저 확인).
+- 1분마다(`MT4_INGEST_SECONDS`): MT4 거래 내역·잔고 수집 (`app/services/mt4_ingest.py`).
+  - 대상: 발급 완료 + 거래 가능(ACTIVE) 계좌 전체를 동시에 `MT4_INGEST_CONCURRENCY`(기본 10)개씩. ACTIVE를 벗어난 계좌는 30분(`MT4_INGEST_AFTER_CLOSE_SECONDS`) 더 받아 종료 청산 내역까지 저장하고 멈춘다. 대회 시작 전(PENDING)은 수집하지 않는다.
+  - 거래: `GET /api/mt4/accounts/{login}/orders/all` (마지막 청산 시각 − 1시간(`MT4_INGEST_OVERLAP_SECONDS`) ~ 지금 + 1일, MT4 서버 시각 `MT4_SERVER_TIMEZONE`=Europe/Athens). `core.trading_account_trades`에 (계좌, MT4 주문번호)로 덮어쓰기 → 중복 없음. 열린 포지션은 `is_open`.
+  - 잔고: 서버별 `POST /api/mt4/accounts/balances` 일괄 조회, 빠진 계좌만 `GET …/{login}/balance`. 최신 값은 `trading_accounts.balance·equity…`, 이력은 5분(`MT4_EQUITY_SNAPSHOT_SECONDS`) 간격으로 `core.trading_account_equity_snapshots`.
+  - 실패하면 커서를 그대로 두고 `core.trading_account_sync`에 오류·연속 실패 수를 남겨 다음 주기에 다시 받는다. 손실 한도·수익 목표 자동 판정은 아직 없다.
 - 생존 기록: `core.worker_heartbeats`. 관리자 API `GET /api/v1/admin/system/worker`(살아 있는지, 마지막 실행 결과, 작업 수), `GET /api/v1/admin/system/jobs`(작업 목록).
 - 종료 신호(SIGTERM)를 받으면 진행 중인 반복을 마치고 끝낸다.
 - 로컬: `.env`에 `DATABASE_URL`을 넣고 `python -m app.worker`.

@@ -240,6 +240,22 @@ async def admin_order_summary(session: AsyncSession, now: datetime | None = None
 # ── 계좌 (사용자) ───────────────────────────────────────────
 
 
+def money_out(a: TradingAccount) -> dict:
+    """잔고·평가금액·수익. MT4에서 수집한 값이 있으면 그 값, 없으면 발급 완료 계좌는 자본금으로 본다."""
+    issued = a.provision_status == orders.DONE
+    capital = _f(a.capital)
+    balance = _f(a.balance) if a.balance is not None else (capital if issued else 0.0)
+    equity = _f(a.equity) if a.equity is not None else balance
+    collected = a.balance is not None
+    return {
+        "balance": balance,
+        "equity": equity,
+        "total_profit": round(balance - capital, 2) if collected else 0.0,
+        "floating_profit": round(equity - capital, 2) if collected else 0.0,
+        "equity_updated_at": a.equity_updated_at,
+    }
+
+
 def account_out(a: TradingAccount, product: Product | None, challenge: Challenge | None, user: User) -> dict:
     # 발급이 끝난 계좌는 대회 시작 전(PENDING, 거래 잠금)에도 본인에게 비밀번호를 보여 준다 (발급 메일에도 담겨 나간다).
     revealed = a.provision_status == orders.DONE
@@ -256,9 +272,7 @@ def account_out(a: TradingAccount, product: Product | None, challenge: Challenge
         "type_code": a.type_code,
         "is_read_only": a.is_read_only,
         "capital": _f(a.capital),
-        "balance": _f(a.capital) if a.provision_status == orders.DONE else 0.0,
-        "equity": _f(a.capital) if a.provision_status == orders.DONE else 0.0,
-        "total_profit": 0.0,
+        **money_out(a),
         "failed_reason": a.provision_error if a.provision_status == "FAILED" else None,
         "reason": None,
         "created_at": a.created_at,
@@ -316,7 +330,8 @@ async def my_account(session: AsyncSession, user: User, account_id: uuid.UUID) -
     return {
         **out,
         "leverage": a.leverage,
-        "available_balance": 0.0,
+        # 출금 가능 수익 = max(0, 잔고 − 자본금) (기존 서버와 같음)
+        "available_balance": max(0.0, out["total_profit"]),
         "total_completed_payout": 0.0,
         "session_id": a.challenge_id,
         "session_name": c.name if c else None,

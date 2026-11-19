@@ -92,6 +92,17 @@ class Mt4Client:
         self.base_url = normalize_base_url(base_url)
         self.api_key = api_key
         self._transport = transport
+        self._shared: httpx.AsyncClient | None = None
+
+    async def __aenter__(self) -> "Mt4Client":
+        """여러 요청을 한 연결 풀로 보낼 때 (거래 수집처럼 짧은 시간에 많이 부를 때)."""
+        self._shared = self._client()
+        return self
+
+    async def __aexit__(self, *exc) -> None:
+        if self._shared is not None:
+            await self._shared.aclose()
+            self._shared = None
 
     def _client(self) -> httpx.AsyncClient:
         if not self.base_url or not self.api_key:
@@ -105,12 +116,17 @@ class Mt4Client:
         )
 
     async def _request(self, operation: str, method: str, path: str, **kwargs) -> httpx.Response:
+        if self._shared is not None:
+            return await self._send(self._shared, operation, method, path, **kwargs)
         async with self._client() as client:
-            try:
-                resp = await client.request(method, path, **kwargs)
-            except httpx.HTTPError as exc:
-                raise Mt4Error(operation, f"{type(exc).__name__}: {exc}") from exc
-        return resp
+            return await self._send(client, operation, method, path, **kwargs)
+
+    @staticmethod
+    async def _send(client: httpx.AsyncClient, operation: str, method: str, path: str, **kwargs) -> httpx.Response:
+        try:
+            return await client.request(method, path, **kwargs)
+        except httpx.HTTPError as exc:
+            raise Mt4Error(operation, f"{type(exc).__name__}: {exc}") from exc
 
     async def _call(self, operation: str, method: str, path: str, **kwargs) -> Any:
         resp = await self._request(operation, method, path, **kwargs)
@@ -183,6 +199,41 @@ class Mt4Client:
 
     async def set_read_only(self, login: int, read_only: bool) -> None:
         await self._call("readonly", "POST", f"/api/mt4/accounts/{login}/readonly", json={"value": read_only})
+
+    async def all_orders(self, login: int, date_from: str, date_to: str) -> list[dict]:
+        """청산 시각이 기간 안인 주문 + 지금 열린 포지션 (명세: 기간은 청산 시각에만 적용).
+
+        기간은 MT4 서버 시각 문자열(YYYY-MM-DDTHH:MM:SS)로 보낸다. 기존 서버와 같이 400·404는 거래 없음으로 본다.
+        """
+        resp = await self._request(
+            "all_orders", "GET", f"/api/mt4/accounts/{login}/orders/all", params={"dateFrom": date_from, "dateTo": date_to}
+        )
+        if resp.status_code in (400, 404):
+            text, _ = _error_text(resp)
+            logger.info("MT4 %s all_orders login=%s → %s %s (거래 없음으로 처리)", self.server, login, resp.status_code, text)
+            return []
+        if resp.status_code >= 400:
+            text, body = _error_text(resp)
+            raise Mt4Error("all_orders", text, resp.status_code, body)
+        data = resp.json() if resp.content else []
+        return data if isinstance(data, list) else []
+
+    async def balance(self, login: int) -> dict | None:
+        """한 계좌의 잔고·평가금액(balance, equity, margin, marginFree, marginLevel, credit). 없는 계좌는 None."""
+        resp = await self._request("get_balance", "GET", f"/api/mt4/accounts/{login}/balance")
+        if resp.status_code in (400, 404):
+            return None
+        if resp.status_code >= 400:
+            text, body = _error_text(resp)
+            raise Mt4Error("get_balance", text, resp.status_code, body)
+        data = resp.json() if resp.content else None
+        return data if isinstance(data, dict) else None
+
+    async def balances(self, logins: list[int]) -> list[dict]:
+        """여러 계좌의 잔고·평가금액을 한 번에 (MT4 API 캐시). 응답에 없는 계좌는 balance()로 따로 묻는다."""
+        data = await self._call("get_balances", "POST", "/api/mt4/accounts/balances", json={"logins": logins})
+        items = data.get("balances") if isinstance(data, dict) else data
+        return [b for b in items or [] if isinstance(b, dict)]
 
     async def open_orders(self, login: int) -> list[dict]:
         """미결 포지션(열린 주문) 목록."""

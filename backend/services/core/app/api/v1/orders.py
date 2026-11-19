@@ -7,6 +7,7 @@
     GET  /accounts                           내 트레이딩 계좌 목록
     GET  /accounts/challenge-summary         내 챌린지 계좌 요약
     GET  /accounts/{account_id}              내 계좌 상세
+    GET  /accounts/{account_id}/trades       내 계좌 거래내역 (Worker가 MT4에서 수집한 청산 거래)
     POST /demo/accounts                      데모 계좌 만들기 (Worker가 MT4 계좌 발급)
 관리자
     GET  /admin/challenges/orders            전체구매/결제이력
@@ -26,6 +27,7 @@ from app.deps import AdminUser, CurrentUser, Sender, Session
 from app.schemas.trading import (
     AccountDetail,
     AccountPage,
+    AccountTradePage,
     AdminOrderDetail,
     AdminOrderPage,
     AdminOrderSummary,
@@ -38,7 +40,7 @@ from app.schemas.trading import (
     OrderPage,
     SalesPeriod,
 )
-from app.services import challenge_order, demo_account, notify
+from app.services import challenge_order, demo_account, mt4_ingest, notify
 from app.services import trading_query as q
 from app.services.wallet import as_float, get_wallet
 
@@ -130,6 +132,16 @@ async def my_challenge_summary(user: CurrentUser, session: Session) -> Challenge
 @router.get("/accounts/{account_id:uuid}", response_model=AccountDetail, summary="내 계좌 상세")
 async def my_account(account_id: uuid.UUID, user: CurrentUser, session: Session) -> AccountDetail:
     return AccountDetail(**await q.my_account(session, user, account_id))
+
+
+@router.get("/accounts/{account_id:uuid}/trades", response_model=AccountTradePage, summary="내 계좌 거래내역")
+async def my_account_trades(
+    account_id: uuid.UUID, user: CurrentUser, session: Session, page: Page = 1, size: Annotated[int, Query(ge=1, le=1000)] = 100
+) -> AccountTradePage:
+    """청산된 매수·매도 거래, 청산 시각 최신순. Worker가 1분마다 MT4에서 받아 온다 (잔고 입출금·열린 포지션 제외)."""
+    await q.my_account(session, user, account_id)  # 본인 계좌가 아니면 404
+    items, total = await mt4_ingest.closed_trades(session, account_id, page=page, size=size)
+    return AccountTradePage(items=items, total=total, page=page, size=size, pages=q.pages(total, size))
 
 
 # ── 사용자: 데모 계좌 ───────────────────────────────────────
