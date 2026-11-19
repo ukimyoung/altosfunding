@@ -10,6 +10,7 @@ from app.models.manual_email import (
     ManualEmailRecipient,
     UploadedFile,
 )
+from app.models.reward import RewardRecord, TradingBonusRecord
 from app.models.trading import (
     ChallengeOrder,
     Mt4AccountIssuedHistory,
@@ -69,8 +70,10 @@ __all__ = [
     "PlatformConfigHistory",
     "Product",
     "RefreshToken",
+    "RewardRecord",
     "Ruleset",
     "TradingAccount",
+    "TradingBonusRecord",
     "TradingAccountStatusHistory",
     "UploadedFile",
     "User",

@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.errors import AppError
 from app.models import Challenge, ChallengeOrder, Mt4AccountIssuedHistory, Product, TradingAccount, User
 from app.security import generate_human_code
-from app.services import jobs, mt4
+from app.services import jobs, mt4, reward_admin
 from app.services.wallet import USER_WALLET, Line, _change_balance, _post_journal, get_wallet
 
 logger = logging.getLogger(__name__)
@@ -221,6 +221,7 @@ async def mark_issued(session: AsyncSession, account: TradingAccount) -> None:
             )
         order.issued_quantity += 1
         _finish_if_done(order, now)
+        await reward_admin.on_order_completed(session, order)
     await jobs.enqueue(
         session, ISSUED_MAIL_JOB, {"account_id": str(account.id)},
         dedupe_key=f"mail:account_issued:{account.id}", ref_type="trading_account", ref_id=str(account.id),
@@ -269,6 +270,7 @@ async def refund_account(session: AsyncSession, account: TradingAccount, reason:
         order.refunded_quantity += 1
         order.refunded_amount += account.unit_price
         _finish_if_done(order, now)
+        await reward_admin.on_order_completed(session, order)
     if account.challenge_id:
         await session.execute(
             update(Challenge)

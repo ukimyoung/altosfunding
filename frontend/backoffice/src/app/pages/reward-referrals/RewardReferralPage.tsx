@@ -1320,7 +1320,7 @@ export function RewardReferralPage() {
               ]}
               rows={referralRows}
               isLoading={referralsQuery.isLoading}
-              rowKey={(reward) => reward.id}
+              rowKey={(reward) => `${reward.id}-${reward.refereeEmail}`}
               shellStyle={{
                 background: t.surface,
                 borderRadius: 12,
