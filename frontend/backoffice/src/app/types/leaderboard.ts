@@ -1,4 +1,6 @@
-// 리더보드 테이블, 승인 패널, 통계 카드 타입
+// 리더보드 테이블, 통계 카드 타입
+export type EvaluationResult = 'PASSED' | 'FAILED';
+
 export interface RankEntry {
   id: string;
   rank: number;
@@ -8,22 +10,13 @@ export interface RankEntry {
   productName: string;
   profitRate: number;
   profit: number;
-  isPassed: boolean;
-  approvalStatus?: 'approved' | 'not-approved' | 'failed' | null;
+  /** '확인하기' 마지막 판정 (판정 전이면 null) */
+  evaluationResult: EvaluationResult | null;
+  evaluatedAt: string | null;
 }
 
-export interface VipEntry {
-  id: string;
-  rank: number;
-  accountNumber: string;
-  platform: 'MT4' | 'MT5';
-  accountStatus: string;
-  productName: string;
-  profitRate: number;
-  profit: number;
+export interface VipEntry extends RankEntry {
   profitTarget: number | null;
-  isPassed: boolean;
-  approvalStatus?: 'approved' | 'not-approved' | 'failed' | null;
 }
 
 export interface LeaderboardStats {

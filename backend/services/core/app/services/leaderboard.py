@@ -10,14 +10,10 @@
 
 같은 수익률이면 수익금이 큰 순, 그다음 MT4 번호 순이다.
 
-달성 여부(is_passed)는 룰셋의 통과 조건으로 계산한다. VIP·VVIP 회원은 VIP 조건을 쓴다.
-- 상대평가(RELATIVE): 같은 날 같은 등급 그룹(일반 / VIP) 순위가 상위 N% 안 (인원 × N% 내림).
-- 절대평가(ABSOLUTE): 수익금이 정한 금액 이상 (금액이 없으면 자본금 × N%).
-기존 서버와 다른 점: 기존 서버는 RELATIVE를 "수익률 N% 이상"으로 계산했지만,
-백오피스 룰셋 화면은 "상위 N%"로 입력받으므로 순위 기준으로 계산한다.
+통과 여부는 관리자가 '확인하기'로 판정한 마지막 결과다 (challenge_evaluation 서비스).
+판정하지 않은 계좌는 evaluation_result = null, is_passed = false.
 """
 
-import math
 import uuid
 from datetime import UTC, datetime, time, timedelta
 from decimal import Decimal
@@ -25,7 +21,14 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Challenge, Product, Ruleset, TradingAccount, TradingAccountEquitySnapshot, User
+from app.models import (
+    Challenge,
+    ChallengeEvaluation,
+    Product,
+    TradingAccount,
+    TradingAccountEquitySnapshot,
+    User,
+)
 from app.services.challenge import CANCELLED, KST, _parse_day
 
 VIP_GRADES = ("VIP", "VVIP")
@@ -87,12 +90,42 @@ async def _snapshots_before_end(session: AsyncSession, account_ids: list[uuid.UU
     return {r.account_id: r for r in rows}
 
 
-def _pass_condition(ruleset: Ruleset | None, grade: str | None) -> tuple[str | None, Decimal | None, Decimal | None]:
-    if ruleset is None:
-        return None, None, None
-    if grade in VIP_GRADES:
-        return ruleset.pass_condition_vip_type, ruleset.pass_condition_vip_pct, ruleset.pass_condition_vip_amt
-    return ruleset.pass_condition_type, ruleset.pass_condition_pct, ruleset.pass_condition_amt
+def account_value(
+    account: TradingAccount, challenge: Challenge, snap, now: datetime
+) -> tuple[Decimal, Decimal | None, datetime | None, bool]:
+    """수익률 계산에 쓸 (평가금액, 잔고, 받은 시각, 대회 종료 여부). snap은 종료 시각 이전 마지막 스냅샷."""
+    capital = Decimal(account.capital or 0)
+    end = cutoff(challenge)
+    ended = end <= now
+    equity = balance = taken_at = None
+    if ended:
+        if snap is not None:
+            equity, balance, taken_at = snap.equity, snap.balance, snap.taken_at
+        if (
+            account.equity is not None
+            and account.equity_updated_at is not None
+            and account.equity_updated_at <= end
+            and (taken_at is None or account.equity_updated_at > taken_at)
+        ):
+            equity, balance, taken_at = account.equity, account.balance, account.equity_updated_at
+    elif account.equity is not None:
+        equity, balance, taken_at = account.equity, account.balance, account.equity_updated_at
+    return (Decimal(equity) if equity is not None else capital), balance, taken_at, ended
+
+
+async def snapshot_before_end(session: AsyncSession, account_id: uuid.UUID):
+    return (await _snapshots_before_end(session, [account_id])).get(account_id)
+
+
+async def _latest_evaluations(session: AsyncSession, account_ids: list[uuid.UUID]) -> dict:
+    if not account_ids:
+        return {}
+    ev = ChallengeEvaluation
+    rows = await session.scalars(
+        select(ev).where(ev.account_id.in_(account_ids))
+        .distinct(ev.account_id).order_by(ev.account_id, ev.created_at.desc(), ev.id.desc())
+    )
+    return {r.account_id: r for r in rows}
 
 
 def _sort_key(entry: dict):
@@ -106,7 +139,7 @@ async def build(
     product_id: str | None = None,
     now: datetime | None = None,
 ) -> tuple[list[Challenge], list[dict]]:
-    """대회 목록과 등급 구분 없는 전체 순위 (rank는 전체 기준, cohort_rank는 일반/VIP 그룹 기준)."""
+    """대회 목록과 등급 구분 없는 전체 순위."""
     now = now or datetime.now(UTC)
     challenges = await challenges_on(session, date, product_id)
     if not challenges:
@@ -115,10 +148,9 @@ async def build(
 
     rows = (
         await session.execute(
-            select(TradingAccount, User, Product, Ruleset)
+            select(TradingAccount, User, Product)
             .join(User, User.id == TradingAccount.user_id)
             .join(Product, Product.product_id == TradingAccount.product_id)
-            .outerjoin(Ruleset, Ruleset.id == Product.ruleset_id)
             .where(
                 TradingAccount.challenge_id.in_(list(by_id)),
                 TradingAccount.tier == "CHALLENGE",
@@ -130,29 +162,16 @@ async def build(
     ended_ids = [a.id for a, *_ in rows if cutoff(by_id[a.challenge_id]) <= now]
     snapshots = await _snapshots_before_end(session, ended_ids)
 
+    evaluations = await _latest_evaluations(session, [a.id for a, *_ in rows])
+
     entries: list[dict] = []
-    for account, user, product, ruleset in rows:
+    for account, user, product in rows:
         challenge = by_id[account.challenge_id]
         capital = Decimal(account.capital or 0)
-        end = cutoff(challenge)
-        ended = end <= now
-        equity = balance = taken_at = None
-        if ended:
-            snap = snapshots.get(account.id)
-            if snap is not None:
-                equity, balance, taken_at = snap.equity, snap.balance, snap.taken_at
-            if (
-                account.equity is not None
-                and account.equity_updated_at is not None
-                and account.equity_updated_at <= end
-                and (taken_at is None or account.equity_updated_at > taken_at)
-            ):
-                equity, balance, taken_at = account.equity, account.balance, account.equity_updated_at
-        elif account.equity is not None:
-            equity, balance, taken_at = account.equity, account.balance, account.equity_updated_at
-        equity = Decimal(equity) if equity is not None else capital
+        equity, balance, taken_at, ended = account_value(account, challenge, snapshots.get(account.id), now)
         profit = equity - capital
         rate = float(round(profit / capital * 100, 4)) if capital > 0 else 0.0
+        evaluation = evaluations.get(account.id)
         name = " ".join(p for p in (user.first_name, user.last_name) if p)
         entries.append({
             "account_id": str(account.id),
@@ -173,28 +192,15 @@ async def build(
             "participant_status": account.status,
             "snapshot_ts": taken_at,
             "basis": "END" if ended else "LATEST",
-            "_rule": _pass_condition(ruleset, user.grade),
+            "evaluation_id": evaluation.id if evaluation else None,
+            "evaluation_result": evaluation.result if evaluation else None,
+            "evaluated_at": evaluation.created_at if evaluation else None,
+            "is_passed": bool(evaluation and evaluation.result == "PASSED"),
         })
 
     entries.sort(key=_sort_key)
-    cohort_sizes: dict[str, int] = {}
-    for entry in entries:
-        cohort = _cohort(entry["user_grade"])
-        cohort_sizes[cohort] = cohort_sizes.get(cohort, 0) + 1
-        entry["cohort_rank"] = cohort_sizes[cohort]
     for i, entry in enumerate(entries, start=1):
         entry["rank"] = i
-        kind, pct, amt = entry.pop("_rule")
-        passed = False
-        if kind == "RELATIVE" and pct is not None:
-            limit = math.floor(cohort_sizes[_cohort(entry["user_grade"])] * float(pct) / 100)
-            passed = entry["cohort_rank"] <= limit
-        elif kind == "ABSOLUTE":
-            target = float(amt) if amt is not None else (
-                entry["capital"] * float(pct) / 100 if pct is not None else None
-            )
-            passed = target is not None and entry["profit"] >= target
-        entry["is_passed"] = passed
     return challenges, entries
 
 
@@ -209,7 +215,7 @@ def filter_grade(entries: list[dict], grade: str | None) -> list[dict]:
 
 
 def summary_stats(entries: list[dict]) -> dict:
-    """Leaderboard 상단 카드. 승격 대상·VIP 달성자는 달성 여부 기준."""
+    """Leaderboard 상단 카드. 승격 대상·VIP 달성자는 '확인하기'로 통과 판정된 계좌 수."""
     return {
         "total_active_participants": len(entries),
         "passed_count": sum(1 for e in entries if e["is_passed"] and _cohort(e["user_grade"]) == "NORMAL"),

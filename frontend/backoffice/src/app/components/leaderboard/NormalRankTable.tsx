@@ -4,10 +4,8 @@ import { LeaderboardRankTable } from './LeaderboardRankTable';
 interface NormalRankTableProps {
   dark: boolean;
   data: RankEntry[];
-  selectedIds: string[];
-  onToggleSelect: (id: string) => void;
-  onToggleAll: () => void;
-  isClosed: boolean;
+  evaluatingId: string | null;
+  onEvaluate: (id: string) => void;
 }
 
 export function NormalRankTable(props: NormalRankTableProps) {

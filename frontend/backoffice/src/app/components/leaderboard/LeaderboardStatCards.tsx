@@ -24,13 +24,13 @@ export function LeaderboardStatCards({ dark, stats }: LeaderboardStatCardsProps)
       label: '일반 승격 대상',
       value: `${stats.normalPromotionCandidates}명`,
       color: '#16A34A',
-      sub: '상위 10% 이내',
+      sub: '확인하기 통과 판정',
     },
     {
       label: 'VIP 달성자',
       value: `${stats.vipAchievers}명`,
       color: '#D97706',
-      sub: '수익 목표 달성',
+      sub: '확인하기 통과 판정',
     },
     {
       label: '탈락 / 위반',

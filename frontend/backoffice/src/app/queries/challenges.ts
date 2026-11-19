@@ -3,6 +3,7 @@ import {
   getChallengeSummaryStats,
   listActiveChallengeDates,
   listChallengeGrouped,
+  evaluateLeaderboardAccount,
   listDailyLeaderboard,
   listLeaderboardEndDates,
   notifyFailedByAccounts,
@@ -64,6 +65,18 @@ export function useChallengeSummaryStatsQuery(params: ChallengeSummaryStatsParam
     queryFn: () => getChallengeSummaryStats(params),
     placeholderData: keepPreviousData,
     enabled: Boolean(params.target_date),
+  });
+}
+
+/** Leaderboard '확인하기': 판정 후 순위·통계를 다시 불러온다 */
+export function useEvaluateLeaderboardAccountMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (accountId: string) => evaluateLeaderboardAccount(accountId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: challengeQueryKeys.all });
+    },
   });
 }
 
