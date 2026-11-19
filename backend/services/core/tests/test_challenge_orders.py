@@ -186,7 +186,7 @@ def test_purchase_issue_start_close(client, admin_headers, buyer, round_, fake_m
         assert acc["name"] == "김 철수".encode("cp949").decode("latin-1")
         assert acc["pool"] == {"loginsPoolStart": POOL_START, "loginsPoolEnd": POOL_START + 9}
     assert fake_mt4.api_key_seen == {"demo-key"}
-    status = {r["mt4_login"]: r["status"] for r in run_sql("select mt4_login, status from core.mt4_logins")}
+    status = {r["mt4_login"]: r["status"] for r in run_sql("select mt4_login, status from core.mt4_account_issued_history")}
     assert status == {POOL_START: "IN_USE", POOL_START + 1: "BLACKLISTED", POOL_START + 2: "IN_USE"}
     ledger = _ledger()
     assert ledger["LIABILITY:ORDER_PENDING"] == 0 and ledger["REVENUE:CHALLENGE_SALES"] == 160
@@ -276,7 +276,7 @@ def test_failed_provision_refunds(client, admin_headers, buyer, round_, fake_mt4
     refund = run_sql("select is_reversal, reversed_entry_id from core.journal_entries where entry_type = 'CHALLENGE_REFUND'")
     assert len(refund) == 1 and refund[0]["is_reversal"] and refund[0]["reversed_entry_id"]
     # 생성 요청이 응답 없이 끝났으므로 MT4에 생겼을 수 있다 → 정리 대상
-    assert run_sql("select count(*) n from core.mt4_logins where status = 'ORPHANED'")[0]["n"] == 1
+    assert run_sql("select count(*) n from core.mt4_account_issued_history where status = 'ORPHANED'")[0]["n"] == 1
     assert run_sql("select current_participants n from core.challenges")[0]["n"] == 1
     job = run_sql("select status, attempts from core.jobs where kind = 'mt4.provision_challenge_account' and status = 'FAILED'")
     assert len(job) == 1 and job[0]["attempts"] == 8
@@ -294,7 +294,7 @@ def test_all_failed_order_is_refunded(client, buyer, round_, fake_mt4):
     assert detail["status"] == "REFUNDED" and detail["refunded_quantity"] == 1
     assert _balance(client, buyer) == 300
     # 생성 거부(응답 받음)라 MT4에는 없다 → 정리 대상 아님
-    assert run_sql("select status from core.mt4_logins")[0]["status"] == "BLACKLISTED"
+    assert run_sql("select status from core.mt4_account_issued_history")[0]["status"] == "BLACKLISTED"
 
 
 def test_timeout_after_create_does_not_duplicate(client, buyer, round_, fake_mt4):
@@ -317,7 +317,7 @@ def test_duplicate_login_rejection_uses_next_number(client, buyer, round_, fake_
     _work()
     detail = client.get(f"/api/v1/challenges/orders/{order['order_id']}", headers=buyer).json()
     assert detail["status"] == "COMPLETED" and detail["accounts"][0]["mt4_login"] == POOL_START + 1
-    rows = {r["mt4_login"]: r["status"] for r in run_sql("select mt4_login, status from core.mt4_logins")}
+    rows = {r["mt4_login"]: r["status"] for r in run_sql("select mt4_login, status from core.mt4_account_issued_history")}
     assert rows == {POOL_START: "BLACKLISTED", POOL_START + 1: "IN_USE"}
 
 

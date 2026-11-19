@@ -81,8 +81,8 @@ class TradingAccount(Base):
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
 
-class Mt4Login(Base):
-    __tablename__ = "mt4_logins"
+class Mt4AccountIssuedHistory(Base):
+    __tablename__ = "mt4_account_issued_history"
 
     mt4_server: Mapped[str] = mapped_column(primary_key=True)
     mt4_login: Mapped[int] = mapped_column(BigInteger, primary_key=True)

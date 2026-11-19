@@ -15,7 +15,7 @@ from app.api.v1.files import router as files_router
 from app.api.v1.google import router as google_router
 from app.api.v1.kyc import router as kyc_router
 from app.api.v1.manual_email import router as admin_manual_email_router
-from app.api.v1.mt4_logins import router as admin_mt4_logins_router
+from app.api.v1.mt4_account_issued_history import router as admin_mt4_account_issued_history_router
 from app.api.v1.newsletter import router as newsletter_router
 from app.api.v1.orders import admin_router as admin_orders_router
 from app.api.v1.orders import router as orders_router
@@ -50,4 +50,4 @@ router.include_router(admin_manual_email_router)
 router.include_router(files_router)
 router.include_router(newsletter_router)
 router.include_router(admin_system_router)
-router.include_router(admin_mt4_logins_router)
+router.include_router(admin_mt4_account_issued_history_router)

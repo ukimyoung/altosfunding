@@ -1,6 +1,6 @@
 """MT4 계좌번호 기록 관리 (백오피스 운영 관리 > 계좌 관리).
 
-발급(app/jobs/mt4.py _reserve_login)은 새 번호를 core.mt4_logins에 넣다가 충돌하면 그 번호를 건너뛴다.
+발급(app/jobs/mt4.py _reserve_login)은 새 번호를 core.mt4_account_issued_history에 넣다가 충돌하면 그 번호를 건너뛴다.
 그래서 관리자가 BLACKLISTED 행을 미리 넣어 두기만 하면 발급 대상에서 빠진다.
 
 - 등록: 비어 있는 번호는 BLACKLISTED(source=ADMIN)로 넣고, 정리 대상(ORPHANED)은 BLACKLISTED로 바꾼다.
@@ -14,7 +14,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
-from app.models import Mt4Login, Product, User
+from app.models import Mt4AccountIssuedHistory, Product, User
 from app.services import mt4
 
 MAX_RANGE = 1000
@@ -70,21 +70,21 @@ async def list_logins(
     page_size: int,
 ) -> dict:
     query = (
-        select(Mt4Login, Product.name, User.email)
-        .outerjoin(Product, Product.product_id == Mt4Login.product_id)
-        .outerjoin(User, User.id == Mt4Login.created_by)
-        .where(Mt4Login.mt4_server == server)
+        select(Mt4AccountIssuedHistory, Product.name, User.email)
+        .outerjoin(Product, Product.product_id == Mt4AccountIssuedHistory.product_id)
+        .outerjoin(User, User.id == Mt4AccountIssuedHistory.created_by)
+        .where(Mt4AccountIssuedHistory.mt4_server == server)
     )
     if status:
-        query = query.where(Mt4Login.status == status)
+        query = query.where(Mt4AccountIssuedHistory.status == status)
     if source:
-        query = query.where(Mt4Login.source == source)
+        query = query.where(Mt4AccountIssuedHistory.source == source)
     if login:
-        query = query.where(cast(Mt4Login.mt4_login, String).like(f"%{login}%"))
+        query = query.where(cast(Mt4AccountIssuedHistory.mt4_login, String).like(f"%{login}%"))
     total = await session.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = (
         await session.execute(
-            query.order_by(Mt4Login.updated_at.desc(), Mt4Login.mt4_login.desc())
+            query.order_by(Mt4AccountIssuedHistory.updated_at.desc(), Mt4AccountIssuedHistory.mt4_login.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
         )
@@ -92,7 +92,7 @@ async def list_logins(
     counts = dict(
         (
             await session.execute(
-                select(Mt4Login.status, func.count()).where(Mt4Login.mt4_server == server).group_by(Mt4Login.status)
+                select(Mt4AccountIssuedHistory.status, func.count()).where(Mt4AccountIssuedHistory.mt4_server == server).group_by(Mt4AccountIssuedHistory.status)
             )
         ).all()
     )
@@ -134,7 +134,7 @@ async def add_blacklist(
     logins = list(range(login_from, login_to + 1))
     added = list(
         await session.scalars(
-            insert(Mt4Login)
+            insert(Mt4AccountIssuedHistory)
             .values(
                 [
                     {"mt4_server": server, "mt4_login": n, "status": "BLACKLISTED", "reason": reason,
@@ -143,13 +143,13 @@ async def add_blacklist(
                 ]
             )
             .on_conflict_do_nothing()
-            .returning(Mt4Login.mt4_login)
+            .returning(Mt4AccountIssuedHistory.mt4_login)
         )
     )
     taken = set(added)
     existing = await session.scalars(
-        select(Mt4Login)
-        .where(Mt4Login.mt4_server == server, Mt4Login.mt4_login.in_([n for n in logins if n not in taken]))
+        select(Mt4AccountIssuedHistory)
+        .where(Mt4AccountIssuedHistory.mt4_server == server, Mt4AccountIssuedHistory.mt4_login.in_([n for n in logins if n not in taken]))
         .with_for_update()
     )
     converted: list[int] = []
@@ -171,7 +171,7 @@ async def add_blacklist(
 
 
 async def release_blacklist(session: AsyncSession, server: str, login: int) -> None:
-    row = await session.get(Mt4Login, (server, login), with_for_update=True)
+    row = await session.get(Mt4AccountIssuedHistory, (server, login), with_for_update=True)
     if row is None:
         raise AppError(404, "mt4_login_not_found", "등록된 번호가 아닙니다.")
     if row.status != "BLACKLISTED" or row.source != "ADMIN":

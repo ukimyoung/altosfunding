@@ -10,7 +10,7 @@ from app.models.manual_email import (
     ManualEmailRecipient,
     UploadedFile,
 )
-from app.models.trading import ChallengeOrder, Mt4Login, TradingAccount
+from app.models.trading import ChallengeOrder, Mt4AccountIssuedHistory, TradingAccount
 from app.models.user import (
     EmailVerification,
     LoginHistory,
@@ -55,7 +55,7 @@ __all__ = [
     "ManualEmailDraft",
     "ManualEmailJob",
     "ManualEmailRecipient",
-    "Mt4Login",
+    "Mt4AccountIssuedHistory",
     "PasswordResetToken",
     "PlatformConfig",
     "PlatformConfigHistory",

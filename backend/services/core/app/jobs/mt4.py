@@ -2,7 +2,7 @@
 
 mt4.provision_challenge_account — 챌린지 계좌 1개 발급
   1) MT4 번호 할당: 상품 범위(mt4_login_pool_start~end)에서 카운터(last_mt4_login)를 원자적으로 +1 하고,
-     core.mt4_logins에 RESERVED로 기록(번호마다 한 줄, 중복 불가) → MT4 GET이 404면 확정.
+     core.mt4_account_issued_history에 RESERVED로 기록(번호마다 한 줄, 중복 불가) → MT4 GET이 404면 확정.
      MT4에 이미 있으면 BLACKLISTED로 남기고 다음 번호. 범위를 넘으면 실패(환불).
   2) MT4 계좌 생성 (대회 시작 전이면 읽기 전용으로 만든다). 요청 직전에 시도 시각을 커밋해 두고,
      응답을 못 받았으면(타임아웃·5xx) 다음 시도 때 GET으로 생성 여부를 먼저 확인한다.
@@ -25,7 +25,7 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Challenge, Job, Mt4Login, Product, TradingAccount, User
+from app.models import Challenge, Job, Mt4AccountIssuedHistory, Product, TradingAccount, User
 from app.security import decrypt_text, encrypt_text
 from app.services import challenge_order as orders
 from app.services import jobs, mt4, notify
@@ -79,13 +79,13 @@ def _account_id(job: Job) -> uuid.UUID:
 
 
 async def _set_login_status(session: AsyncSession, account: TradingAccount, login: int, status: str, reason: str) -> None:
-    stmt = insert(Mt4Login).values(
+    stmt = insert(Mt4AccountIssuedHistory).values(
         mt4_server=account.mt4_server, mt4_login=login, product_id=account.product_id,
         account_id=account.id if status in ("RESERVED", "IN_USE") else None, status=status, reason=reason,
     )
     await session.execute(
         stmt.on_conflict_do_update(
-            index_elements=[Mt4Login.mt4_server, Mt4Login.mt4_login],
+            index_elements=[Mt4AccountIssuedHistory.mt4_server, Mt4AccountIssuedHistory.mt4_login],
             # 관리자가 등록한 번호였더라도 발급 과정에서 실제로 쓰였거나 MT4에 생겼으면 시스템 기록으로 바꾼다.
             set_={"status": status, "reason": reason, "source": "SYSTEM", "created_by": None},
         )
@@ -113,13 +113,13 @@ async def _reserve_login(session: AsyncSession, client: mt4.Mt4Client, account: 
             continue
         # 이미 기록된 번호(다른 계좌가 쓰는 번호, 블랙리스트)는 건너뛴다.
         inserted = await session.scalar(
-            insert(Mt4Login)
+            insert(Mt4AccountIssuedHistory)
             .values(
                 mt4_server=account.mt4_server, mt4_login=login, product_id=account.product_id,
                 account_id=account.id, status="RESERVED",
             )
             .on_conflict_do_nothing()
-            .returning(Mt4Login.mt4_login)
+            .returning(Mt4AccountIssuedHistory.mt4_login)
         )
         if inserted is None:
             await session.commit()
