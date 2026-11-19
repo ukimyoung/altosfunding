@@ -323,3 +323,66 @@ class HolidayOut(BaseModel):
 
 
 ScheduleTriggerResponse.model_rebuild()
+
+
+# ── 백오피스 Leaderboard ────────────────────────────────────
+
+
+class LeaderboardEntry(BaseModel):
+    account_id: str
+    mt4_login: int | None
+    user_id: str
+    email: str
+    user_grade: str
+    nickname: str
+    challenge_id: str
+    product_id: str
+    product_name: str
+    capital: float
+    equity: float
+    balance: float
+    profit: float
+    profit_rate: float
+    account_status: str
+    participant_status: str
+    # 수익률 계산에 쓴 잔고 시각 (받은 값이 없으면 null → 자본금 기준)
+    snapshot_ts: datetime | None
+    # END: 대회 종료 시각 기준, LATEST: 진행 중이라 최근 값 기준
+    basis: Literal["END", "LATEST"]
+    is_passed: bool
+    rank: int
+
+
+class LeaderboardChallenge(BaseModel):
+    id: str
+    name: str
+    status: str
+    product_id: str
+    start_at: datetime
+    end_at: datetime
+    # 수익률 기준 시각 (관리자가 먼저 종료했으면 종료한 시각)
+    cutoff_at: datetime
+
+
+class DailyLeaderboardResponse(BaseModel):
+    date: str
+    product_id: str | None
+    grade: str | None
+    total: int
+    challenges: list[LeaderboardChallenge]
+    entries: list[LeaderboardEntry]
+
+
+class LeaderboardStats(BaseModel):
+    total_active_participants: int
+    passed_count: int
+    failed_count: int
+    withdrawn_count: int
+    vip_count: int
+    passed_accounts: int
+
+
+class LeaderboardSummaryResponse(BaseModel):
+    target_date: str
+    challenges: list[LeaderboardChallenge]
+    stats: LeaderboardStats

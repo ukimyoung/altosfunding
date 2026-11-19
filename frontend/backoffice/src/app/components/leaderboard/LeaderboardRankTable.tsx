@@ -1,5 +1,5 @@
 import type { RankEntry, VipEntry } from '../../types/leaderboard';
-import { getLeaderboardTierConfig } from '../../constants/leaderboard';
+import { getLeaderboardTierConfig, toLeaderboardTierLabel } from '../../constants/leaderboard';
 import { formatSignedPercent, formatSignedUsdMoney } from '../../utils/utils';
 
 type LeaderboardRankTableVariant = 'normal' | 'vip';
@@ -177,7 +177,7 @@ export function LeaderboardRankTable<T extends LeaderboardRankTableEntry>({
                       border: `1px solid ${tierCfg.border}`,
                     }}
                   >
-                    {entry.productName}
+                    {toLeaderboardTierLabel(entry.productName)}
                   </span>
                 </td>
 

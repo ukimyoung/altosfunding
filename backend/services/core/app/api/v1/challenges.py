@@ -18,6 +18,9 @@ from app.schemas.challenge import (
     ChallengeOut,
     ChallengePage,
     ChallengeStatus,
+    DailyLeaderboardResponse,
+    LeaderboardChallenge,
+    LeaderboardSummaryResponse,
     ChallengeOffersResponse,
     ChallengeSummaryResponse,
     HolidayCreate,
@@ -33,6 +36,7 @@ from app.schemas.challenge import (
 )
 from app.services import challenge as svc
 from app.services import challenge_order
+from app.services import leaderboard
 
 router = APIRouter(tags=["challenges"])
 
@@ -99,6 +103,56 @@ async def challenge_grouped(
         session, status=status, date=date, date_from=date_from, date_to=date_to, page=page, size=size
     )
     return ChallengeGroupedPage(items=items, total=total, page=page, size=size, pages=_pages(total, size))
+
+
+def _leaderboard_challenges(challenges) -> list[LeaderboardChallenge]:
+    return [
+        LeaderboardChallenge(
+            id=c.challenge_id, name=c.name, status=c.status, product_id=c.product_id,
+            start_at=c.start_at, end_at=c.end_at, cutoff_at=leaderboard.cutoff(c),
+        )
+        for c in challenges
+    ]
+
+
+@router.get(
+    "/admin/challenges/leaderboard/daily",
+    response_model=DailyLeaderboardResponse,
+    summary="Leaderboard: 같은 날 시작한 대회 계좌의 수익률 순위 (종료된 대회는 종료 시각 기준)",
+)
+async def daily_leaderboard(
+    admin: AdminUser,
+    session: Session,
+    date: Annotated[str, Query(description="대회 시작일 (YYYYMMDD 또는 YYYY-MM-DD, UTC)")],
+    product_id: str | None = None,
+    grade: Annotated[str | None, Query(description="NORMAL | VIP | VVIP (없으면 전체)")] = None,
+) -> DailyLeaderboardResponse:
+    grade = grade.upper() if grade else None
+    if grade and grade not in leaderboard.GRADES:
+        raise AppError(400, "invalid_grade", "grade는 NORMAL, VIP, VVIP 중 하나여야 합니다.")
+    challenges, entries = await leaderboard.build(session, date, product_id=product_id, now=_now())
+    entries = leaderboard.filter_grade(entries, grade)
+    return DailyLeaderboardResponse(
+        date=date, product_id=product_id, grade=grade, total=len(entries),
+        challenges=_leaderboard_challenges(challenges), entries=entries,
+    )
+
+
+@router.get(
+    "/admin/challenges/summary-stats",
+    response_model=LeaderboardSummaryResponse,
+    summary="Leaderboard 상단 통계 (참가 계좌·승격 대상·VIP 달성·탈락)",
+)
+async def leaderboard_summary_stats(
+    admin: AdminUser,
+    session: Session,
+    target_date: Annotated[str, Query(description="대회 시작일 (YYYY-MM-DD 또는 YYYYMMDD, UTC)")],
+) -> LeaderboardSummaryResponse:
+    challenges, entries = await leaderboard.build(session, target_date, now=_now())
+    return LeaderboardSummaryResponse(
+        target_date=target_date, challenges=_leaderboard_challenges(challenges),
+        stats=leaderboard.summary_stats(entries),
+    )
 
 
 @router.get("/admin/challenges", response_model=ChallengePage, summary="회차 목록")
