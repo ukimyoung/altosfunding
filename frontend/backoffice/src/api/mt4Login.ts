@@ -66,22 +66,22 @@ export interface BlacklistResult {
 }
 
 export const listMt4Logins = async (params: Mt4LoginListParams): Promise<Mt4LoginPage> => {
-  const response = await api.get<Mt4LoginPage>('/v1/admin/mt4/logins', { params });
+  const response = await api.get<Mt4LoginPage>('/v1/admin/mt4/account-issued-history', { params });
   return response.data;
 };
 
 export const listMt4LoginPools = async (server: Mt4Server): Promise<Mt4LoginPool[]> => {
-  const response = await api.get<Mt4LoginPool[]>('/v1/admin/mt4/login-pools', { params: { server } });
+  const response = await api.get<Mt4LoginPool[]>('/v1/admin/mt4/account-issued-history/pools', { params: { server } });
   return response.data;
 };
 
 export const addMt4Blacklist = async (payload: BlacklistInput): Promise<BlacklistResult> => {
-  const response = await api.post<BlacklistResult>('/v1/admin/mt4/blacklist', payload);
+  const response = await api.post<BlacklistResult>('/v1/admin/mt4/account-issued-history/blacklist', payload);
   return response.data;
 };
 
 export const releaseMt4Blacklist = async (server: Mt4Server, login: number): Promise<void> => {
-  await api.delete(`/v1/admin/mt4/blacklist/${server}/${login}`);
+  await api.delete(`/v1/admin/mt4/account-issued-history/blacklist/${server}/${login}`);
 };
 
 const ERROR_MESSAGES: Record<string, string> = {

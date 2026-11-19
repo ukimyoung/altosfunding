@@ -11,7 +11,7 @@ import {
 import { formatKstDateTime } from "../../utils/utils";
 
 // 운영 관리 > 계좌 관리
-// MT4 계좌번호 기록(core.mt4_logins)을 보고, 관리자가 특정 번호를 블랙리스트로 등록해 발급 대상에서 뺀다.
+// MT4 계좌번호 기록(core.mt4_account_issued_history)을 보고, 관리자가 특정 번호를 블랙리스트로 등록해 발급 대상에서 뺀다.
 // 발급은 기록이 있는 번호를 모두 건너뛰므로 블랙리스트로 등록한 번호는 다시 발급되지 않는다.
 
 interface Mt4LoginManagementProps {

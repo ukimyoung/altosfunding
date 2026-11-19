@@ -21,7 +21,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
-from app.models import Challenge, ChallengeOrder, Mt4Login, Product, TradingAccount, User
+from app.models import Challenge, ChallengeOrder, Mt4AccountIssuedHistory, Product, TradingAccount, User
 from app.security import generate_human_code
 from app.services import jobs, mt4
 from app.services.wallet import USER_WALLET, Line, _change_balance, _post_journal, get_wallet
@@ -232,7 +232,7 @@ async def refund_account(session: AsyncSession, account: TradingAccount, reason:
     account.provision_error = reason[:2000]
 
     if account.mt4_login is not None:
-        row = await session.get(Mt4Login, (account.mt4_server, account.mt4_login), with_for_update=True)
+        row = await session.get(Mt4AccountIssuedHistory, (account.mt4_server, account.mt4_login), with_for_update=True)
         maybe_created = account.mt4_created_at is not None or account.mt4_create_attempted_at is not None
         if row is not None:
             if maybe_created:
