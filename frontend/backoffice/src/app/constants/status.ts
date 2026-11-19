@@ -117,8 +117,10 @@ export const DEMO_CATEGORY_FILTER = [
 export const DEMO_ACCOUNT_STATUS_FILTER = [
   { value: 'All', label: '관리: 전체' },
   { value: 'ACTIVE', label: '활성' },
-  { value: 'IN_PROGRESS', label: '진행중' },
+  // Core는 IN_PROGRESS를 쓰지 않는다
+  // { value: 'IN_PROGRESS', label: '진행중' },
   { value: 'INACTIVE', label: '비활성' },
+  { value: 'BANNED', label: '영구정지' },
 ] as const;
 
 export const PRODUCT_TYPE_FILTER = [

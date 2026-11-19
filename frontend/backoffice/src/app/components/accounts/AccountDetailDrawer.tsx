@@ -414,7 +414,7 @@ export function AccountDetailDrawer({
   const totalProfit = detail ? formatSignedUsdMoney(detail.total_profit) : acct.profit;
   const login = asDisplay(detail?.mt4_login ?? mt4Login);
   const password = asDisplay(detail?.mt4_password);
-  const server = emptyValue;
+  const server = asDisplay(detail?.mt4_server);
 
   const showDrawerToast = (msg: string, duration = 3000) => {
     setDrawerToast(msg);

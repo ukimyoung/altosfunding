@@ -26,7 +26,7 @@ const pageSize = 20;
 const toDateParam = (value: string) => value.replace(/\D/g, '') || null;
 
 const toStatusParam = (value: string): AccountStatus | null => {
-  if (value === 'ACTIVE' || value === 'IN_PROGRESS' || value === 'INACTIVE') {
+  if (value === 'ACTIVE' || value === 'INACTIVE' || value === 'BANNED') {
     return value;
   }
   return null;

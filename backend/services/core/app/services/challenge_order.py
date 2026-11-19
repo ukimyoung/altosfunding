@@ -189,6 +189,11 @@ async def enqueue_read_only(session: AsyncSession, account: TradingAccount, read
 async def mark_issued(session: AsyncSession, account: TradingAccount) -> None:
     """MT4 계좌 생성·자본금 입금이 끝난 계좌를 발급 완료로 바꾼다 (Worker 작업 안에서)."""
     now = _now()
+    if account.challenge_id is None:
+        # 데모 계좌: 대회 없이 바로 거래한다 (MT4에도 읽기 전용이 아닌 상태로 만든다). 발급 메일은 보내지 않는다.
+        account.provision_status, account.issued_at, account.provision_error = DONE, now, None
+        account.status = "ACTIVE"
+        return
     # 대회 시작 처리와 겹치지 않게 대회 행을 잠근다 (시작 처리는 FOR UPDATE).
     challenge = await session.scalar(
         select(Challenge).where(Challenge.challenge_id == account.challenge_id).with_for_update(read=True)

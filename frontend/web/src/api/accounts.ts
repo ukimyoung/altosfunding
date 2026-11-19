@@ -77,6 +77,8 @@ export interface AccountListItem {
   user_email: string | null;
   mt4_password?: string | null;
   leverage_override?: number | null;
+  // Core: QUEUED(발급 중) → DONE(발급 완료)
+  provision_status?: string | null;
 }
 
 export interface ListAccountsParams {

@@ -95,3 +95,18 @@ class Mt4AccountIssuedHistory(Base):
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class TradingAccountStatusHistory(Base):
+    """관리자가 바꾼 계좌 상태 이력 (20261119020000)."""
+
+    __tablename__ = "trading_account_status_history"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("core.trading_accounts.id"))
+    action: Mapped[str]
+    from_status: Mapped[str]
+    to_status: Mapped[str]
+    reason: Mapped[str | None]
+    changed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())

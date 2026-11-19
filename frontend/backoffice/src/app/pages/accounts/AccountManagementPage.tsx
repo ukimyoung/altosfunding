@@ -19,6 +19,8 @@ import {
   TableFilterBar,
 } from '../../components/shared/TableFilters';
 import { tok } from '../../theme/tokens';
+import { challengeTierLabel } from '../../utils/revenue';
+import { useListCatalogProductsQuery } from '../../queries/catalogProducts';
 import { AccountDetailDrawer } from '../../components/accounts/AccountDetailDrawer';
 import { AccountListTable } from '../../components/accounts/AccountListTable';
 import {
@@ -34,7 +36,8 @@ const pageSize = 20;
 const CHALLENGE_STATUS_OPTIONS = [
   { value: 'PENDING', label: '대기' },
   { value: 'ACTIVE', label: '활성' },
-  { value: 'IN_PROGRESS', label: '진행중' },
+  // Core는 IN_PROGRESS를 쓰지 않는다 (대회 진행 중 = ACTIVE)
+  // { value: 'IN_PROGRESS', label: '진행중' },
   { value: 'CLOSED', label: '종료' },
   { value: 'PASSED', label: '통과' },
   { value: 'FAILED', label: '실패' },
@@ -101,6 +104,12 @@ export function AccountManagementPage() {
     refetch: refetchAccounts,
   } = useListTierAccountsQuery(tier, accountParams);
   const { data: accountStats, refetch: refetchAccountStats } = useAccountStatsQuery(tier);
+  // 계좌 유형 필터 = 해당 티어 상품 (상품명에서 'Challenge ' 제외, 값은 상품코드)
+  const { data: productData } = useListCatalogProductsQuery({ tier_type: tier, page: 1, size: 100 });
+  const accountTypeOptions = (productData?.items ?? []).map((product) => ({
+    value: product.product_id,
+    label: challengeTierLabel(product.name) || product.product_id,
+  }));
   const rows = accountData?.items ?? [];
 
   const updateParams = (updates: Record<string, string | number | null | undefined>) => {
@@ -254,9 +263,10 @@ export function AccountManagementPage() {
           iconColor={t.text}
           options={[
             { value: 'all', label: '계좌 유형: 전체' },
-            { value: '100', label: '$100' },
-            { value: '300', label: '$300' },
-            { value: '500', label: '$500' },
+            ...accountTypeOptions,
+            // { value: '100', label: '$100' },
+            // { value: '300', label: '$300' },
+            // { value: '500', label: '$500' },
           ]}
         />
         <DateRangeFilter

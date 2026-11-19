@@ -184,6 +184,11 @@ class Mt4Client:
     async def set_read_only(self, login: int, read_only: bool) -> None:
         await self._call("readonly", "POST", f"/api/mt4/accounts/{login}/readonly", json={"value": read_only})
 
+    async def open_orders(self, login: int) -> list[dict]:
+        """미결 포지션(열린 주문) 목록."""
+        data = await self._call("open_orders", "GET", f"/api/mt4/accounts/{login}/orders/open")
+        return data if isinstance(data, list) else []
+
 
 # 테스트에서 모의 MT4 서버(httpx.MockTransport)를 끼워 넣는다.
 _transport: httpx.AsyncBaseTransport | None = None

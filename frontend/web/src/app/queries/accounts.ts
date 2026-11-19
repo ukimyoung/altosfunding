@@ -38,6 +38,9 @@ export function useAccountsQuery(params: ListAccountsParams) {
   return useQuery({
     queryKey: accountsQueryKeys.list(params),
     queryFn: () => listAccounts(params),
+    // 발급 중(QUEUED)인 계좌가 있으면 3초마다 다시 불러 발급 완료(번호·비밀번호)를 보여 준다.
+    refetchInterval: (query) =>
+      query.state.data?.items.some((item) => item.provision_status === 'QUEUED') ? 3000 : false,
   });
 }
 
