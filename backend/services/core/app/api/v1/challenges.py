@@ -2,6 +2,7 @@
 
 import hmac
 import math
+import uuid
 from datetime import UTC, datetime
 from typing import Annotated
 
@@ -18,6 +19,7 @@ from app.schemas.challenge import (
     ChallengeOut,
     ChallengePage,
     ChallengeStatus,
+    ChallengeEvaluationOut,
     DailyLeaderboardResponse,
     LeaderboardChallenge,
     LeaderboardSummaryResponse,
@@ -36,7 +38,7 @@ from app.schemas.challenge import (
 )
 from app.services import challenge as svc
 from app.services import challenge_order
-from app.services import leaderboard
+from app.services import challenge_evaluation, leaderboard
 
 router = APIRouter(tags=["challenges"])
 
@@ -145,6 +147,35 @@ async def daily_leaderboard(
         date=date, product_id=product_id, grade=grade, total=len(entries),
         challenges=_leaderboard_challenges(challenges), entries=entries,
     )
+
+
+def _account_uuid(account_id: str) -> uuid.UUID:
+    try:
+        return uuid.UUID(account_id)
+    except ValueError as exc:
+        raise AppError(404, "account_not_found", "챌린지 계좌를 찾을 수 없습니다.") from exc
+
+
+@router.post(
+    "/admin/challenges/leaderboard/accounts/{account_id}/evaluate",
+    response_model=ChallengeEvaluationOut,
+    summary="Leaderboard '확인하기': 거래 내역을 룰셋으로 확인해 통과 여부 판정 (결과만 기록)",
+)
+async def evaluate_account(account_id: str, admin: AdminUser, session: Session) -> ChallengeEvaluationOut:
+    evaluation = await challenge_evaluation.evaluate(session, _account_uuid(account_id), admin.id, _now())
+    await session.commit()
+    await session.refresh(evaluation)
+    return ChallengeEvaluationOut.model_validate(evaluation)
+
+
+@router.get(
+    "/admin/challenges/leaderboard/accounts/{account_id}/evaluation",
+    response_model=ChallengeEvaluationOut | None,
+    summary="Leaderboard: 계좌의 마지막 판정 결과 (없으면 null)",
+)
+async def latest_evaluation(account_id: str, admin: AdminUser, session: Session) -> ChallengeEvaluationOut | None:
+    evaluation = await challenge_evaluation.latest(session, _account_uuid(account_id))
+    return ChallengeEvaluationOut.model_validate(evaluation) if evaluation else None
 
 
 @router.get(

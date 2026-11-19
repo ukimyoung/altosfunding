@@ -349,6 +349,11 @@ class LeaderboardEntry(BaseModel):
     snapshot_ts: datetime | None
     # END: 대회 종료 시각 기준, LATEST: 진행 중이라 최근 값 기준
     basis: Literal["END", "LATEST"]
+    # '확인하기' 마지막 판정 (판정 전이면 null)
+    evaluation_id: int | None = None
+    evaluation_result: Literal["PASSED", "FAILED"] | None = None
+    evaluated_at: datetime | None = None
+    # 마지막 판정이 통과면 true
     is_passed: bool
     rank: int
 
@@ -386,3 +391,38 @@ class LeaderboardSummaryResponse(BaseModel):
     target_date: str
     challenges: list[LeaderboardChallenge]
     stats: LeaderboardStats
+
+
+class EvaluationCheck(BaseModel):
+    key: str
+    label: str
+    passed: bool
+    detail: str | None = None
+
+
+class ChallengeEvaluationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    account_id: str
+    challenge_id: str
+    ruleset_id: str | None
+    result: Literal["PASSED", "FAILED"]
+    period_start: datetime
+    period_end: datetime
+    capital: float
+    equity: float
+    profit: float
+    profit_rate: float
+    trades_count: int
+    open_positions: int
+    # 적용한 룰 수 (0이면 룰셋 판정 로직 미적용)
+    rules_applied: int
+    checks: list[EvaluationCheck]
+    evaluated_by: str | None
+    created_at: datetime
+
+    @field_validator("account_id", "evaluated_by", mode="before")
+    @classmethod
+    def _uuid_str(cls, value):
+        return None if value is None else str(value)

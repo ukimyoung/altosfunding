@@ -55,6 +55,11 @@ export interface DailyLeaderboardEntry {
   snapshot_ts: string | null;
   /** END: 대회 종료 시각 기준, LATEST: 진행 중이라 최근 값 기준 */
   basis?: 'END' | 'LATEST';
+  /** '확인하기' 마지막 판정 (판정 전이면 null) */
+  evaluation_id?: number | null;
+  evaluation_result?: 'PASSED' | 'FAILED' | null;
+  evaluated_at?: string | null;
+  /** 마지막 판정이 통과면 true */
   is_passed: boolean;
   rank: number;
 }
@@ -129,6 +134,42 @@ export const listChallengeGrouped = async (
       size,
     },
   });
+  return response.data;
+};
+
+export interface ChallengeEvaluationCheck {
+  key: string;
+  label: string;
+  passed: boolean;
+  detail: string | null;
+}
+
+/** Leaderboard '확인하기' 판정 결과 */
+export interface ChallengeEvaluation {
+  id: number;
+  account_id: string;
+  challenge_id: string;
+  ruleset_id: string | null;
+  result: 'PASSED' | 'FAILED';
+  period_start: string;
+  period_end: string;
+  capital: number;
+  equity: number;
+  profit: number;
+  profit_rate: number;
+  trades_count: number;
+  open_positions: number;
+  /** 적용한 룰 수 (0이면 룰셋 판정 로직 미적용) */
+  rules_applied: number;
+  checks: ChallengeEvaluationCheck[];
+  evaluated_by: string | null;
+  created_at: string;
+}
+
+export const evaluateLeaderboardAccount = async (accountId: string): Promise<ChallengeEvaluation> => {
+  const response = await api.post<ChallengeEvaluation>(
+    `/v1/admin/challenges/leaderboard/accounts/${accountId}/evaluate`,
+  );
   return response.data;
 };
 

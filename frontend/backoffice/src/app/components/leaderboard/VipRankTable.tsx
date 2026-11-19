@@ -4,9 +4,8 @@ import { LeaderboardRankTable } from './LeaderboardRankTable';
 interface VipRankTableProps {
   dark: boolean;
   data: VipEntry[];
-  selectedIds: string[];
-  onToggleSelect: (id: string) => void;
-  onToggleAll: () => void;
+  evaluatingId: string | null;
+  onEvaluate: (id: string) => void;
 }
 
 export function VipRankTable(props: VipRankTableProps) {

@@ -190,3 +190,27 @@ class TradingAccountEquitySnapshot(Base):
     margin: Mapped[Decimal | None] = mapped_column(Money)
     free_margin: Mapped[Decimal | None] = mapped_column(Money)
     margin_level: Mapped[Decimal | None] = mapped_column(Money)
+
+
+class ChallengeEvaluation(Base):
+    """백오피스 Leaderboard '확인하기' 판정 결과 (20261120010000). 계좌별 마지막 줄이 현재 판정."""
+
+    __tablename__ = "challenge_evaluations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("core.trading_accounts.id"))
+    challenge_id: Mapped[str] = mapped_column(ForeignKey("core.challenges.id"))
+    ruleset_id: Mapped[str | None] = mapped_column(ForeignKey("core.rulesets.id"))
+    result: Mapped[str]
+    period_start: Mapped[datetime]
+    period_end: Mapped[datetime]
+    capital: Mapped[Decimal] = mapped_column(Money)
+    equity: Mapped[Decimal] = mapped_column(Money)
+    profit: Mapped[Decimal] = mapped_column(Money)
+    profit_rate: Mapped[Decimal] = mapped_column(Numeric(12, 4))
+    trades_count: Mapped[int] = mapped_column(server_default="0")
+    open_positions: Mapped[int] = mapped_column(server_default="0")
+    checks: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    rules_applied: Mapped[int] = mapped_column(server_default="0")
+    evaluated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
