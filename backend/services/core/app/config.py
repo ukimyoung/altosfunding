@@ -75,6 +75,17 @@ class Settings(BaseSettings):
     # 계좌 발급 메일·화면에 보여 주는 MT4 서버 이름
     mt4_demo_server_name: str = "MexnLimited-Demo"
     mt4_live_server_name: str = "MexnLimited-Live"
+    # 거래 내역·잔고 수집 (Worker). 주기마다 거래 가능(ACTIVE) 계좌 전체를 동시에 조회한다.
+    mt4_ingest_seconds: float = 60
+    mt4_ingest_concurrency: int = 10
+    # 다음 조회는 마지막 청산 시각에서 이만큼 앞부터 다시 받는다 (늦게 기록된 청산·시간대 차이 대비).
+    mt4_ingest_overlap_seconds: int = 3600
+    # 잔고·평가금액 이력을 쌓는 최소 간격 (최근 값은 매 주기 계좌에 갱신)
+    mt4_equity_snapshot_seconds: int = 300
+    # 계좌가 ACTIVE를 벗어난 뒤(대회 종료 등) 이 시간 동안 더 수집해 마지막 청산 내역을 받는다.
+    mt4_ingest_after_close_seconds: int = 1800
+    # MT4 서버 시각의 시간대. 조회 기간(dateFrom/dateTo)을 이 시간대로 보내고, 시간대 없는 응답 시각도 이 시간대로 읽는다.
+    mt4_server_timezone: str = "Europe/Athens"
 
     # Sumsub KYC. 비어 있으면 본인 인증 시작(토큰 발급)과 웹훅을 막는다. 상태 조회는 된다.
     sumsub_app_token: str = ""

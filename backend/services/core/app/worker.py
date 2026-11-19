@@ -6,6 +6,7 @@ Core API와 같은 코드·같은 DB를 쓰고, 사람이 누르지 않아도 �
   (백오피스 '지금 실행'과 같은 app.services.challenge.run_due_jobs).
 - 예약 수동 메일: 1분마다 예약 시각이 된 발송 작업을 보낸다 (app.services.manual_email.run_due_jobs).
 - 작업 큐(core.jobs): 몇 초마다 실행할 작업을 꺼내 처리한다 (app.services.jobs).
+- MT4 거래·잔고 수집: 1분마다 거래 가능 계좌의 거래 내역·잔고를 브로커 API에서 받아 저장한다 (app.services.mt4_ingest).
 - MT4 연결 확인: 시작할 때와 10분마다 실제 브로커 API(서버 시각)를 불러 주소·API 키가 맞는지 로그로 남긴다.
 - 생존 기록: core.worker_heartbeats에 마지막 실행 시각과 결과를 남긴다 (GET /api/v1/admin/system/worker).
 
@@ -31,7 +32,7 @@ from app import db
 from app.config import settings
 from app.models import Challenge, ChallengeSchedule, Job, WorkerHeartbeat
 from app.services import challenge as challenge_svc
-from app.services import jobs, mt4
+from app.services import jobs, mt4, mt4_ingest
 from app.services import manual_email as manual_email_svc
 from app.services.email import get_email_sender
 from app.services.files import public_base_url
@@ -120,7 +121,10 @@ class Worker:
                 if name == "job_queue":
                     for status, n in result.items():
                         self.jobs_since_report[status] = self.jobs_since_report.get(status, 0) + n
-                if any(result.values()):
+                # 거래 수집은 매분 같은 건수가 나와서 실패가 있을 때만 따로 남긴다 (평소 결과는 상태 줄에 나온다).
+                if name == "mt4_ingest" and not result.get("failed"):
+                    pass
+                elif any(result.values()):
                     logger.info("%s: %s", name, result)
             except Exception as exc:
                 self.last[name] = {"at": datetime.now(UTC).isoformat(), "ok": False, "error": str(exc)[:500]}
@@ -186,12 +190,13 @@ class Worker:
 
         next_start = state["next_start"]
         logger.info(
-            "상태: 대회[%s] 예약메일[%s] 작업큐[%s] MT4[%s] | 활성 스케줄 %d, 모집 중 대회 %d (다음 시작 %s), "
+            "상태: 대회[%s] 예약메일[%s] 작업큐[%s] MT4[%s] 거래수집[%s] | 활성 스케줄 %d, 모집 중 대회 %d (다음 시작 %s), "
             "진행 중 대회 %d, 대기 작업 %d",
             result("challenges"),
             result("manual_emails"),
             ",".join(f"{k}={v}" for k, v in self.jobs_since_report.items()) or "0",
             result("mt4"),
+            result("mt4_ingest"),
             state["schedules"],
             state["pending_rounds"],
             f"{next_start:%Y-%m-%d %H:%M} UTC" if next_start else "없음",
@@ -209,6 +214,7 @@ class Worker:
             self._every("job_queue", settings.worker_poll_seconds, lambda: run_job_queue(self.sessionmaker)),
             self._every("heartbeat", tick, self.heartbeat),
             self._every("mt4", MT4_CHECK_SECONDS, check_mt4),
+            self._every("mt4_ingest", settings.mt4_ingest_seconds, lambda: mt4_ingest.run(self.sessionmaker)),
         ]
         logger.info("Worker 시작: %s (주기 %ss, 작업 큐 %ss)", WORKER_ID, tick, settings.worker_poll_seconds)
         await asyncio.gather(*loops)

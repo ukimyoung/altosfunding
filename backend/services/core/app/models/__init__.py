@@ -10,7 +10,15 @@ from app.models.manual_email import (
     ManualEmailRecipient,
     UploadedFile,
 )
-from app.models.trading import ChallengeOrder, Mt4AccountIssuedHistory, TradingAccount, TradingAccountStatusHistory
+from app.models.trading import (
+    ChallengeOrder,
+    Mt4AccountIssuedHistory,
+    TradingAccount,
+    TradingAccountEquitySnapshot,
+    TradingAccountStatusHistory,
+    TradingAccountSync,
+    TradingAccountTrade,
+)
 from app.models.user import (
     EmailVerification,
     LoginHistory,

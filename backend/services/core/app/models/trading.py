@@ -8,6 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import BigInteger, ForeignKey, Numeric, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -77,6 +78,14 @@ class TradingAccount(Base):
     end_at: Mapped[datetime | None]
     refund_wallet_tx_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("core.wallet_transactions.id"))
     issued_at: Mapped[datetime | None]
+    # MT4에서 수집한 최근 잔고·평가금액 (20261119030000). 수집 전이면 None.
+    balance: Mapped[Decimal | None] = mapped_column(Money)
+    equity: Mapped[Decimal | None] = mapped_column(Money)
+    credit: Mapped[Decimal | None] = mapped_column(Money)
+    margin: Mapped[Decimal | None] = mapped_column(Money)
+    free_margin: Mapped[Decimal | None] = mapped_column(Money)
+    margin_level: Mapped[Decimal | None] = mapped_column(Money)
+    equity_updated_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
@@ -110,3 +119,74 @@ class TradingAccountStatusHistory(Base):
     reason: Mapped[str | None]
     changed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class TradingAccountTrade(Base):
+    """MT4에서 수집한 주문 (거래·잔고 입출금). 미결 포지션은 is_open (20261119030000)."""
+
+    __tablename__ = "trading_account_trades"
+
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.trading_accounts.id"), primary_key=True
+    )
+    mt4_order: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    mt4_login: Mapped[int] = mapped_column(BigInteger)
+    type: Mapped[str]
+    action: Mapped[str]
+    is_open: Mapped[bool] = mapped_column(server_default="false")
+    symbol: Mapped[str | None]
+    volume: Mapped[Decimal] = mapped_column(Numeric(18, 4), server_default="0")
+    open_time: Mapped[datetime | None]
+    open_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    close_time: Mapped[datetime | None]
+    close_price: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    stop_loss: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    take_profit: Mapped[Decimal | None] = mapped_column(Numeric(20, 6))
+    profit: Mapped[Decimal] = mapped_column(Money, server_default="0")
+    commission: Mapped[Decimal] = mapped_column(Money, server_default="0")
+    swap: Mapped[Decimal] = mapped_column(Money, server_default="0")
+    taxes: Mapped[Decimal] = mapped_column(Money, server_default="0")
+    contract_size: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
+    base_currency: Mapped[str | None]
+    quote_currency: Mapped[str | None]
+    comment: Mapped[str | None]
+    reason: Mapped[str | None]
+    raw: Mapped[dict | None] = mapped_column(JSONB)
+    first_seen_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class TradingAccountSync(Base):
+    """계좌별 MT4 수집 상태 (커서·마지막 성공/실패) (20261119030000)."""
+
+    __tablename__ = "trading_account_sync"
+
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.trading_accounts.id"), primary_key=True
+    )
+    last_close_time: Mapped[datetime | None]
+    last_synced_at: Mapped[datetime | None]
+    last_trades_count: Mapped[int] = mapped_column(server_default="0")
+    last_error: Mapped[str | None]
+    last_error_at: Mapped[datetime | None]
+    consecutive_failures: Mapped[int] = mapped_column(server_default="0")
+    last_snapshot_at: Mapped[datetime | None]
+    inactive_since: Mapped[datetime | None]
+    final_synced_at: Mapped[datetime | None]
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class TradingAccountEquitySnapshot(Base):
+    """잔고·평가금액 이력 (20261119030000)."""
+
+    __tablename__ = "trading_account_equity_snapshots"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("core.trading_accounts.id"))
+    taken_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    balance: Mapped[Decimal] = mapped_column(Money)
+    equity: Mapped[Decimal] = mapped_column(Money)
+    credit: Mapped[Decimal | None] = mapped_column(Money)
+    margin: Mapped[Decimal | None] = mapped_column(Money)
+    free_margin: Mapped[Decimal | None] = mapped_column(Money)
+    margin_level: Mapped[Decimal | None] = mapped_column(Money)
