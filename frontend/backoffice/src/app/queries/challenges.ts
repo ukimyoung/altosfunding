@@ -4,6 +4,7 @@ import {
   listActiveChallengeDates,
   listChallengeGrouped,
   listDailyLeaderboard,
+  listLeaderboardEndDates,
   notifyFailedByAccounts,
   promoteByAccounts,
 } from '@/api/challenge';
@@ -17,6 +18,7 @@ import type {
 export const challengeQueryKeys = {
   all: ['admin', 'challenges'] as const,
   activeDates: () => [...challengeQueryKeys.all, 'active-dates'] as const,
+  leaderboardEndDates: () => [...challengeQueryKeys.all, 'leaderboard-end-dates'] as const,
   grouped: (params: ChallengeGroupedParams) =>
     [...challengeQueryKeys.all, 'grouped', params] as const,
   dailyLeaderboard: (params: DailyLeaderboardParams) =>
@@ -29,6 +31,13 @@ export function useActiveChallengeDatesQuery() {
   return useQuery({
     queryKey: challengeQueryKeys.activeDates(),
     queryFn: listActiveChallengeDates,
+  });
+}
+
+export function useLeaderboardEndDatesQuery() {
+  return useQuery({
+    queryKey: challengeQueryKeys.leaderboardEndDates(),
+    queryFn: listLeaderboardEndDates,
   });
 }
 

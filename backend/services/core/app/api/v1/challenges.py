@@ -116,14 +116,23 @@ def _leaderboard_challenges(challenges) -> list[LeaderboardChallenge]:
 
 
 @router.get(
+    "/admin/challenges/leaderboard/end-dates",
+    response_model=list[str],
+    summary="Leaderboard 날짜 목록: 대회 종료일 (한국 시간 YYYYMMDD, 최근 순)",
+)
+async def leaderboard_end_dates(admin: AdminUser, session: Session) -> list[str]:
+    return await leaderboard.end_dates(session)
+
+
+@router.get(
     "/admin/challenges/leaderboard/daily",
     response_model=DailyLeaderboardResponse,
-    summary="Leaderboard: 같은 날 시작한 대회 계좌의 수익률 순위 (종료된 대회는 종료 시각 기준)",
+    summary="Leaderboard: 같은 날(한국 시간) 끝나는 대회 계좌의 수익률 순위 (종료된 대회는 종료 시각 기준)",
 )
 async def daily_leaderboard(
     admin: AdminUser,
     session: Session,
-    date: Annotated[str, Query(description="대회 시작일 (YYYYMMDD 또는 YYYY-MM-DD, UTC)")],
+    date: Annotated[str, Query(description="대회 종료일 (YYYYMMDD 또는 YYYY-MM-DD, 한국 시간)")],
     product_id: str | None = None,
     grade: Annotated[str | None, Query(description="NORMAL | VIP | VVIP (없으면 전체)")] = None,
 ) -> DailyLeaderboardResponse:
@@ -146,7 +155,7 @@ async def daily_leaderboard(
 async def leaderboard_summary_stats(
     admin: AdminUser,
     session: Session,
-    target_date: Annotated[str, Query(description="대회 시작일 (YYYY-MM-DD 또는 YYYYMMDD, UTC)")],
+    target_date: Annotated[str, Query(description="대회 종료일 (YYYY-MM-DD 또는 YYYYMMDD, 한국 시간)")],
 ) -> LeaderboardSummaryResponse:
     challenges, entries = await leaderboard.build(session, target_date, now=_now())
     return LeaderboardSummaryResponse(

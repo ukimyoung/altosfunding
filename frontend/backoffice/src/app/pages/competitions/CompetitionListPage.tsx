@@ -84,10 +84,10 @@ function formatPeriod(startAt: string, endAt: string) {
   return `${start.year}.${start.md} ${start.hm} ~ ${endDate} ${end.hm}`;
 }
 
-/** Leaderboard는 회차 시작일(UTC, active-dates와 같은 기준)로 조회한다. */
-function toLeaderboardDate(startAt: string) {
-  const date = new Date(startAt);
-  return Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+/** Leaderboard는 대회 종료일(한국 시간, 목록의 기간 표시와 같은 기준)로 조회한다. */
+function toLeaderboardDate(endAt: string) {
+  const end = kstParts(endAt);
+  return end ? `${end.year}${end.md.replace('.', '')}` : '';
 }
 
 /** 상품명에서 'Challenge ' 접두어를 떼어 티어 이름으로 쓴다 (웹 Start New Challenge와 같은 규칙). */
@@ -210,7 +210,7 @@ export function CompetitionListPage() {
   };
 
   const openLeaderboard = (row: ChallengeGroupedItem) => {
-    const date = toLeaderboardDate(row.start_at);
+    const date = toLeaderboardDate(row.end_at);
     navigate(date ? `${ROUTE_BY_PAGE_ID.leaderboard}?date=${date}` : ROUTE_BY_PAGE_ID.leaderboard);
   };
 

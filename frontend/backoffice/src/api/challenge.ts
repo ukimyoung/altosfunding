@@ -111,6 +111,12 @@ export const listActiveChallengeDates = async (): Promise<string[]> => {
   return response.data;
 };
 
+/** Leaderboard 날짜 목록: 대회 종료일 (한국 시간 YYYYMMDD, 최근 순) */
+export const listLeaderboardEndDates = async (): Promise<string[]> => {
+  const response = await api.get<string[]>('/v1/admin/challenges/leaderboard/end-dates');
+  return response.data;
+};
+
 export const listChallengeGrouped = async (
   params: ChallengeGroupedParams = {},
 ): Promise<ChallengeGroupedResponse> => {
