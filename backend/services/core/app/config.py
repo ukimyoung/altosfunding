@@ -9,6 +9,13 @@ class Settings(BaseSettings):
     database_url: str = ""
     # 테스트처럼 이벤트 루프가 자주 바뀌는 환경에서는 연결 풀을 쓰지 않는다.
     database_null_pool: bool = False
+    # 프로세스 하나가 여는 DB 연결 수 = pool_size + max_overflow.
+    # Supabase 풀러(session 모드, 5432)는 프로젝트 전체 동시 연결이 15개로 제한된다.
+    # Core 5개 + Worker 5개 = 10개로 두어, 배포 중 새·옛 인스턴스가 잠시 겹쳐도 15개를 넘지 않게 한다.
+    db_pool_size: int = 3
+    db_max_overflow: int = 2
+    # 연결이 모두 사용 중이면 이만큼 기다린 뒤 실패한다 (풀러 한도 초과로 바로 실패하는 대신).
+    db_pool_timeout: float = 30
     redis_url: str = "redis://localhost:6379/0"
 
     # 이메일 인증코드 HMAC, JWT 서명 등에 쓰는 비밀 값. 배포 환경에서는 반드시 바꾼다.
