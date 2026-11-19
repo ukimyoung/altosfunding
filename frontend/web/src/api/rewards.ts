@@ -53,6 +53,8 @@ export interface MyReward {
   created_at: string;
   credited_at: string | null;
   rejection_reason?: string | null;
+  /** 추천인 리워드면 피추천인(구매자) 이메일. 기존 서버 응답에는 없다. */
+  source_user_email?: string | null;
 }
 
 export type GetMyRewardsResponse =

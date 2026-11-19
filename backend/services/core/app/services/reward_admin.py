@@ -446,15 +446,22 @@ async def my_rewards(
     status = (status or "").upper() or None
     records: list[dict] = []
     if type_ != "TRADING_BONUS":
-        stmt = select(RewardRecord).where(RewardRecord.user_id == user.id)
+        source = aliased(User, name="source")
+        stmt = (
+            select(RewardRecord, source.email)
+            .outerjoin(source, RewardRecord.source_user_id == source.id)
+            .where(RewardRecord.user_id == user.id)
+        )
         if type_:
             stmt = stmt.where(RewardRecord.type == type_)
         if status:
             stmt = stmt.where(RewardRecord.status == status)
-        for r in await session.scalars(stmt):
+        for r, source_email in (await session.execute(stmt)).all():
             records.append({
                 "id": r.id, "type": r.type, "amount": as_float(r.amount), "currency": r.currency,
                 "status": r.status, "description": r.description, "rejection_reason": r.rejection_reason,
+                # 웹에서 언어별 설명('피추천인 첫 구매. (구매자 : ...)')을 만들 때 쓴다 (기존 서버 응답에는 없던 필드).
+                "source_user_email": source_email,
                 "created_at": r.created_at.isoformat(),
                 "credited_at": r.approved_at.isoformat() if r.approved_at else None,
             })
@@ -466,6 +473,7 @@ async def my_rewards(
             records.append({
                 "id": b.id, "type": "TRADING_BONUS", "amount": as_float(b.bonus_amount), "currency": "USDT",
                 "status": b.status, "description": f"Trading Bonus for Payout #{b.payout_request_id}",
+                "source_user_email": None,
                 "rejection_reason": b.rejection_reason, "created_at": b.created_at.isoformat(),
                 "credited_at": b.approved_at.isoformat() if b.approved_at else None,
             })

@@ -77,6 +77,7 @@ def test_first_purchase_creates_pending_reward_and_approve(
     assert (my["pending_referrals"], my["total_earned"]) == (1, 40.0)
     mine = client.get("/api/v1/rewards/mine", headers=referrer).json()
     assert mine["total"] == 1 and mine["items"][0]["status"] == "APPROVED" and mine["items"][0]["credited_at"]
+    assert mine["items"][0]["source_user_email"] == BUYER
     summary = client.get("/api/v1/rewards/summary", headers=referrer).json()
     assert summary["total_credited"] == 40 and summary["referral_count"] == 2
     links = client.get("/api/v1/admin/rewards/referral-links", headers=admin_headers).json()

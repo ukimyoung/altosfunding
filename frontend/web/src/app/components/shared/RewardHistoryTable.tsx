@@ -27,6 +27,7 @@ export type RewardHistory = {
   status: 'completed' | 'pending' | 'failed';
   type: 'referral' | 'bonus' | 'affiliate';
   rejection_reason?: string | null;
+  purchaserEmail?: string | null;
 };
 
 export interface RewardHistoryFilterParams {
@@ -45,8 +46,15 @@ interface RewardHistoryTableProps {
 
 const getDisplayRewardDescription = (reward: RewardHistory, translations: RewardTranslations) => {
   if (reward.type === 'referral') {
-    const userName = reward.description.split(' - ')[0];
-    return userName ? `${translations.referee} - ${userName}` : reward.description;
+    // 서버 설명: 'Referral Bonus (First Purchase by email)'. 구매자 이메일로 언어별 문구를 만든다.
+    const purchaser =
+      reward.purchaserEmail || reward.description.match(/First Purchase by (.+?)\)?$/i)?.[1] || '';
+    if (purchaser) {
+      return translations.referralFirstPurchase.replace('{email}', purchaser);
+    }
+    // const userName = reward.description.split(' - ')[0];
+    // return userName ? `${translations.referee} - ${userName}` : reward.description;
+    return reward.description;
   }
 
   if (reward.type === 'bonus') {
