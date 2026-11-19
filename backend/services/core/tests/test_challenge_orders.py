@@ -201,6 +201,7 @@ def test_purchase_issue_start_close(client, admin_headers, buyer, round_, fake_m
     assert all(a["mt4_password"] and a["mt4_server"] == "MexnLimited-Demo" and a["product_name"] == "Challenge Starter" for a in accounts["items"])
     summary = client.get("/api/v1/accounts/challenge-summary", headers=buyer).json()
     assert summary["total_challenges"] == 2 and summary["by_product"][0]["count"] == 2
+    assert summary["active_challenges"] == 0  # 대회 시작 전(PENDING)은 진행 중이 아니다
     # my-asset 경로가 계좌 상세 경로와 겹치지 않는다
     assert _balance(client, buyer) == 140
 
@@ -231,12 +232,16 @@ def test_purchase_issue_start_close(client, admin_headers, buyer, round_, fake_m
     assert all(a["mt4_password"] and not a["is_read_only"] for a in accounts)
     detail = client.get(f"/api/v1/accounts/{accounts[0]['account_id']}", headers=buyer)
     assert detail.status_code == 200 and detail.json()["leverage"] == 100
+    summary = client.get("/api/v1/accounts/challenge-summary", headers=buyer).json()
+    assert summary["active_challenges"] == 2 and summary["total_challenges"] == 2
 
     # 대회 종료 → 다시 잠금
     assert client.post(f"/api/v1/admin/challenges/{cid}/close", headers=admin_headers).status_code == 200
     _work()
     assert all(fake_mt4.accounts[login]["isReadOnly"] is True for login in logins)
     assert {a["status"] for a in client.get("/api/v1/accounts", headers=buyer).json()["items"]} == {"CLOSED"}
+    summary = client.get("/api/v1/accounts/challenge-summary", headers=buyer).json()
+    assert summary["active_challenges"] == 0 and summary["total_challenges"] == 2
 
 
 def test_failed_provision_refunds(client, admin_headers, buyer, round_, fake_mt4):  # noqa: F811

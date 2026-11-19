@@ -337,7 +337,8 @@ async def challenge_account_summary(session: AsyncSession, user: User) -> dict:
         await session.execute(
             select(
                 func.count(),
-                func.count().filter(TradingAccount.status.in_(("PENDING", *orders.TRADABLE_STATUSES))),
+                # 진행 중 = 대회가 시작돼 거래 가능한 ACTIVE 계좌만 (대회 시작 전 PENDING·종료된 CLOSED 등은 제외)
+                func.count().filter(TradingAccount.status == "ACTIVE"),
                 func.count().filter(TradingAccount.status == "PASSED"),
                 func.count().filter(TradingAccount.status == "FAILED"),
                 func.count().filter(TradingAccount.provision_status == orders.QUEUED),
