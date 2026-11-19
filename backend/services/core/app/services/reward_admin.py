@@ -1,7 +1,7 @@
 """추천인 리워드·트레이딩 보너스 (생성·관리자 승인/반려·통계). 경로와 응답 형태는 기존 서버와 같다.
 
 - 추천인 리워드: 피추천인의 첫 챌린지 주문이 완료되면(on_order_completed) 정책 조건이 FIRST_PURCHASE일 때
-  추천인 앞으로 PENDING 1건을 만든다. FUNDED_UPGRADE는 펀디드 승급을 Core로 옮길 때 연결한다.
+  추천인 앞으로 PENDING 1건을 만든다. 펀디드 승급 시 지급(FUNDED_UPGRADE)은 하지 않는다.
 - 트레이딩 보너스: 수익 정산(payout) 신청 시 만든다. 수익 정산은 아직 Core에 없어서 목록은 비어 있다.
 - 승인하면 받는 사람의 통합 지갑에 입금한다.
     추천인 리워드:   차) EXPENSE:REFERRAL_REWARD / 대) LIABILITY:USER_WALLET

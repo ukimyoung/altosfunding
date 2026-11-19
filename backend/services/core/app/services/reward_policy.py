@@ -14,7 +14,9 @@ from app.models import PlatformConfig
 from app.schemas.reward import RewardPolicyOut
 
 SCOPE = "REWARD"
-CONDITIONS: tuple[str, ...] = ("FIRST_PURCHASE", "FUNDED_UPGRADE")
+# 펀디드 승급 시(FUNDED_UPGRADE) 지급은 하지 않기로 함 (2026-11-19 사용자 결정).
+# 저장된 값이 FUNDED_UPGRADE면 get_policy가 기본값(FIRST_PURCHASE)을 쓴다.
+CONDITIONS: tuple[str, ...] = ("FIRST_PURCHASE",)
 DEFAULTS: dict[str, object] = {
     "referral_reward_amount": 40,
     "referral_reward_condition": "FIRST_PURCHASE",
@@ -22,7 +24,7 @@ DEFAULTS: dict[str, object] = {
 }
 DESCRIPTIONS = {
     "referral_reward_amount": "추천인 리워드 지급액 (USD)",
-    "referral_reward_condition": "추천인 리워드 지급 조건 (FIRST_PURCHASE | FUNDED_UPGRADE)",
+    "referral_reward_condition": "추천인 리워드 지급 조건 (FIRST_PURCHASE)",
     "trading_bonus_rate": "트레이딩 보너스 추가율 (0.01 = 1%p)",
 }
 MAX_REFERRAL_REWARD = 1_000_000
@@ -49,7 +51,7 @@ def validate_value(key: str, value: object) -> object:
         return int(amount) if amount == int(amount) else amount
     if key == "referral_reward_condition":
         if value not in CONDITIONS:
-            raise _invalid("지급 조건은 FIRST_PURCHASE 또는 FUNDED_UPGRADE여야 합니다.")
+            raise _invalid("지급 조건은 FIRST_PURCHASE만 쓸 수 있습니다.")
         return value
     if key == "trading_bonus_rate":
         rate = _number(value, "트레이딩 보너스 추가율")

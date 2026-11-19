@@ -87,9 +87,16 @@ def test_first_purchase_creates_pending_reward_and_approve(
 
 
 def test_reject_and_policy_conditions(client, admin_headers, buyer, referrer, round_, fake_mt4):  # noqa: F811
-    # 조건이 펀디드 승급이면 첫 구매로는 생기지 않는다.
-    client.put("/api/v1/admin/rewards/policy", headers=admin_headers,
-               json={"referral_reward_condition": "FUNDED_UPGRADE"})
+    # 펀디드 승급 시 지급은 하지 않는다: 저장 거절, 예전에 저장된 값이 있으면 첫 구매 기준으로 본다.
+    res = client.put("/api/v1/admin/rewards/policy", headers=admin_headers,
+                     json={"referral_reward_condition": "FUNDED_UPGRADE"})
+    assert res.status_code == 422
+    run_sql("update core.platform_config set value = '\"FUNDED_UPGRADE\"'::jsonb"
+            " where scope = 'REWARD' and key = 'referral_reward_condition'")
+    policy = client.get("/api/v1/admin/rewards/policy", headers=admin_headers).json()
+    assert policy["referral_reward_condition"] == "FIRST_PURCHASE"
+    # 지급액이 0이면 첫 구매로도 생기지 않는다.
+    client.put("/api/v1/admin/rewards/policy", headers=admin_headers, json={"referral_reward_amount": 0})
     _join(client, buyer, round_["challenge_id"])
     _work()
     assert run_sql("select count(*) n from core.reward_records")[0]["n"] == 0

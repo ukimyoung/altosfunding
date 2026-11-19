@@ -1777,7 +1777,8 @@ export function RewardReferralPage() {
                     }}
                   >
                     <option value="FIRST_PURCHASE">피추천인 첫 챌린지 구매 시</option>
-                    <option value="FUNDED_UPGRADE">피추천인 펀디드 승급 시</option>
+                    {/* '펀디드 승급 시' 리워드는 지급하지 않기로 함 (2026-11-19). Core도 FUNDED_UPGRADE를 받지 않는다.
+                    <option value="FUNDED_UPGRADE">피추천인 펀디드 승급 시</option> */}
                   </select>
                 </div>
               </div>

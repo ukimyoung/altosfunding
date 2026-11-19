@@ -66,7 +66,7 @@ def test_reward_policy_defaults_and_update(client, member):  # noqa: F811
     res = client.put(
         "/api/v1/admin/rewards/policy",
         headers=headers,
-        json={"referral_reward_amount": 75, "referral_reward_condition": "FUNDED_UPGRADE"},
+        json={"referral_reward_amount": 75, "referral_reward_condition": "FIRST_PURCHASE"},
     )
     assert res.status_code == 200, res.text
     assert res.json()["message"]
@@ -78,14 +78,14 @@ def test_reward_policy_defaults_and_update(client, member):  # noqa: F811
     res = client.get("/api/v1/admin/rewards/policy", headers=headers)
     assert res.json() == {
         "referral_reward_amount": 75,
-        "referral_reward_condition": "FUNDED_UPGRADE",
+        "referral_reward_condition": "FIRST_PURCHASE",
         "trading_bonus_rate": 0.07,
     }
 
     # 웹 Referral 'How it works'에 바뀐 값이 나온다
     body = client.get("/api/v1/rewards/referrals/stats", headers=headers).json()
     assert body["referral_reward_amount"] == 75
-    assert body["referral_reward_condition"] == "FUNDED_UPGRADE"
+    assert body["referral_reward_condition"] == "FIRST_PURCHASE"
 
 
 def test_reward_policy_validation(client, member):  # noqa: F811
@@ -94,6 +94,7 @@ def test_reward_policy_validation(client, member):  # noqa: F811
         {"referral_reward_amount": -1},
         {"referral_reward_amount": 10.555},
         {"referral_reward_condition": "SIGNUP"},
+        {"referral_reward_condition": "FUNDED_UPGRADE"},  # 펀디드 승급 시 지급은 하지 않는다
         {"trading_bonus_rate": 1.5},
     ):
         res = client.put("/api/v1/admin/rewards/policy", headers=headers, json=payload)
