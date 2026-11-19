@@ -140,6 +140,29 @@ def test_dedupe_and_priority(db):
     assert later
 
 
+def test_dedupe_enqueue_repeated_on_one_connection(db):
+    """같은 연결에서 dedupe 작업을 여러 번 넣어도 된다.
+
+    asyncpg는 같은 SQL을 prepared statement로 재사용하고, Postgres는 6번째 실행부터 일반 계획을 쓴다.
+    ON CONFLICT 조건이 바인드 파라미터면 이때 부분 유니크 인덱스를 찾지 못해 실패했다 (대회 시작 시 계좌 잠금 해제).
+    """
+
+    async def go(sm):
+        async with sm() as session:
+            ids = []
+            for i in range(12):
+                job = await jobs.enqueue(session, "test.ok", {"n": i}, dedupe_key=f"acct:{i}")
+                ids.append(job.id)
+            # 같은 연결에서 중복 키는 여전히 걸러진다.
+            for i in range(8):
+                assert await jobs.enqueue(session, "test.ok", dedupe_key=f"acct:{i}") is None
+            await session.commit()
+            return ids
+
+    ids = _run(go)
+    assert len(set(ids)) == 12
+
+
 def test_concurrent_claims_do_not_overlap(db):
     ids = [_enqueue("test.ok", {"n": i}) for i in range(20)]
 

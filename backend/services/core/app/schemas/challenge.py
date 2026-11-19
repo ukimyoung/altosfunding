@@ -286,6 +286,7 @@ class JobRunResponse(BaseModel):
     started: int
     closed: int
     cancelled: int
+    failed: int = 0  # 이번 실행에서 실패해 다음 주기로 미룬 회차·스케줄 수
 
 
 # ── 휴장일 ──────────────────────────────────────────────────
