@@ -32,6 +32,7 @@ export function todayInSeoul(): string {
 }
 
 export function toSalesReportPeriod(period: RevenuePeriod): SalesReportPeriod {
+  if (period === "일별") return "daily";
   if (period === "주별") return "weekly";
   if (period === "월별") return "monthly";
   return "yearly";

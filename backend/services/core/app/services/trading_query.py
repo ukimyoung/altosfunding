@@ -380,11 +380,11 @@ async def challenge_account_summary(session: AsyncSession, user: User) -> dict:
 
 # ── 매출 ────────────────────────────────────────────────────
 
-PERIOD_UNIT = {"weekly": "week", "monthly": "month", "yearly": "year"}
+PERIOD_UNIT = {"daily": "day", "weekly": "week", "monthly": "month", "yearly": "year"}
 
 
 def _bucket_label(value: datetime, period: str) -> str:
-    if period == "weekly":
+    if period in ("daily", "weekly"):
         return value.strftime("%Y-%m-%d")
     if period == "monthly":
         return value.strftime("%Y-%m")
@@ -420,7 +420,7 @@ async def _keyword_user_ids(session: AsyncSession, keyword: str | None) -> list[
 
 def _require_period(period: str | None) -> str:
     if period not in PERIOD_UNIT:
-        raise AppError(400, "period_required", "주별 / 월별 / 연별 중 하나를 선택해주세요.")
+        raise AppError(400, "period_required", "일별 / 주별 / 월별 / 연별 중 하나를 선택해주세요.")
     return period
 
 

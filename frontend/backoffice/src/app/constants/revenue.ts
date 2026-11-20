@@ -10,7 +10,7 @@ export const CHALLENGE_REVENUE_FALLBACK_COLUMNS: ChallengeRevenueColumn[] = [
   { product_id: "prime", label: "Prime", price_usdt: 1000 },
 ];
 
-export const REVENUE_PERIODS: RevenuePeriod[] = ["주별", "월별", "연별"];
+export const REVENUE_PERIODS: RevenuePeriod[] = ["일별", "주별", "월별", "연별"];
 
 export const REVENUE_KNOWN_USERS = [
   "john", "john.doe", "john.doe@email.com",

@@ -1,4 +1,4 @@
-export type RevenuePeriod = "주별" | "월별" | "연별";
+export type RevenuePeriod = "일별" | "주별" | "월별" | "연별";
 export type RevenueSearchState = "idle" | "loading" | "no_period" | "not_found" | "no_data" | "error" | "results";
 
 export interface RevenueThemeTokens {

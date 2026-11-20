@@ -180,7 +180,7 @@ class AdminOrderSummary(BaseModel):
     provisioning_accounts: int
 
 
-SalesPeriod = Literal["weekly", "monthly", "yearly"]
+SalesPeriod = Literal["daily", "weekly", "monthly", "yearly"]
 
 
 class SalesCell(BaseModel):

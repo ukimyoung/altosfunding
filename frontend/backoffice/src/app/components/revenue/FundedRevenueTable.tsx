@@ -43,7 +43,7 @@ export function FundedRevenueTable({ state, rows, allRows, summary, traderPct, c
   const emptyMsg =
     state === "idle"       ? "검색 조건을 설정하고 조회 버튼을 눌러주세요." :
     state === "loading"    ? "조회 중입니다." :
-    state === "no_period"  ? "주별 / 월별 / 연별 중 하나를 선택해주세요." :
+    state === "no_period"  ? "일별 / 주별 / 월별 / 연별 중 하나를 선택해주세요." :
     state === "not_found"  ? `'${query}'에 해당하는 유저를 찾을 수 없습니다.` :
     state === "no_data"    ? "데이터가 없습니다." :
     state === "error"      ? "매출 현황을 불러오지 못했습니다." : "";
