@@ -25,6 +25,8 @@ export interface StartNewChallengeTranslations {
   maxDrawdown: string;
   maxDrawdownEod: string;
   maxContracts: string;
+  /** 카드 Challenge Stage의 'Min. Trading Days' (룰셋 최소 거래일) */
+  minTradingDaysShort: string;
   consistency: string;
   profitSplit: string;
   leverage: string;
@@ -37,6 +39,7 @@ export interface StartNewChallengeTranslations {
     maxDrawdownEod: string;
     dailyLossLimit: string;
     maxContracts: string;
+    minTradingDays: string;
     consistency: string;
     tradingPeriod: string;
     profitSplit: string; // "{trader}" / "{company}"
