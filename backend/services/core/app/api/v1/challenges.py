@@ -12,6 +12,7 @@ from app.api.v1.auth import Session
 from app.config import settings
 from app.deps import AdminUser
 from app.errors import AppError
+from app.models.catalog import Ruleset
 from app.schemas.challenge import (
     ChallengeCloseRequest,
     ChallengeCreate,
@@ -165,7 +166,7 @@ async def evaluate_account(account_id: str, admin: AdminUser, session: Session) 
     evaluation = await challenge_evaluation.evaluate(session, _account_uuid(account_id), admin.id, _now())
     await session.commit()
     await session.refresh(evaluation)
-    return ChallengeEvaluationOut.model_validate(evaluation)
+    return await _evaluation_out(session, evaluation)
 
 
 @router.get(
@@ -175,7 +176,15 @@ async def evaluate_account(account_id: str, admin: AdminUser, session: Session) 
 )
 async def latest_evaluation(account_id: str, admin: AdminUser, session: Session) -> ChallengeEvaluationOut | None:
     evaluation = await challenge_evaluation.latest(session, _account_uuid(account_id))
-    return ChallengeEvaluationOut.model_validate(evaluation) if evaluation else None
+    return await _evaluation_out(session, evaluation) if evaluation else None
+
+
+async def _evaluation_out(session, evaluation) -> ChallengeEvaluationOut:
+    out = ChallengeEvaluationOut.model_validate(evaluation)
+    if evaluation.ruleset_id:
+        ruleset = await session.get(Ruleset, evaluation.ruleset_id)
+        out.ruleset_name = ruleset.name if ruleset else None
+    return out
 
 
 @router.get(

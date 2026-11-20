@@ -405,6 +405,8 @@ class ChallengeEvaluationOut(BaseModel):
     account_id: str
     challenge_id: str
     ruleset_id: str | None
+    # 판정 당시 룰셋의 현재 이름 (룰셋이 삭제되었으면 null)
+    ruleset_name: str | None = None
     result: Literal["PASSED", "FAILED"]
     period_start: datetime
     period_end: datetime
