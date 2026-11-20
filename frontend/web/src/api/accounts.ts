@@ -196,6 +196,30 @@ export const getAccountDetail = async (accountId: string) => {
   return response.data;
 };
 
+/** 챌린지 룰별 결과 1개 (Core가 판정 때 기록). values는 화면 문구용 숫자 값 (이전 판정에는 없음). */
+export interface AccountEvaluationCheck {
+  key: 'profit_target' | 'min_trading_days' | 'max_drawdown' | 'consistency' | string;
+  label: string;
+  passed: boolean;
+  detail: string | null;
+  values?: Record<string, number | string | boolean | null> | null;
+}
+
+/** 챌린지 최종 판정. 대회 기간이 끝나고 판정이 난 뒤에만 오고, 그 전에는 null. */
+export interface AccountEvaluationResponse {
+  result: 'PASSED' | 'FAILED';
+  period_start: string;
+  period_end: string;
+  evaluated_at: string;
+  checks: AccountEvaluationCheck[];
+}
+
+export const getAccountEvaluation = async (accountId: string) => {
+  const response = await api.get<AccountEvaluationResponse | null>(`/v1/accounts/${accountId}/evaluation`);
+
+  return response.data;
+};
+
 export const getAccountTradeHistory = async (accountId: string) => {
   const response = await api.get<AccountTradeHistoryResponse>(`/v1/accounts/${accountId}/trades`);
 

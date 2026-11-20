@@ -396,6 +396,8 @@ class EvaluationCheck(BaseModel):
     label: str
     passed: bool
     detail: str | None = None
+    # 언어별 문구용 숫자 값 (이전 판정에는 없음)
+    values: dict | None = None
 
 
 class ChallengeEvaluationOut(BaseModel):

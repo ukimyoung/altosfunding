@@ -66,7 +66,7 @@ def test_trading_date_is_mt4_server_day():
     assert trading_rules.day_bounds(date(2026, 7, 1))[1] == datetime(2026, 7, 1, 21, 0, tzinfo=UTC)
 
 
-def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, round_, active):  # noqa: F811
+def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, buyer, round_, active):  # noqa: F811
     _ruleset(round_["product_id"])
     acc = active[A]
     now0 = datetime.now(UTC)
@@ -124,6 +124,12 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, ro
     page = client.get("/api/v1/admin/rule-violations?severity=HARD", headers=admin_headers).json()
     assert page["total"] == 1 and page["items"][0]["mt4_login"] == A and page["items"][0]["email"]
 
+    # 회원 Account Detail: 대회 기간 중에는 (관리자가 '확인하기'를 눌렀어도) 판정을 보여 주지 않는다
+    member_eval = f"/api/v1/accounts/{acc}/evaluation"
+    assert client.post(f"/api/v1/admin/challenges/leaderboard/accounts/{acc}/evaluate", headers=admin_headers).status_code == 200
+    assert client.get(member_eval, headers=buyer).json() is None
+    assert client.get(member_eval, headers=admin_headers).status_code == 404  # 본인 계좌만
+
     # 대회 종료 → 10분 뒤 자동 최종 판정 (한 번만)
     ended = t1 + timedelta(minutes=2)
     run_sql("update core.challenges set status = 'CLOSED', closed_at = $2 where id = $1", round_["challenge_id"], ended)
@@ -131,11 +137,22 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, ro
     assert _run(ended + timedelta(minutes=5))["evaluated"] == 0
     assert _run(ended + timedelta(minutes=11))["evaluated"] == 2
     assert _run(ended + timedelta(minutes=12))["evaluated"] == 0
-    ev = run_sql("select * from core.challenge_evaluations where account_id = $1", uuid.UUID(acc))
+    ev = run_sql("select * from core.challenge_evaluations where account_id = $1 and source = 'AUTO'", uuid.UUID(acc))
     assert len(ev) == 1 and ev[0]["source"] == "AUTO" and ev[0]["evaluated_by"] is None
     assert ev[0]["result"] == "FAILED"
     checks = {c["key"]: c["passed"] for c in __import__("json").loads(ev[0]["checks"])}
     assert checks == {"profit_target": False, "min_trading_days": False, "max_drawdown": False, "consistency": True}
+
+    # 대회가 끝나고 판정이 나면 회원에게도 룰별 결과를 보여 준다 (화면 문구용 숫자 값 포함)
+    mine = client.get(member_eval, headers=buyer).json()
+    assert mine["result"] == "FAILED" and [c["key"] for c in mine["checks"]] == [
+        "profit_target", "min_trading_days", "max_drawdown", "consistency"
+    ]
+    values = {c["key"]: c["values"] for c in mine["checks"]}
+    assert values["profit_target"]["target"] == 6000
+    assert values["min_trading_days"]["required"] == 3
+    assert values["max_drawdown"]["dd"] == 5000 and values["max_drawdown"]["floor"] == 98000
+    assert values["max_drawdown"]["equity"] == 97900 and values["max_drawdown"]["violated_at"]
     # 종료일까지 결산이 채워진다 (마지막 날은 종료 시각에서 자름)
     last = run_sql(
         "select * from core.account_daily_stats where account_id = $1 order by trading_date desc limit 1",

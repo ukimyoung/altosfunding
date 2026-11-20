@@ -8,6 +8,7 @@
     GET  /accounts/challenge-summary         내 챌린지 계좌 요약
     GET  /accounts/{account_id}              내 계좌 상세
     GET  /accounts/{account_id}/trades       내 계좌 거래내역 (Worker가 MT4에서 수집한 청산 거래)
+    GET  /accounts/{account_id}/evaluation   내 챌린지 계좌 최종 판정 (대회 종료 후, 없으면 null)
     POST /demo/accounts                      데모 계좌 만들기 (Worker가 MT4 계좌 발급)
 관리자
     GET  /admin/challenges/orders            전체구매/결제이력
@@ -18,12 +19,14 @@
 """
 
 import uuid
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Header, Query
 from pydantic import BaseModel, Field
 
 from app.deps import AdminUser, CurrentUser, Sender, Session
+from app.schemas.challenge import EvaluationCheck
 from app.schemas.trading import (
     AccountDetail,
     AccountPage,
@@ -40,7 +43,13 @@ from app.schemas.trading import (
     OrderPage,
     SalesPeriod,
 )
-from app.services import challenge_order, demo_account, mt4_ingest, notify
+from app.services import (
+    challenge_evaluation,
+    challenge_order,
+    demo_account,
+    mt4_ingest,
+    notify,
+)
 from app.services import trading_query as q
 from app.services.wallet import as_float, get_wallet
 
@@ -142,6 +151,29 @@ async def my_account_trades(
     await q.my_account(session, user, account_id)  # 본인 계좌가 아니면 404
     items, total = await mt4_ingest.closed_trades(session, account_id, page=page, size=size)
     return AccountTradePage(items=items, total=total, page=page, size=size, pages=q.pages(total, size))
+
+
+class MyEvaluationOut(BaseModel):
+    result: Literal["PASSED", "FAILED"]
+    period_start: datetime
+    period_end: datetime
+    evaluated_at: datetime
+    checks: list[EvaluationCheck]
+
+
+@router.get(
+    "/accounts/{account_id:uuid}/evaluation", response_model=MyEvaluationOut | None, summary="내 챌린지 계좌 최종 판정"
+)
+async def my_account_evaluation(account_id: uuid.UUID, user: CurrentUser, session: Session) -> MyEvaluationOut | None:
+    """대회 기간이 끝난 뒤 내려진 판정만 돌려준다 (Worker 자동 판정 또는 관리자 확인). 기간 중이거나 판정 전이면 null."""
+    await q.my_account(session, user, account_id)  # 본인 계좌가 아니면 404
+    ev = await challenge_evaluation.final_of_member(session, account_id)
+    if ev is None:
+        return None
+    return MyEvaluationOut(
+        result=ev.result, period_start=ev.period_start, period_end=ev.period_end, evaluated_at=ev.created_at,
+        checks=ev.checks or [],
+    )
 
 
 # ── 사용자: 데모 계좌 ───────────────────────────────────────
