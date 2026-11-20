@@ -83,3 +83,7 @@ alter table core.rule_violations enable row level security;
 
 alter table core.challenge_evaluations
   add column source text not null default 'MANUAL' check (source in ('MANUAL', 'AUTO'));
+
+-- Max Drawdown은 EOD trailing 기준 (2026-11-20 사용자 결정): 기본값을 EOD로 바꾸고 기존 STATIC 룰셋도 EOD로 맞춘다.
+alter table core.rulesets alter column dd_calc_method set default 'EOD';
+update core.rulesets set dd_calc_method = 'EOD', updated_at = now() where dd_calc_method = 'STATIC';
