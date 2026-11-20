@@ -9,9 +9,16 @@
 5. RULE_CHECKS에 등록된 룰을 차례로 돌린다. 모두 통과하면 PASSED, 하나라도 실패하면 FAILED.
 6. 결과를 core.challenge_evaluations에 한 줄 쌓는다 (계좌별 마지막 줄이 현재 판정).
 
-룰셋 판정 로직은 운영자가 다시 설계한 뒤 RULE_CHECKS에 추가한다. 지금은 등록된 룰이 없어서
-모든 계좌가 PASSED로 판정되고 rules_applied = 0으로 남는다 (화면에 '룰셋 판정 미적용'으로 표시).
+룰 (2026-11-20 사용자 확정, 룰셋에 값이 없는 룰은 적용하지 않는다)
+- 수익 목표: 종료 시각 평가금액 − 자본금 ≥ 목표 (profit_target_amt, 없으면 profit_target_pct × 자본금).
+- 최소 거래일: 진입 또는 청산 체결이 1건이라도 있는 거래일(MT4 서버 날짜) 수 ≥ min_trading_days.
+- Max Drawdown: 기간 중 Max Drawdown 위반 기록(core.rule_violations, 취소되지 않은 것)이 없어야 한다.
+  위반 감시는 Worker의 trading_rules가 1분마다 한다.
+- Consistency: 하루 최대 수익 ÷ 전체 순수익 ≤ consistency_pct. 하루 수익은 일일 결산(core.account_daily_stats)의
+  하루 손익(미실현 포함). 결산이 없으면 청산 거래의 실현 손익을 청산일별로 합친 값. 전체 순수익이 0 이하이면
+  비율을 따지지 않는다 (수익 목표에서 이미 불합격).
 
+관리자 '확인하기'(source=MANUAL)와 대회 종료 후 Worker 자동 판정(source=AUTO)이 같은 룰을 쓴다.
 판정은 결과 기록만 한다. 계좌 상태(PASSED/FAILED)·MT4 읽기 전용·펀디드 발급은 바꾸지 않는다.
 """
 
@@ -26,10 +33,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
 from app.models import (
+    AccountDailyStat,
     Challenge,
     ChallengeEvaluation,
     Product,
     Ruleset,
+    RuleViolation,
     TradingAccount,
     TradingAccountTrade,
     User,
@@ -55,6 +64,9 @@ class EvaluationContext:
     profit_rate: Decimal
     # 기간 안의 매수·매도 거래 (미결 포함), 연 시각 순
     trades: list[TradingAccountTrade] = field(default_factory=list)
+    # 기간 안의 일일 결산과 룰 위반 기록 (Worker trading_rules)
+    daily_stats: list[AccountDailyStat] = field(default_factory=list)
+    violations: list[RuleViolation] = field(default_factory=list)
 
     @property
     def closed_trades(self) -> list[TradingAccountTrade]:
@@ -83,8 +95,95 @@ class RuleResult:
 # 룰 함수: 판정 재료를 받아 결과를 돌려준다. 룰셋에 해당 조건이 없으면 None(적용 안 함).
 RuleCheck = Callable[[EvaluationContext], RuleResult | None]
 
-# 룰셋 판정 로직 (운영자 설계 후 추가). 예: RULE_CHECKS.append(check_max_drawdown)
-RULE_CHECKS: list[RuleCheck] = []
+def _money(value: Decimal) -> str:
+    return f"${Decimal(value):,.2f}"
+
+
+def check_profit_target(ctx: EvaluationContext) -> RuleResult | None:
+    from app.services import trading_rules as tr
+
+    target = tr.profit_target_amount(ctx.ruleset, ctx.capital)
+    if target is None:
+        return None
+    return RuleResult(
+        "profit_target", "수익 목표", ctx.profit >= target, f"수익 {_money(ctx.profit)} / 목표 {_money(target)}"
+    )
+
+
+def trading_days(ctx: EvaluationContext) -> set:
+    """진입 또는 청산 체결이 기간 안에 1건이라도 있는 거래일(MT4 서버 날짜)."""
+    from app.services import trading_rules as tr
+
+    days = set()
+    for t in ctx.trades:
+        for at in (t.open_time, None if t.is_open else t.close_time):
+            if at is not None and ctx.period_start <= at <= ctx.period_end:
+                days.add(tr.trading_date(at))
+    return days
+
+
+def check_min_trading_days(ctx: EvaluationContext) -> RuleResult | None:
+    need = ctx.ruleset.min_trading_days if ctx.ruleset else None
+    if not need:
+        return None
+    days = len(trading_days(ctx))
+    return RuleResult("min_trading_days", "최소 거래일", days >= need, f"거래일 {days}일 / 최소 {need}일")
+
+
+def check_max_drawdown(ctx: EvaluationContext) -> RuleResult | None:
+    from app.services import trading_rules as tr
+
+    dd = tr.dd_amount(ctx.ruleset, ctx.capital, ctx.is_vip)
+    if dd is None:
+        return None
+    hits = [v for v in ctx.violations if v.rule_key == tr.MAX_DRAWDOWN and v.status != "DISMISSED"]
+    if hits:
+        first = hits[0]
+        detail = f"{first.detected_at:%Y-%m-%d %H:%M} UTC 위반: {first.detail}"
+    else:
+        floors = [s.dd_floor_after for s in ctx.daily_stats if s.dd_floor_after is not None]
+        detail = f"위반 없음 (DD {_money(dd)}" + (f", 마지막 기준선 {_money(floors[-1])})" if floors else ")")
+    return RuleResult("max_drawdown", "최대 손실 한도 (Max Drawdown)", not hits, detail)
+
+
+def daily_profits(ctx: EvaluationContext) -> dict:
+    """거래일별 하루 손익. 일일 결산이 있으면 그 값(미실현 포함), 없으면 청산 거래의 실현 손익을 청산일별로 합친다."""
+    from app.services import trading_rules as tr
+
+    if ctx.daily_stats:
+        return {s.trading_date: Decimal(s.day_pnl) for s in ctx.daily_stats}
+    out: dict = {}
+    for t in ctx.closed_trades:
+        if t.close_time is None or not (ctx.period_start <= t.close_time <= ctx.period_end):
+            continue
+        day = tr.trading_date(t.close_time)
+        out[day] = out.get(day, Decimal(0)) + Decimal(t.profit) + Decimal(t.commission) + Decimal(t.swap) + Decimal(t.taxes)
+    return out
+
+
+def check_consistency(ctx: EvaluationContext) -> RuleResult | None:
+    pct = ctx.ruleset.consistency_pct if ctx.ruleset else None
+    if pct is None or pct <= 0:
+        return None
+    total = ctx.profit
+    if total <= 0:
+        return RuleResult("consistency", "Consistency", True, f"전체 순수익 {_money(total)} — 비율 계산 안 함")
+    profits = daily_profits(ctx)
+    best_day, best = max(profits.items(), key=lambda kv: kv[1]) if profits else (None, Decimal(0))
+    ratio = (best / total * 100).quantize(Decimal("0.01")) if best > 0 else Decimal(0)
+    detail = f"하루 최대 수익 {_money(best)}" + (f" ({best_day})" if best_day else "") + (
+        f" / 전체 순수익 {_money(total)} = {ratio}% (기준 {pct}%)"
+    )
+    return RuleResult("consistency", "Consistency", ratio <= Decimal(pct), detail)
+
+
+# 판정 순서대로. 룰 함수가 None을 돌려주면(룰셋에 값 없음) 적용하지 않는다.
+RULE_CHECKS: list[RuleCheck] = [
+    check_profit_target,
+    check_min_trading_days,
+    check_max_drawdown,
+    check_consistency,
+]
 
 
 async def _load(session: AsyncSession, account_id: uuid.UUID):
@@ -136,10 +235,21 @@ async def build_context(session: AsyncSession, account_id: uuid.UUID, now: datet
     capital = Decimal(account.capital or 0)
     profit = equity - capital
     rate = (profit / capital * 100).quantize(Decimal("0.0001")) if capital > 0 else Decimal(0)
+    stats = await session.scalars(
+        select(AccountDailyStat)
+        .where(AccountDailyStat.account_id == account.id, AccountDailyStat.period_start < end)
+        .order_by(AccountDailyStat.trading_date)
+    )
+    violations = await session.scalars(
+        select(RuleViolation)
+        .where(RuleViolation.account_id == account.id, RuleViolation.detected_at <= end)
+        .order_by(RuleViolation.detected_at, RuleViolation.id)
+    )
     return EvaluationContext(
         account=account, challenge=challenge, product=product, ruleset=ruleset, user=user,
         period_start=start, period_end=end, capital=capital, equity=equity, profit=profit,
         profit_rate=rate, trades=await _trades(session, account.id, start, end),
+        daily_stats=list(stats), violations=list(violations),
     )
 
 
@@ -153,7 +263,7 @@ def run_rules(ctx: EvaluationContext, rules: list[RuleCheck] | None = None) -> l
 
 
 async def evaluate(
-    session: AsyncSession, account_id: uuid.UUID, admin_id: uuid.UUID | None, now: datetime
+    session: AsyncSession, account_id: uuid.UUID, admin_id: uuid.UUID | None, now: datetime, source: str = "MANUAL"
 ) -> ChallengeEvaluation:
     ctx = await build_context(session, account_id, now)
     results = run_rules(ctx)
@@ -173,6 +283,7 @@ async def evaluate(
         checks=[r.as_dict() for r in results],
         rules_applied=len(results),
         evaluated_by=admin_id,
+        source=source,
     )
     session.add(evaluation)
     await session.flush()

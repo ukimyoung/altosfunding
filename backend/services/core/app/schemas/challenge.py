@@ -418,6 +418,8 @@ class ChallengeEvaluationOut(BaseModel):
     rules_applied: int
     checks: list[EvaluationCheck]
     evaluated_by: str | None
+    # MANUAL: 관리자 '확인하기' | AUTO: 대회 종료 후 자동 판정
+    source: Literal["MANUAL", "AUTO"] = "MANUAL"
     created_at: datetime
 
     @field_validator("account_id", "evaluated_by", mode="before")

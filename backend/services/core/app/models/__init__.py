@@ -12,6 +12,9 @@ from app.models.manual_email import (
 )
 from app.models.reward import RewardRecord, TradingBonusRecord
 from app.models.trading import (
+    AccountDailyStat,
+    AccountRiskState,
+    RuleViolation,
     ChallengeEvaluation,
     ChallengeOrder,
     Mt4AccountIssuedHistory,
@@ -42,6 +45,9 @@ from app.models.wallet import (
 )
 
 __all__ = [
+    "AccountDailyStat",
+    "AccountRiskState",
+    "RuleViolation",
     "ChallengeEvaluation",
     "Announcement",
     "AnnouncementCategory",

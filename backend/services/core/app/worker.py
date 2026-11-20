@@ -32,7 +32,7 @@ from app import db
 from app.config import settings
 from app.models import Challenge, ChallengeSchedule, Job, WorkerHeartbeat
 from app.services import challenge as challenge_svc
-from app.services import jobs, mt4, mt4_ingest
+from app.services import jobs, mt4, mt4_ingest, trading_rules
 from app.services import manual_email as manual_email_svc
 from app.services.email import get_email_sender
 from app.services.files import public_base_url
@@ -122,7 +122,7 @@ class Worker:
                     for status, n in result.items():
                         self.jobs_since_report[status] = self.jobs_since_report.get(status, 0) + n
                 # 거래 수집은 매분 같은 건수가 나와서 실패가 있을 때만 따로 남긴다 (평소 결과는 상태 줄에 나온다).
-                if name == "mt4_ingest" and not result.get("failed"):
+                if name in ("mt4_ingest", "trading_rules") and not result.get("failed") and not result.get("violations"):
                     pass
                 elif any(result.values()):
                     logger.info("%s: %s", name, result)
@@ -190,13 +190,14 @@ class Worker:
 
         next_start = state["next_start"]
         logger.info(
-            "상태: 대회[%s] 예약메일[%s] 작업큐[%s] MT4[%s] 거래수집[%s] | 활성 스케줄 %d, 모집 중 대회 %d (다음 시작 %s), "
+            "상태: 대회[%s] 예약메일[%s] 작업큐[%s] MT4[%s] 거래수집[%s] 룰감시[%s] | 활성 스케줄 %d, 모집 중 대회 %d (다음 시작 %s), "
             "진행 중 대회 %d, 대기 작업 %d",
             result("challenges"),
             result("manual_emails"),
             ",".join(f"{k}={v}" for k, v in self.jobs_since_report.items()) or "0",
             result("mt4"),
             result("mt4_ingest"),
+            result("trading_rules"),
             state["schedules"],
             state["pending_rounds"],
             f"{next_start:%Y-%m-%d %H:%M} UTC" if next_start else "없음",
@@ -216,6 +217,10 @@ class Worker:
             self._every("mt4", MT4_CHECK_SECONDS, check_mt4),
             self._every("mt4_ingest", settings.mt4_ingest_seconds, lambda: mt4_ingest.run(self.sessionmaker)),
         ]
+        if settings.risk_enabled:
+            loops.append(
+                self._every("trading_rules", settings.risk_seconds, lambda: trading_rules.run(self.sessionmaker))
+            )
         logger.info("Worker 시작: %s (주기 %ss, 작업 큐 %ss)", WORKER_ID, tick, settings.worker_poll_seconds)
         await asyncio.gather(*loops)
         logger.info("Worker 종료: %s", WORKER_ID)
