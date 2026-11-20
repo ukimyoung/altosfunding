@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import axios from "axios";
 import { listCatalogProducts } from "@/api/catalogProduct";
 import { getChallengeSalesReport, getFundedSalesReport } from "@/api/revenue";
@@ -21,6 +21,7 @@ import type {
 import {
   buildSalesReportParams,
   challengeTierLabel,
+  todayInSeoul,
   mapChallengeSalesReport,
   mapFundedSalesReport,
 } from "../../utils/revenue";
@@ -67,9 +68,10 @@ export function RevenuePage() {
 
   // Challenge tab state
   const [cQuery,  setCQuery]  = useState("");
-  const [cFrom,   setCFrom]   = useState("");
-  const [cTo,     setCTo]     = useState("");
-  const [cPeriod, setCPeriod] = useState<RevenuePeriod | null>(null);
+  // 메뉴 진입 시 오늘(GMT+9) 하루를 주별로 바로 조회한다.
+  const [cFrom,   setCFrom]   = useState(todayInSeoul);
+  const [cTo,     setCTo]     = useState(todayInSeoul);
+  const [cPeriod, setCPeriod] = useState<RevenuePeriod | null>("주별");
   const [cState,  setCState]  = useState<RevenueSearchState>("idle");
   const [cRows,   setCRows]   = useState<ChallengeRevenueRow[]>([]);
   // 티어 열: Core 활성 챌린지 상품 기준 (고정 4개 하드코딩 대신)
@@ -109,6 +111,14 @@ export function RevenuePage() {
     return () => { cancelled = true; };
   }, []);
 
+  const initialSearchDone = useRef(false);
+  useEffect(() => {
+    if (initialSearchDone.current) return;
+    initialSearchDone.current = true;
+    void handleChallengeSearch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // 조회 결과에 열 정보가 있으면 그 기준, 없으면 활성 상품 기준
   const challengeColumns = cColumns.length > 0 ? cColumns : productColumns;
 
@@ -120,7 +130,7 @@ export function RevenuePage() {
     setCState("loading");
     try {
       const report = await getChallengeSalesReport(buildSalesReportParams(cPeriod, cQuery, cFrom, cTo));
-      const mapped = mapChallengeSalesReport(report);
+      const mapped = mapChallengeSalesReport(report, cFrom, cTo);
       setCColumns(mapped.columns);
       setCRows(mapped.rows);
       setCSummary(mapped.summary);

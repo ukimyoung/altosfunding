@@ -24,6 +24,13 @@ export function challengeTierLabel(name: string | null | undefined): string {
   return trimmed.replace(/^challenge\s+/i, "") || trimmed;
 }
 
+/** 오늘 날짜(YYYY-MM-DD, 한국 시간). 매출 현황 진입 시 기본 조회 기간. */
+export function todayInSeoul(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+}
+
 export function toSalesReportPeriod(period: RevenuePeriod): SalesReportPeriod {
   if (period === "주별") return "weekly";
   if (period === "월별") return "monthly";
@@ -45,7 +52,7 @@ export function buildSalesReportParams(
   };
 }
 
-export function mapChallengeSalesReport(response: ChallengeSalesReportResponse): {
+export function mapChallengeSalesReport(response: ChallengeSalesReportResponse, from = "", to = ""): {
   columns: ChallengeRevenueColumn[];
   rows: ChallengeRevenueRow[];
   summary: ChallengeRevenueSummary;
@@ -54,7 +61,7 @@ export function mapChallengeSalesReport(response: ChallengeSalesReportResponse):
   const rows = [...response.items]
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((item) => ({
-      label: response.period === "weekly" ? weekLabel(item.date) : item.date,
+      label: response.period === "weekly" ? weekLabel(item.date, from, to) : item.date,
       products: item.products,
       totalQty: item.subtotal.quantity,
       totalAmt: item.subtotal.amount,
@@ -108,11 +115,16 @@ function weekMonday(dateStr: string): Date {
   return date;
 }
 
-function weekLabel(dateStr: string): string {
+/** 주별 행 표시 '월 ~ 일'. 조회 기간(from~to)이 주 안쪽이면 그 범위로 잘라 보여 주고, 하루면 날짜 하나만. */
+function weekLabel(dateStr: string, from = "", to = ""): string {
   const monday = weekMonday(dateStr);
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
-  return `${isoDate(monday)} ~ ${isoDate(sunday)}`;
+  let start = isoDate(monday);
+  let end = isoDate(sunday);
+  if (from && from > start) start = from;
+  if (to && to < end) end = to;
+  return start === end ? start : `${start} ~ ${end}`;
 }
 
 function getRevenuePeriodLabel(date: string, period: RevenuePeriod): string {
