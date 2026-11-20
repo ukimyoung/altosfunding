@@ -15,25 +15,10 @@ export interface RevenueThemeTokens {
   tfoot: string;
 }
 
-export interface ChallengeRevenueDailyRow {
-  date: string;
-  starterQty: number;
-  starterAmt: number;
-  proQty: number;
-  proAmt: number;
-  eliteQty: number;
-  eliteAmt: number;
-}
-
 export interface ChallengeRevenueRow {
   label: string;
+  /** 상품(product_id)별 수량·금액. 열은 Core 응답 columns 기준이라 Prime 등 티어 수에 제한이 없다. */
   products: Record<string, { quantity: number; amount: number } | undefined>;
-  starterQty: number;
-  starterAmt: number;
-  proQty: number;
-  proAmt: number;
-  eliteQty: number;
-  eliteAmt: number;
   totalQty: number;
   totalAmt: number;
 }
