@@ -1,13 +1,14 @@
 """트레이딩 룰 자동 검증 1단계 (기록만): 1분 감시·일일 마감 결산·대회 종료 자동 판정을 확인한다."""
 
 import asyncio
+import json
 import uuid
 from datetime import UTC, date, datetime, timedelta
 
 from app.services import trading_rules
 from tests.conftest import run_sql
 from tests.test_admin_users import admin_headers  # noqa: F401
-from tests.test_challenge_orders import POOL_START, buyer, fake_mt4, round_  # noqa: F401
+from tests.test_challenge_orders import POOL_START, _work, buyer, fake_mt4, round_  # noqa: F401
 from tests.test_login import member  # noqa: F401
 from tests.test_mt4_ingest import active, broker  # noqa: F401
 
@@ -66,7 +67,16 @@ def test_trading_date_is_mt4_server_day():
     assert trading_rules.day_bounds(date(2026, 7, 1))[1] == datetime(2026, 7, 1, 21, 0, tzinfo=UTC)
 
 
-def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, buyer, round_, active):  # noqa: F811
+def _status(account_id):
+    return run_sql("select status from core.trading_accounts where id = $1", uuid.UUID(account_id))[0]["status"]
+
+
+def _jobs(kind):
+    rows = run_sql("select * from core.jobs where kind = $1 order by id", kind)
+    return [{**r, "payload": json.loads(r["payload"]) if isinstance(r["payload"], str) else r["payload"]} for r in rows]
+
+
+def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, buyer, round_, active, broker):  # noqa: F811
     _ruleset(round_["product_id"])
     acc = active[A]
     now0 = datetime.now(UTC)
@@ -114,8 +124,22 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, bu
     assert mdd[0]["ruleset_snapshot"]  # 당시 룰셋 값 보관
     # 챌린지 계좌에는 Daily Loss를 적용하지 않는다
     assert not run_sql("select 1 from core.rule_violations where rule_key = 'DAILY_LOSS'")
-    # 기록만: 계좌 상태는 그대로
-    assert run_sql("select status from core.trading_accounts where id = $1", uuid.UUID(acc))[0]["status"] == "ACTIVE"
+    # 2단계 조치: FAILED + 전량 청산·읽기 전용 + 위반 안내 메일
+    assert mdd[0]["mode"] == "ENFORCED" and mdd[0]["status"] == "ACTIONED"
+    assert mdd[0]["action"] == "CLOSE_ALL+READ_ONLY+FAILED"
+    assert _status(acc) == "FAILED" and _status(active[B]) == "ACTIVE"
+    hist = run_sql("select * from core.trading_account_status_history where account_id = $1", uuid.UUID(acc))
+    assert [(h["action"], h["from_status"], h["to_status"], h["changed_by"]) for h in hist] == [
+        ("RULE_VIOLATION", "ACTIVE", "FAILED", None)
+    ]
+    broker.fake.open_positions[A] = [{"order": 1}]
+    _work(rounds=2)
+    assert broker.fake.closed_all == [A] and A not in broker.fake.open_positions
+    assert broker.fake.accounts[A]["isReadOnly"] is True and not broker.fake.accounts[B]["isReadOnly"]
+    assert [j["status"] for j in _jobs("mt4.close_all_and_lock")] == ["SUCCEEDED"]
+    assert [j["status"] for j in _jobs("notify.account_violated")] == ["SUCCEEDED"]
+    # FAILED 계좌는 더 감시하지 않는다
+    assert _run(t1 + timedelta(minutes=2))["checked"] == 1
 
     # 관리자 조회
     rules = client.get(f"/api/v1/admin/accounts/{acc}/rules", headers=admin_headers).json()
@@ -133,7 +157,8 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, bu
     # 대회 종료 → 10분 뒤 자동 최종 판정 (한 번만)
     ended = t1 + timedelta(minutes=2)
     run_sql("update core.challenges set status = 'CLOSED', closed_at = $2 where id = $1", round_["challenge_id"], ended)
-    run_sql("update core.trading_accounts set status = 'CLOSED' where challenge_id = $1", round_["challenge_id"])
+    run_sql("update core.trading_accounts set status = 'CLOSED' where challenge_id = $1 and status = 'ACTIVE'",
+            round_["challenge_id"])
     assert _run(ended + timedelta(minutes=5))["evaluated"] == 0
     assert _run(ended + timedelta(minutes=11))["evaluated"] == 2
     assert _run(ended + timedelta(minutes=12))["evaluated"] == 0
@@ -142,6 +167,10 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, bu
     assert ev[0]["result"] == "FAILED"
     checks = {c["key"]: c["passed"] for c in __import__("json").loads(ev[0]["checks"])}
     assert checks == {"profit_target": False, "min_trading_days": False, "max_drawdown": False, "consistency": True}
+    # 최종 판정이 계좌 상태에 반영된다: 이미 FAILED인 계좌는 그대로, CLOSED였던 계좌는 결과로 (결과 메일 1통)
+    assert _status(acc) == "FAILED" and _status(active[B]) == "FAILED"
+    result_mails = _jobs("notify.challenge_result")
+    assert [(j["payload"]["account_id"], j["payload"]["result"]) for j in result_mails] == [(active[B], "FAILED")]
 
     # 대회가 끝나고 판정이 나면 회원에게도 룰별 결과를 보여 준다 (화면 문구용 숫자 값 포함)
     mine = client.get(member_eval, headers=buyer).json()
@@ -169,7 +198,7 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, bu
     assert latest.json()["ruleset_name"] == "Test"
 
 
-def test_funded_daily_loss(client, admin_headers, round_, active):  # noqa: F811
+def test_funded_daily_loss(client, admin_headers, round_, active, broker):  # noqa: F811
     _ruleset(round_["product_id"])
     run_sql("update core.trading_accounts set tier = 'FUNDED' where mt4_login = $1", B)
     now = datetime.now(UTC)
@@ -181,6 +210,53 @@ def test_funded_daily_loss(client, admin_headers, round_, active):  # noqa: F811
     assert _run(now + timedelta(minutes=2))["violations"] == 0  # 같은 거래일은 한 번만
     v = run_sql("select * from core.rule_violations where rule_key = 'DAILY_LOSS'")
     assert len(v) == 1 and float(v[0]["observed_value"]) == 2100 and float(v[0]["limit_value"]) == 2000
+    assert v[0]["mode"] == "ENFORCED" and v[0]["action"] == "CLOSE_ALL+READ_ONLY_DAY"
+
+    # 그날만 정지: 상태는 ACTIVE 그대로, 다음 거래일 시작까지 청산·읽기 전용
+    day_end = trading_rules.day_bounds(trading_rules.trading_date(now + timedelta(minutes=1)))[1]
+    row = run_sql("select status, trading_halted_until from core.trading_accounts where id = $1", uuid.UUID(active[B]))[0]
+    assert row["status"] == "ACTIVE" and row["trading_halted_until"] == day_end
+    broker.fake.open_positions[B] = [{"order": 7}]
+    _work(rounds=2)
+    assert broker.fake.closed_all == [B] and broker.fake.accounts[B]["isReadOnly"] is True
+    assert not _jobs("notify.account_violated")  # 하루 정지는 FAILED 안내 메일을 보내지 않는다
+
+    # 다음 거래일이 되면 정지를 풀고 다시 거래할 수 있다
+    assert _run(day_end - timedelta(minutes=1))["released"] == 0
+    assert _run(day_end + timedelta(minutes=1))["released"] == 1
+    assert run_sql("select trading_halted_until from core.trading_accounts where id = $1",
+                   uuid.UUID(active[B]))[0]["trading_halted_until"] is None
+    _work()
+    assert broker.fake.accounts[B]["isReadOnly"] is False
+
+
+def test_challenge_close_closes_positions(client, admin_headers, round_, active, broker):  # noqa: F811
+    """대회 종료: 거래 중이던 계좌의 남은 포지션을 모두 청산하고 잠근다."""
+    broker.fake.open_positions[A] = [{"order": 3}]
+    res = client.post(f"/api/v1/admin/challenges/{round_['challenge_id']}/close", headers=admin_headers)
+    assert res.status_code == 200, res.text
+    assert _status(active[A]) == "CLOSED" and _status(active[B]) == "CLOSED"
+    assert len(_jobs("mt4.close_all_and_lock")) == 2
+    _work(rounds=2)
+    assert sorted(broker.fake.closed_all) == [A, B]
+    assert broker.fake.accounts[A]["isReadOnly"] is True and broker.fake.accounts[B]["isReadOnly"] is True
+
+
+def test_close_retries_while_positions_remain(client, admin_headers, round_, active, broker):  # noqa: F811
+    """청산 뒤에도 열린 포지션이 남으면 작업이 실패로 재시도된다."""
+    real = broker.fake.handler
+
+    def stubborn(request):
+        if request.url.path.endswith("/orders-pending/close"):
+            return __import__("httpx").Response(200, json={"message": "partially"})  # 포지션을 남긴다
+        return real(request)
+
+    broker.fake.handler = stubborn
+    broker.fake.open_positions[A] = [{"order": 3}]
+    client.post(f"/api/v1/admin/challenges/{round_['challenge_id']}/close", headers=admin_headers)
+    _work()
+    job = next(j for j in _jobs("mt4.close_all_and_lock") if j["payload"]["account_id"] == active[A])
+    assert job["status"] == "PENDING" and job["attempts"] == 1 and "열린 주문 1개" in job["last_error"]
 
 
 def test_stale_equity_is_not_judged(round_, active):  # noqa: F811

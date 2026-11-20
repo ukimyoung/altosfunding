@@ -103,6 +103,9 @@ class Settings(BaseSettings):
     risk_equity_max_age_seconds: int = 180
     # 대회 종료 후 이만큼 지나 자동 최종 판정을 기록한다 (종료 후 마지막 수집을 기다림)
     risk_final_delay_seconds: int = 600
+    # 2단계 조치: Max Drawdown 위반 → 전량 청산·ReadOnly·FAILED, 펀디드 Daily Loss → 그날 청산·정지,
+    # 대회 종료 → 전량 청산, 최종 판정 → 계좌 상태 PASSED/FAILED. false면 1단계처럼 기록만 한다.
+    risk_enforce: bool = True
 
     # Sumsub KYC. 비어 있으면 본인 인증 시작(토큰 발급)과 웹훅을 막는다. 상태 조회는 된다.
     sumsub_app_token: str = ""

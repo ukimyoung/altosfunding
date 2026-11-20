@@ -30,6 +30,7 @@ class FakeMt4:
         self.balance_errors: list[int] = []
         self.api_key_seen: set[str] = set()
         self.open_positions: dict[int, list[dict]] = {}  # 계좌별 미결 포지션
+        self.closed_all: list[int] = []  # 전량 청산 요청을 받은 계좌
 
     def handler(self, request: httpx.Request) -> httpx.Response:
         self.api_key_seen.add(request.headers.get("X-API-KEY", ""))
@@ -68,6 +69,10 @@ class FakeMt4:
         if parts[4:] == ["readonly"]:
             self.accounts[login]["isReadOnly"] = body["value"]
             return httpx.Response(200)
+        if parts[4:] == ["orders-pending", "close"] and request.method == "POST":
+            self.closed_all.append(login)
+            self.open_positions.pop(login, None)
+            return httpx.Response(200, json={"message": "closed"})
         return httpx.Response(404)
 
     def creates(self) -> int:

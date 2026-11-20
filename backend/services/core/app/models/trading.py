@@ -86,6 +86,8 @@ class TradingAccount(Base):
     free_margin: Mapped[Decimal | None] = mapped_column(Money)
     margin_level: Mapped[Decimal | None] = mapped_column(Money)
     equity_updated_at: Mapped[datetime | None]
+    # 펀디드 Daily Loss 위반으로 이 시각(다음 거래일 시작)까지 거래 정지 (상태는 ACTIVE 유지)
+    trading_halted_until: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
