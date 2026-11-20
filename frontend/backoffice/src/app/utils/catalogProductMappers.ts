@@ -19,6 +19,7 @@ const baseProductFields = (product: CatalogProduct) => ({
   tradingPeriod: product.duration_days,
   maxDrawdown: null,
   marginCall: product.margin_call_pct == null ? '' : String(product.margin_call_pct),
+  minTradingDays: product.min_trading_days ?? null,
   stopOut: product.stop_out_pct == null ? '' : String(product.stop_out_pct),
   ruleset: product.ruleset_id ?? '',
   rulesetName: product.ruleset_name ?? '',

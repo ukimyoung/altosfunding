@@ -209,7 +209,7 @@ async def create_product(session: AsyncSession, data: dict) -> Product:
 
 
 _NULLABLE_PRODUCT_FIELDS = {
-    "type_code", "description", "ruleset_id", "next_product_id", "margin_call_pct", "stop_out_pct", "discount_price_usdt",
+    "type_code", "description", "ruleset_id", "next_product_id", "margin_call_pct", "min_trading_days", "stop_out_pct", "discount_price_usdt",
     "related_id",
 }
 

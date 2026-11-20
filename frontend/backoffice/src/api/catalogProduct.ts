@@ -16,6 +16,8 @@ export interface CatalogProduct {
   mt4_login_pool_start: number | null;
   mt4_login_pool_end: number | null;
   margin_call_pct: number | null;
+  /** 최소거래일. null이면 룰셋 값 사용 */
+  min_trading_days?: number | null;
   stop_out_pct: number | null;
   ruleset_id: string | null;
   ruleset_name: string | null;
@@ -57,6 +59,7 @@ export interface CreateCatalogProductRequest {
   leverage?: number | null;
   duration_days?: number | null;
   margin_call_pct?: number | null;
+  min_trading_days?: number | null;
   stop_out_pct?: number | null;
   funding_start_delay_hours?: number | null;
   mt4_login_pool_start?: number | null;

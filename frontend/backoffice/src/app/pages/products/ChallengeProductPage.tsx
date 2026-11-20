@@ -157,6 +157,10 @@ export function ChallengeProductPage() {
               product.marginCall === '' ? null : Number(product.marginCall),
               exists.marginCall === '' ? null : Number(exists.marginCall),
             ),
+            min_trading_days: getCatalogProductUpdateValue(
+              product.minTradingDays ?? null,
+              exists.minTradingDays ?? null,
+            ),
             stop_out_pct: getCatalogProductUpdateValue(
               product.stopOut === '' ? null : Number(product.stopOut),
               exists.stopOut === '' ? null : Number(exists.stopOut),
@@ -198,6 +202,7 @@ export function ChallengeProductPage() {
           leverage: product.leverage,
           duration_days: product.tradingPeriod,
           margin_call_pct: product.marginCall === '' ? null : Number(product.marginCall),
+          min_trading_days: product.minTradingDays ?? null,
           stop_out_pct: product.stopOut === '' ? null : Number(product.stopOut),
           funding_start_delay_hours: product.creationDelayHours,
           mt4_login_pool_start: product.accountRangeStart,

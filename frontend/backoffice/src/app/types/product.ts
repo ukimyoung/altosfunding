@@ -13,6 +13,8 @@ export interface ChallengeProduct {
   passConditionValue: number;
   maxDrawdown: number | null;
   marginCall?: string;
+  // 최소거래일. null이면 연결된 룰셋의 최소 거래일을 쓴다
+  minTradingDays?: number | null;
   stopOut: string;
   drawdownMethod: string;
   retryPolicy: string;
@@ -55,6 +57,8 @@ export interface FundedProduct {
   maxDrawdown: number | null;
   maxDrawdownVip?: number | null;
   marginCall?: string;
+  // 최소거래일. null이면 연결된 룰셋의 최소 거래일을 쓴다
+  minTradingDays?: number | null;
   stopOut: string;
   ruleset?: string;
   rulesetName?: string;

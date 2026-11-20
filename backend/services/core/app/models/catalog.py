@@ -69,6 +69,8 @@ class Product(Base):
     funding_start_delay_hours: Mapped[int] = mapped_column(server_default="0")
     duration_days: Mapped[int] = mapped_column(server_default="30")
     margin_call_pct: Mapped[Decimal | None]
+    # 상품별 최소거래일. null이면 연결된 룰셋의 min_trading_days를 쓴다.
+    min_trading_days: Mapped[int | None]
     stop_out_pct: Mapped[Decimal | None]
     payout_ratio: Mapped[Decimal] = mapped_column(server_default="80")
     payout_period_days: Mapped[int] = mapped_column(server_default="14")

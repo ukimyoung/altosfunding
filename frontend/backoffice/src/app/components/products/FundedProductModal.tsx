@@ -37,6 +37,7 @@ export function FundedProductModal({ product, isOpen, onClose, onSave, onNavigat
       maxDrawdown: null,
       maxDrawdownVip: null,
       marginCall: "",
+      minTradingDays: null,
       stopOut: "",
       ruleset: "",
       rulesetName: "",
@@ -65,6 +66,7 @@ export function FundedProductModal({ product, isOpen, onClose, onSave, onNavigat
       maxDrawdown: null,
       maxDrawdownVip: null,
       marginCall: "",
+      minTradingDays: null,
       stopOut: "",
       ruleset: "",
       rulesetName: "",
@@ -258,6 +260,18 @@ export function FundedProductModal({ product, isOpen, onClose, onSave, onNavigat
                     value={formData.stopOut}
                     onChange={(v) => setFormData({ ...formData, stopOut: v })}
                     suffix="%"
+                    t={t}
+                  />
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <InputField
+                    label="최소거래일"
+                    type="number"
+                    value={formData.minTradingDays == null ? "" : String(formData.minTradingDays)}
+                    onChange={(v) => setFormData({ ...formData, minTradingDays: v === "" ? null : Math.max(0, Math.floor(Number(v))) })}
+                    suffix="일"
+                    placeholder="-"
                     t={t}
                   />
                 </div>

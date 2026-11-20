@@ -330,7 +330,7 @@ async def summary(session: AsyncSession) -> dict:
     return {"challenges": challenges, "total_active_accounts": total_active}
 
 
-def _offer_rules(ruleset: Ruleset | None, capital: Decimal) -> dict | None:
+def _offer_rules(ruleset: Ruleset | None, capital: Decimal, min_trading_days: int | None = None) -> dict | None:
     if ruleset is None:
         return None
 
@@ -351,7 +351,8 @@ def _offer_rules(ruleset: Ruleset | None, capital: Decimal) -> dict | None:
         "daily_loss_limit_pct": float(ruleset.daily_loss_limit_pct),
         "daily_loss_limit_amt": amount_or_pct(ruleset.daily_loss_limit_amt, ruleset.daily_loss_limit_pct),
         "dd_calc_method": ruleset.dd_calc_method,
-        "min_trading_days": ruleset.min_trading_days,
+        # 상품에 최소거래일이 정해져 있으면 그 값을, 없으면 룰셋 값을 쓴다.
+        "min_trading_days": min_trading_days if min_trading_days is not None else ruleset.min_trading_days,
         "pass_condition_type": ruleset.pass_condition_type,
         "pass_condition_pct": None if ruleset.pass_condition_pct is None else float(ruleset.pass_condition_pct),
         "pass_condition_amt": None if ruleset.pass_condition_amt is None else float(ruleset.pass_condition_amt),
@@ -424,7 +425,7 @@ async def offers(session: AsyncSession) -> list[dict]:
                 "is_most_popular": p.is_most_popular,
                 "leverage": p.leverage,
                 "duration_days": p.duration_days,
-                "rules": _offer_rules(rulesets.get(p.ruleset_id), p.capital),
+                "rules": _offer_rules(rulesets.get(p.ruleset_id), p.capital, p.min_trading_days),
                 "funded": None
                 if funded is None
                 else {
@@ -433,7 +434,7 @@ async def offers(session: AsyncSession) -> list[dict]:
                     "capital": float(funded.capital),
                     "leverage": funded.leverage,
                     "payout_ratio": float(funded.payout_ratio),
-                    "rules": _offer_rules(rulesets.get(funded.ruleset_id), funded.capital),
+                    "rules": _offer_rules(rulesets.get(funded.ruleset_id), funded.capital, funded.min_trading_days),
                 },
                 "open_challenge": None
                 if c is None

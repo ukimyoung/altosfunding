@@ -123,6 +123,7 @@ class ProductCreate(BaseModel):
     funding_start_delay_hours: int = Field(default=0, ge=0)
     duration_days: int = Field(default=30, ge=0)
     margin_call_pct: float | None = Field(default=None, ge=0)
+    min_trading_days: int | None = Field(default=None, ge=0)
     stop_out_pct: float | None = Field(default=None, ge=0)
     payout_ratio: float = Field(default=80.0, ge=0, le=100)
     payout_period_days: int = Field(default=14, ge=0)
@@ -149,6 +150,7 @@ class ProductUpdateRequest(BaseModel):
     funding_start_delay_hours: int | None = Field(default=None, ge=0)
     duration_days: int | None = Field(default=None, ge=0)
     margin_call_pct: float | None = Field(default=None, ge=0)
+    min_trading_days: int | None = Field(default=None, ge=0)
     stop_out_pct: float | None = Field(default=None, ge=0)
     payout_ratio: float | None = Field(default=None, ge=0, le=100)
     payout_period_days: int | None = Field(default=None, ge=0)
@@ -184,6 +186,7 @@ class ProductOut(BaseModel):
     funding_start_delay_hours: int
     duration_days: int
     margin_call_pct: float | None
+    min_trading_days: int | None = None
     stop_out_pct: float | None
     payout_ratio: float
     payout_period_days: int

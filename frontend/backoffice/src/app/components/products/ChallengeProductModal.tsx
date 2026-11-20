@@ -37,6 +37,7 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
       passConditionValue: 0,
       maxDrawdown: null,
       marginCall: "",
+      minTradingDays: null,
       stopOut: "",
       drawdownMethod: "미설정",
       retryPolicy: "미설정",
@@ -81,6 +82,7 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
       passConditionValue: 0,
       maxDrawdown: null,
       marginCall: "",
+      minTradingDays: null,
       stopOut: "",
       drawdownMethod: "",
       retryPolicy: "",
@@ -300,6 +302,18 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
                       value={formData.stopOut}
                       onChange={(v) => setFormData({ ...formData, stopOut: v })}
                       suffix="%"
+                      t={t}
+                    />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <InputField
+                      label="최소거래일"
+                      type="number"
+                      value={formData.minTradingDays == null ? "" : String(formData.minTradingDays)}
+                      onChange={(v) => setFormData({ ...formData, minTradingDays: v === "" ? null : Math.max(0, Math.floor(Number(v))) })}
+                      suffix="일"
+                      placeholder="-"
                       t={t}
                     />
                   </div>

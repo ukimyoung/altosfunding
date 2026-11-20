@@ -350,6 +350,10 @@ def test_challenge_offers(client, admin, challenge_product):  # noqa: F811
                  json={"profit_target_amt": 800, "daily_loss_limit_amt": 300})
     rules = client.get("/api/v1/challenges/products").json()["items"][0]["rules"]
     assert (rules["profit_target_amt"], rules["daily_loss_limit_amt"]) == (800, 300)
+    # 최소거래일: 상품 값이 있으면 그 값, 없으면 룰셋 값
+    assert rules["min_trading_days"] == rs["min_trading_days"]
+    client.put(f"/api/v1/catalog/products/{challenge_product}", headers=admin, json={"min_trading_days": 9})
+    assert client.get("/api/v1/challenges/products").json()["items"][0]["rules"]["min_trading_days"] == 9
     assert items[1]["final_price_usdt"] == 150 and items[1]["rules"] is None and items[1]["funded"] is None
 
     # 모집 중 회차가 생기면 그 회차를 신청 대상으로 준다. 정원이 차면 빠진다.
