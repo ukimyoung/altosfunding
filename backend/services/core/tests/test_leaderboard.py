@@ -184,7 +184,7 @@ def test_evaluate_account(client, admin_headers, buyer, round_, fake_mt4, monkey
     ev = client.post(EVAL.format(account_a), headers=admin_headers).json()
     assert seen == {"orders": [5, 1, 2], "vip": False}
     assert ev["result"] == "FAILED" and ev["rules_applied"] == 1
-    assert ev["checks"] == [{"key": "min_profit", "label": "최소 수익", "passed": False, "detail": "수익 12000.00"}]
+    assert ev["checks"] == [{"key": "min_profit", "label": "최소 수익", "passed": False, "detail": "수익 12000.00", "values": {}}]
 
     # Leaderboard에는 계좌별 마지막 판정이 나온다
     rows = client.get(URL, headers=admin_headers, params={"date": date}).json()["entries"]

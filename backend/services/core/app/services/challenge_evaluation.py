@@ -87,9 +87,11 @@ class RuleResult:
     label: str  # 화면 표시 이름, 예: "최대 손실 한도"
     passed: bool
     detail: str | None = None  # 예: "최대 손실 -8.2% (한도 -10%)"
+    # 화면이 언어별 문구를 만들 수 있도록 숫자 값 (웹 Account Detail). 예: {"profit": 258.0, "target": 600.0}
+    values: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
-        return {"key": self.key, "label": self.label, "passed": self.passed, "detail": self.detail}
+        return {"key": self.key, "label": self.label, "passed": self.passed, "detail": self.detail, "values": self.values}
 
 
 # 룰 함수: 판정 재료를 받아 결과를 돌려준다. 룰셋에 해당 조건이 없으면 None(적용 안 함).
@@ -99,6 +101,10 @@ def _money(value: Decimal) -> str:
     return f"${Decimal(value):,.2f}"
 
 
+def _num(value) -> float | None:
+    return None if value is None else float(value)
+
+
 def check_profit_target(ctx: EvaluationContext) -> RuleResult | None:
     from app.services import trading_rules as tr
 
@@ -106,7 +112,8 @@ def check_profit_target(ctx: EvaluationContext) -> RuleResult | None:
     if target is None:
         return None
     return RuleResult(
-        "profit_target", "수익 목표", ctx.profit >= target, f"수익 {_money(ctx.profit)} / 목표 {_money(target)}"
+        "profit_target", "수익 목표", ctx.profit >= target, f"수익 {_money(ctx.profit)} / 목표 {_money(target)}",
+        {"profit": _num(ctx.profit), "target": _num(target)},
     )
 
 
@@ -127,7 +134,10 @@ def check_min_trading_days(ctx: EvaluationContext) -> RuleResult | None:
     if not need:
         return None
     days = len(trading_days(ctx))
-    return RuleResult("min_trading_days", "최소 거래일", days >= need, f"거래일 {days}일 / 최소 {need}일")
+    return RuleResult(
+        "min_trading_days", "최소 거래일", days >= need, f"거래일 {days}일 / 최소 {need}일",
+        {"days": days, "required": need},
+    )
 
 
 def check_max_drawdown(ctx: EvaluationContext) -> RuleResult | None:
@@ -137,13 +147,19 @@ def check_max_drawdown(ctx: EvaluationContext) -> RuleResult | None:
     if dd is None:
         return None
     hits = [v for v in ctx.violations if v.rule_key == tr.MAX_DRAWDOWN and v.status != "DISMISSED"]
+    values: dict = {"dd": _num(dd)}
     if hits:
         first = hits[0]
         detail = f"{first.detected_at:%Y-%m-%d %H:%M} UTC 위반: {first.detail}"
+        values |= {
+            "violated_at": first.detected_at.isoformat(),
+            "equity": _num(first.observed_value), "floor": _num(first.limit_value),
+        }
     else:
         floors = [s.dd_floor_after for s in ctx.daily_stats if s.dd_floor_after is not None]
         detail = f"위반 없음 (DD {_money(dd)}" + (f", 마지막 기준선 {_money(floors[-1])})" if floors else ")")
-    return RuleResult("max_drawdown", "최대 손실 한도 (Max Drawdown)", not hits, detail)
+        values["floor"] = _num(floors[-1]) if floors else None
+    return RuleResult("max_drawdown", "최대 손실 한도 (Max Drawdown)", not hits, detail, values)
 
 
 def daily_profits(ctx: EvaluationContext) -> dict:
@@ -167,14 +183,21 @@ def check_consistency(ctx: EvaluationContext) -> RuleResult | None:
         return None
     total = ctx.profit
     if total <= 0:
-        return RuleResult("consistency", "Consistency", True, f"전체 순수익 {_money(total)} — 비율 계산 안 함")
+        return RuleResult(
+            "consistency", "일관성 (Consistency)", True, f"전체 순수익 {_money(total)} — 비율 계산 안 함",
+            {"total": _num(total), "limit": _num(pct), "skipped": True},
+        )
     profits = daily_profits(ctx)
     best_day, best = max(profits.items(), key=lambda kv: kv[1]) if profits else (None, Decimal(0))
     ratio = (best / total * 100).quantize(Decimal("0.01")) if best > 0 else Decimal(0)
     detail = f"하루 최대 수익 {_money(best)}" + (f" ({best_day})" if best_day else "") + (
         f" / 전체 순수익 {_money(total)} = {ratio}% (기준 {pct}%)"
     )
-    return RuleResult("consistency", "Consistency", ratio <= Decimal(pct), detail)
+    values = {
+        "best": _num(best), "best_day": best_day.isoformat() if best_day else None,
+        "total": _num(total), "ratio": _num(ratio), "limit": _num(pct),
+    }
+    return RuleResult("consistency", "일관성 (Consistency)", ratio <= Decimal(pct), detail, values)
 
 
 # 판정 순서대로. 룰 함수가 None을 돌려주면(룰셋에 값 없음) 적용하지 않는다.
@@ -294,4 +317,27 @@ async def latest(session: AsyncSession, account_id: uuid.UUID) -> ChallengeEvalu
     ev = ChallengeEvaluation
     return await session.scalar(
         select(ev).where(ev.account_id == account_id).order_by(ev.created_at.desc(), ev.id.desc()).limit(1)
+    )
+
+
+async def final_of_member(session: AsyncSession, account_id: uuid.UUID) -> ChallengeEvaluation | None:
+    """웹 Account Detail용 최종 판정: 대회 기간이 끝난 뒤(종료 시각까지 본) 판정 중 마지막 것. 기간 중 판정은 보여 주지 않는다."""
+    row = (
+        await session.execute(
+            select(TradingAccount, Challenge)
+            .join(Challenge, Challenge.challenge_id == TradingAccount.challenge_id)
+            .where(TradingAccount.id == account_id, TradingAccount.tier == "CHALLENGE")
+        )
+    ).first()
+    if row is None:
+        return None
+    _, challenge = row
+    if challenge.status != "CLOSED":
+        return None
+    ev = ChallengeEvaluation
+    return await session.scalar(
+        select(ev)
+        .where(ev.account_id == account_id, ev.period_end >= leaderboard.cutoff(challenge))
+        .order_by(ev.created_at.desc(), ev.id.desc())
+        .limit(1)
     )

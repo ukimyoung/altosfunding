@@ -25,11 +25,11 @@ export function LeaderboardEvaluationModal({
   const passed = evaluation.result === 'PASSED';
   const resultColor = passed ? '#16A34A' : '#DC2626';
   const rows: [string, string][] = [
-    ['판정 기간', `${formatKstDateTime(evaluation.period_start)} ~ ${formatKstDateTime(evaluation.period_end)} (KST)`],
+    ['판정 기간', `${formatKstDateTime(evaluation.period_start)} ~ ${formatKstDateTime(evaluation.period_end)} (GMT+9)`],
     ['수익률 / 수익금', `${formatSignedPercent(Math.round(evaluation.profit_rate * 100) / 100)} / ${formatSignedUsdMoney(evaluation.profit)}`],
     ['청산 거래 / 미결 포지션', `${evaluation.trades_count}건 / ${evaluation.open_positions}건`],
     ['룰셋', evaluation.ruleset_name ?? evaluation.ruleset_id ?? '연결된 룰셋 없음'],
-    ['확인 시각', `${formatKstDateTime(evaluation.created_at)} (KST)`],
+    ['확인 시각', `${formatKstDateTime(evaluation.created_at)} (GMT+9)`],
   ];
 
   return (
@@ -118,8 +118,8 @@ export function LeaderboardEvaluationModal({
                 }}
               >
                 <span style={{ color: t.text }}>
-                  {check.label}
-                  {check.detail ? <span style={{ color: t.textSec }}> · {check.detail}</span> : null}
+                  {check.key === 'consistency' ? '일관성 (Consistency)' : check.label}
+                  {check.detail ? <span style={{ color: t.textSec }}> : {check.detail}</span> : null}
                 </span>
                 <span style={{ color: check.passed ? '#16A34A' : '#DC2626', fontWeight: 600, whiteSpace: 'nowrap' }}>
                   {check.passed ? '통과' : '위반'}

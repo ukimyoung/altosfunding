@@ -120,6 +120,24 @@ export interface ChallengeTranslations {
   objectivePassed: string;
   objectiveViolated: string;
 
+  // Challenge result (shown after the challenge period ends)
+  ruleResultsTitle: string;
+  ruleResultPassed: string;
+  ruleResultFailed: string;
+  rulePassed: string;
+  ruleViolated: string;
+  ruleProfitTarget: string;
+  ruleProfitTargetDetail: string;
+  ruleMinTradingDays: string;
+  ruleMinTradingDaysDetail: string;
+  ruleMaxDrawdown: string;
+  ruleMaxDrawdownOk: string;
+  ruleMaxDrawdownOkWithFloor: string;
+  ruleMaxDrawdownViolated: string;
+  ruleConsistency: string;
+  ruleConsistencyDetail: string;
+  ruleConsistencySkipped: string;
+
   // Trading history table
   tradingHistory: string;
   tradingHistoryNote: string;

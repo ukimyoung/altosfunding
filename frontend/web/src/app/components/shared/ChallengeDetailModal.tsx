@@ -1,7 +1,8 @@
 import { motion } from 'motion/react';
 import { X, Copy } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useAccountTradeHistoryQuery } from '@/app/queries/accounts';
+import { useAccountEvaluationQuery, useAccountTradeHistoryQuery } from '@/app/queries/accounts';
+import type { AccountEvaluationCheck } from '@/api/accounts';
 import { formatBrowserGmtOffset, formatDateTimeByBrowserTimeZone } from '@/app/utils/date';
 import { useLocale } from '@/app/i18n/LocaleContext';
 
@@ -43,6 +44,68 @@ const formatCredentialPassword = (password: string) => {
 
 const isValidCredentialValue = (value: string) => /[A-Za-z0-9]/.test(value.trim());
 
+type ChallengeText = ReturnType<typeof useLocale>['T']['challenge'];
+
+const fillTemplate = (template: string, values: Record<string, string>) =>
+  template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
+
+const formatUsd = (value: unknown) =>
+  typeof value === 'number'
+    ? `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : '-';
+
+const formatPlain = (value: unknown) =>
+  typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: 2 }) : '-';
+
+/** 룰별 결과 한 줄: 'Name : detail'. 숫자 값(values)이 없는 이전 판정은 Core가 저장한 문구를 그대로 쓴다. */
+const describeRuleCheck = (check: AccountEvaluationCheck, text: ChallengeText): [string, string | null] => {
+  const v = check.values ?? null;
+  switch (check.key) {
+    case 'profit_target':
+      return [
+        text.ruleProfitTarget,
+        v ? fillTemplate(text.ruleProfitTargetDetail, { profit: formatUsd(v.profit), target: formatUsd(v.target) }) : check.detail,
+      ];
+    case 'min_trading_days':
+      return [
+        text.ruleMinTradingDays,
+        v ? fillTemplate(text.ruleMinTradingDaysDetail, { days: formatPlain(v.days), required: formatPlain(v.required) }) : check.detail,
+      ];
+    case 'max_drawdown': {
+      if (!v) return [text.ruleMaxDrawdown, check.detail];
+      if (typeof v.violated_at === 'string') {
+        const at = `${formatDateTimeByBrowserTimeZone(v.violated_at)} ${formatBrowserGmtOffset(v.violated_at)}`.trim();
+        return [
+          text.ruleMaxDrawdown,
+          fillTemplate(text.ruleMaxDrawdownViolated, { at, equity: formatUsd(v.equity), floor: formatUsd(v.floor) }),
+        ];
+      }
+      return [
+        text.ruleMaxDrawdown,
+        typeof v.floor === 'number'
+          ? fillTemplate(text.ruleMaxDrawdownOkWithFloor, { dd: formatUsd(v.dd), floor: formatUsd(v.floor) })
+          : fillTemplate(text.ruleMaxDrawdownOk, { dd: formatUsd(v.dd) }),
+      ];
+    }
+    case 'consistency': {
+      if (!v) return [text.ruleConsistency, check.detail];
+      if (v.skipped) return [text.ruleConsistency, fillTemplate(text.ruleConsistencySkipped, { total: formatUsd(v.total) })];
+      return [
+        text.ruleConsistency,
+        fillTemplate(text.ruleConsistencyDetail, {
+          best: formatUsd(v.best),
+          bestDay: typeof v.best_day === 'string' ? ` (${v.best_day})` : '',
+          total: formatUsd(v.total),
+          ratio: typeof v.ratio === 'number' ? v.ratio.toFixed(2) : '-',
+          limit: formatPlain(v.limit),
+        }),
+      ];
+    }
+    default:
+      return [check.label, check.detail];
+  }
+};
+
 export function ChallengeDetailModal({
   isOpen,
   onClose,
@@ -58,6 +121,8 @@ export function ChallengeDetailModal({
     isLoading: isTradeHistoryLoading,
     isError: isTradeHistoryError,
   } = useAccountTradeHistoryQuery(challengeDetail.accountId, isOpen);
+  // 대회 기간이 끝나고 판정이 난 뒤에만 값이 온다 (그 전에는 null → 표시 안 함)
+  const { data: evaluation } = useAccountEvaluationQuery(challengeDetail.accountId, isOpen);
   const displayPassword = useMemo(
     () => formatCredentialPassword(challengeDetail.password),
     [challengeDetail.password],
@@ -324,6 +389,45 @@ export function ChallengeDetailModal({
               </div>
             </div>
           </div>
+
+          {/* Challenge Result (rule checks, after the challenge period ends) */}
+          {evaluation && evaluation.checks.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-3 mb-4">
+                <h3 className="text-white font-semibold text-lg">{text.ruleResultsTitle}</h3>
+                <span
+                  className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                    evaluation.result === 'PASSED'
+                      ? 'bg-[#00FF94]/10 text-[#00FF94]'
+                      : 'bg-red-500/10 text-red-400'
+                  }`}
+                >
+                  {evaluation.result === 'PASSED' ? text.ruleResultPassed : text.ruleResultFailed}
+                </span>
+              </div>
+              <div className="flex flex-col gap-2">
+                {evaluation.checks.map((check) => {
+                  const [name, detail] = describeRuleCheck(check, text);
+                  return (
+                    <div
+                      key={check.key}
+                      className="flex items-start justify-between gap-4 bg-[#16161f] border border-[#2a2a3a] rounded-xl px-4 py-3 text-sm"
+                    >
+                      <span className="text-white">
+                        {name}
+                        {detail ? <span className="text-gray-400"> : {detail}</span> : null}
+                      </span>
+                      <span
+                        className={`font-semibold whitespace-nowrap ${check.passed ? 'text-[#00FF94]' : 'text-red-400'}`}
+                      >
+                        {check.passed ? text.rulePassed : text.ruleViolated}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Trading History */}
           <div className="mb-6">

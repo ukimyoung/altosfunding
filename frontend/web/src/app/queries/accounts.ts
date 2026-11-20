@@ -3,6 +3,7 @@ import {
   GetChallengeSummary,
   GetFundedSummary,
   getAccountDetail,
+  getAccountEvaluation,
   getAccountTradeHistory,
   listAccounts,
   updateAccountPassword,
@@ -56,6 +57,14 @@ export function useAccountTradeHistoryQuery(accountId: string, enabled: boolean)
   return useQuery({
     queryKey: accountsQueryKeys.tradeHistory(accountId),
     queryFn: () => getAccountTradeHistory(accountId),
+    enabled: enabled && accountId.length > 0,
+  });
+}
+
+export function useAccountEvaluationQuery(accountId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...accountsQueryKeys.all, 'evaluation', accountId] as const,
+    queryFn: () => getAccountEvaluation(accountId),
     enabled: enabled && accountId.length > 0,
   });
 }
