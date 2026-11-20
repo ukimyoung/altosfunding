@@ -1,7 +1,6 @@
 import { REVENUE_KNOWN_USERS } from "../constants/revenue";
 import type {
   ChallengeRevenueColumn,
-  ChallengeRevenueDailyRow,
   ChallengeRevenueRow,
   ChallengeRevenueSummary,
   FundedRevenueDailyRow,
@@ -51,24 +50,15 @@ export function mapChallengeSalesReport(response: ChallengeSalesReportResponse):
   rows: ChallengeRevenueRow[];
   summary: ChallengeRevenueSummary;
 } {
-  const rows = response.items.map((item) => {
-    const first = response.columns[0]?.product_id;
-    const second = response.columns[1]?.product_id;
-    const third = response.columns[2]?.product_id;
-
-    return {
-      label: item.date,
+  // 최신 기간이 먼저 오도록 내림차순. 주별은 Core가 주의 월요일(한국 시간)을 주므로 '월 ~ 일'로 표시한다.
+  const rows = [...response.items]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((item) => ({
+      label: response.period === "weekly" ? weekLabel(item.date) : item.date,
       products: item.products,
-      starterQty: first ? item.products[first]?.quantity ?? 0 : 0,
-      starterAmt: first ? item.products[first]?.amount ?? 0 : 0,
-      proQty: second ? item.products[second]?.quantity ?? 0 : 0,
-      proAmt: second ? item.products[second]?.amount ?? 0 : 0,
-      eliteQty: third ? item.products[third]?.quantity ?? 0 : 0,
-      eliteAmt: third ? item.products[third]?.amount ?? 0 : 0,
       totalQty: item.subtotal.quantity,
       totalAmt: item.subtotal.amount,
-    };
-  });
+    }));
 
   return {
     columns: response.columns.map((column) => ({ ...column, label: challengeTierLabel(column.label) })),
@@ -147,40 +137,6 @@ export function filterRevenueByDate<T extends { date: string }>(rows: T[], from:
 export function matchesRevenueUser(query: string): boolean {
   const normalizedQuery = query.toLowerCase().trim();
   return REVENUE_KNOWN_USERS.some((user) => user.includes(normalizedQuery));
-}
-
-export function aggregateChallengeRevenue(
-  rows: ChallengeRevenueDailyRow[],
-  period: RevenuePeriod,
-): ChallengeRevenueRow[] {
-  const map = new Map<string, ChallengeRevenueRow>();
-  for (const row of rows) {
-    const label = getRevenuePeriodLabel(row.date, period);
-    const entry = map.get(label) ?? {
-      label,
-      products: {},
-      starterQty: 0,
-      starterAmt: 0,
-      proQty: 0,
-      proAmt: 0,
-      eliteQty: 0,
-      eliteAmt: 0,
-      totalQty: 0,
-      totalAmt: 0,
-    };
-    entry.starterQty += row.starterQty;
-    entry.starterAmt += row.starterAmt;
-    entry.proQty += row.proQty;
-    entry.proAmt += row.proAmt;
-    entry.eliteQty += row.eliteQty;
-    entry.eliteAmt += row.eliteAmt;
-    entry.totalQty += row.starterQty + row.proQty + row.eliteQty;
-    entry.totalAmt += row.starterAmt + row.proAmt + row.eliteAmt;
-    map.set(label, entry);
-  }
-  return Array.from(map.values()).sort((a, b) =>
-    getRevenueSortKey(b.label, period).localeCompare(getRevenueSortKey(a.label, period)),
-  );
 }
 
 export function aggregateFundedRevenue(

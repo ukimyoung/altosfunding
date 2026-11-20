@@ -428,7 +428,11 @@ async def challenge_sales(
     session: AsyncSession, *, period: str | None, start_date: str | None, end_date: str | None,
     keyword: str | None, timezone: str | None,
 ) -> dict:
-    """챌린지 매출: 처리가 끝난(COMPLETED) 주문의 발급 수량·금액(환불 제외)을 기간·상품별로 묶는다."""
+    """챌린지 매출: 처리가 끝난(COMPLETED) 주문의 발급 수량·금액(환불 제외)을 기간·상품별로 묶는다.
+
+    열(columns)은 활성 챌린지 상품(가격순, Starter~Prime 등 DB에 있는 만큼)이고,
+    조회 기간에 매출이 있는데 지금은 비활성인 상품도 열로 붙여 합계와 열 합이 맞게 한다.
+    기준 시각은 주문 시각(created_at), 기간·주 경계는 X-Timezone(기본 한국 시간)."""
     period = _require_period(period)
     tz = zone(timezone)
     user_ids = await _keyword_user_ids(session, keyword)
@@ -464,12 +468,21 @@ async def challenge_sales(
         .order_by(bucket)
     )
 
+    rows = list(rows.tuples())
+    known = {c["product_id"] for c in columns}
+    missing = {product_id for _, product_id, _, _ in rows if product_id not in known}
+    if missing:
+        extra = await session.scalars(
+            select(Product).where(Product.product_id.in_(missing)).order_by(Product.price_usdt, Product.product_id)
+        )
+        columns += [{"product_id": p.product_id, "label": p.name, "price_usdt": _f(p.price_usdt)} for p in extra]
+
     def empty() -> dict:
         return {c["product_id"]: {"quantity": 0, "amount": 0.0} for c in columns}
 
     items: dict[datetime, dict] = {}
     summary = {"quantity": 0, "amount": 0.0, "by_product": empty()}
-    for bucket_value, product_id, qty, amount in rows.tuples():
+    for bucket_value, product_id, qty, amount in rows:
         item = items.setdefault(
             bucket_value,
             {"date": _bucket_label(bucket_value, period), "products": empty(), "subtotal": {"quantity": 0, "amount": 0.0}},

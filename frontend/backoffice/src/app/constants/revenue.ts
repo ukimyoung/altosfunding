@@ -1,4 +1,4 @@
-import type { ChallengeRevenueColumn, ChallengeRevenueDailyRow, FundedRevenueDailyRow, RevenuePeriod } from "../types/revenue";
+import type { ChallengeRevenueColumn, FundedRevenueDailyRow, RevenuePeriod } from "../types/revenue";
 
 export const REVENUE_PAGE_SIZE = 10;
 
@@ -19,27 +19,6 @@ export const REVENUE_KNOWN_USERS = [
   "sarah", "sarah.lee", "sarah.lee@email.com",
   "chris", "chris.park", "chris.park@email.com",
   "emma", "emma.wilson", "emma.wilson@email.com",
-];
-
-export const CHALLENGE_REVENUE_SAMPLE_DATA: ChallengeRevenueDailyRow[] = [
-  { date: "2026-05-01", starterQty: 2, starterAmt: 200,  proQty: 1, proAmt: 300,  eliteQty: 0, eliteAmt: 0    },
-  { date: "2026-05-05", starterQty: 4, starterAmt: 400,  proQty: 3, proAmt: 900,  eliteQty: 2, eliteAmt: 1000 },
-  { date: "2026-05-12", starterQty: 1, starterAmt: 100,  proQty: 0, proAmt: 0,    eliteQty: 1, eliteAmt: 500  },
-  { date: "2026-05-19", starterQty: 5, starterAmt: 500,  proQty: 2, proAmt: 600,  eliteQty: 0, eliteAmt: 0    },
-  { date: "2026-05-26", starterQty: 3, starterAmt: 300,  proQty: 4, proAmt: 1200, eliteQty: 1, eliteAmt: 500  },
-  { date: "2026-06-02", starterQty: 6, starterAmt: 600,  proQty: 2, proAmt: 600,  eliteQty: 3, eliteAmt: 1500 },
-  { date: "2026-06-03", starterQty: 2, starterAmt: 200,  proQty: 1, proAmt: 300,  eliteQty: 0, eliteAmt: 0    },
-  { date: "2026-06-09", starterQty: 8, starterAmt: 800,  proQty: 5, proAmt: 1500, eliteQty: 2, eliteAmt: 1000 },
-  { date: "2026-06-10", starterQty: 3, starterAmt: 300,  proQty: 2, proAmt: 600,  eliteQty: 1, eliteAmt: 500  },
-  { date: "2026-06-16", starterQty: 7, starterAmt: 700,  proQty: 6, proAmt: 1800, eliteQty: 4, eliteAmt: 2000 },
-  { date: "2026-06-17", starterQty: 1, starterAmt: 100,  proQty: 0, proAmt: 0,    eliteQty: 2, eliteAmt: 1000 },
-  { date: "2026-06-23", starterQty: 4, starterAmt: 400,  proQty: 3, proAmt: 900,  eliteQty: 0, eliteAmt: 0    },
-  { date: "2026-06-24", starterQty: 2, starterAmt: 200,  proQty: 1, proAmt: 300,  eliteQty: 1, eliteAmt: 500  },
-  { date: "2026-06-30", starterQty: 5, starterAmt: 500,  proQty: 4, proAmt: 1200, eliteQty: 3, eliteAmt: 1500 },
-  { date: "2026-07-01", starterQty: 3, starterAmt: 300,  proQty: 2, proAmt: 600,  eliteQty: 1, eliteAmt: 500  },
-  { date: "2026-07-07", starterQty: 9, starterAmt: 900,  proQty: 7, proAmt: 2100, eliteQty: 5, eliteAmt: 2500 },
-  { date: "2026-07-08", starterQty: 2, starterAmt: 200,  proQty: 1, proAmt: 300,  eliteQty: 0, eliteAmt: 0    },
-  { date: "2026-07-13", starterQty: 4, starterAmt: 400,  proQty: 3, proAmt: 900,  eliteQty: 2, eliteAmt: 1000 },
 ];
 
 export const FUNDED_REVENUE_SAMPLE_DATA: FundedRevenueDailyRow[] = [
