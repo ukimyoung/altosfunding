@@ -24,6 +24,8 @@ type TierCard = {
     maxDrawdown: string | null;
     dailyLossLimit: string | null;
     maxContracts: string | null;
+    /** 룰셋 최소 거래일 */
+    minTradingDays: string | null;
     consistency: string | null;
     tradingPeriod: string | null;
   };
@@ -80,6 +82,10 @@ const offerToTier = (offer: ChallengeOffer, labels: AccountLabels): TierCard => 
       maxDrawdown: moneyOrNull(rules?.max_drawdown_amt),
       dailyLossLimit: moneyOrNull(rules?.daily_loss_limit_amt),
       maxContracts: formatContracts(rules),
+      // 룰셋 최소 거래일. 0이거나 없으면 '없음'
+      minTradingDays: rules?.min_trading_days
+        ? labels.daysFormat.replace('{n}', String(rules.min_trading_days))
+        : null,
       consistency: formatPct(rules?.consistency_pct),
       tradingPeriod: offer.duration_days
         ? labels.daysFormat.replace('{n}', String(offer.duration_days))
@@ -110,6 +116,7 @@ const TIERS: TierCard[] = [
       maxDrawdown: '$500',
       dailyLossLimit: null,   // null = use labels.none
       maxContracts: '1 Mini (10 Micro)',
+      minTradingDays: null,
       consistency: '40%',
       tradingPeriod: '5 Days',
     },
@@ -133,6 +140,7 @@ const TIERS: TierCard[] = [
       maxDrawdown: '$1,000',
       dailyLossLimit: null,
       maxContracts: '2 Mini (20 Micro)',
+      minTradingDays: null,
       consistency: '40%',
       tradingPeriod: '5 Days',
     },
@@ -156,6 +164,7 @@ const TIERS: TierCard[] = [
       maxDrawdown: '$2,000',
       dailyLossLimit: null,
       maxContracts: '4 Mini (40 Micro)',
+      minTradingDays: null,
       consistency: '40%',
       tradingPeriod: '5 Days',
     },
@@ -179,6 +188,7 @@ const TIERS: TierCard[] = [
       maxDrawdown: '$3,500',
       dailyLossLimit: null,
       maxContracts: '6 Mini (60 Micro)',
+      minTradingDays: null,
       consistency: '40%',
       tradingPeriod: '5 Days',
     },
@@ -323,6 +333,13 @@ export function AlphaAccountSizes() {
                             {L.maxContracts}
                           </span>
                           <span className="text-white text-sm font-bold text-right">{tier.challengeStage.maxContracts ?? L.none}</span>
+                        </div>
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
+                            <InfoTooltip content={TT.minTradingDays} />
+                            {L.minTradingDays}
+                          </span>
+                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.minTradingDays ?? L.none}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">

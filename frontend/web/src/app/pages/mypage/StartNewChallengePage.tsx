@@ -1046,6 +1046,17 @@ export function StartNewChallengePage() {
                             </div>
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
+                                <InfoTooltip content={tooltips.minTradingDays} />
+                                {text.minTradingDaysShort}
+                              </span>
+                              <span className="text-right text-sm font-bold text-white">
+                                {account.rules?.min_trading_days
+                                  ? formatDays(account.rules.min_trading_days)
+                                  : text.none}
+                              </span>
+                            </div>
+                            <div className="flex items-start justify-between gap-3">
+                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.consistency} />
                                 {text.consistency}
                               </span>
