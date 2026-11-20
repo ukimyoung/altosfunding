@@ -172,7 +172,7 @@ async def my_account_evaluation(account_id: uuid.UUID, user: CurrentUser, sessio
         return None
     return MyEvaluationOut(
         result=ev.result, period_start=ev.period_start, period_end=ev.period_end, evaluated_at=ev.created_at,
-        checks=ev.checks or [],
+        checks=[challenge_evaluation.with_values(c) for c in ev.checks or []],
     )
 
 

@@ -182,6 +182,13 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, bu
     assert values["min_trading_days"]["required"] == 3
     assert values["max_drawdown"]["dd"] == 5000 and values["max_drawdown"]["floor"] == 98000
     assert values["max_drawdown"]["equity"] == 97900 and values["max_drawdown"]["violated_at"]
+    # values가 없는 이전 판정도 저장된 문구에서 숫자 값을 되살려 준다 (웹 영어 화면)
+    run_sql(
+        "update core.challenge_evaluations set checks = (select jsonb_agg(c - 'values') from jsonb_array_elements(checks) c)"
+    )
+    old = {c["key"]: c["values"] for c in client.get(member_eval, headers=buyer).json()["checks"]}
+    values["consistency"].pop("limit")  # '비율 계산 안 함' 문구에는 기준이 없다 (화면에서도 쓰지 않음)
+    assert old == values
     # 종료일까지 결산이 채워진다 (마지막 날은 종료 시각에서 자름)
     last = run_sql(
         "select * from core.account_daily_stats where account_id = $1 order by trading_date desc limit 1",
