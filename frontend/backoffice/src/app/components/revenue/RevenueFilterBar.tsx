@@ -64,7 +64,7 @@ export function RevenueFilterBar({
       {REVENUE_PERIODS.map(p => {
         const active = period === p;
         return (
-          <button key={p} onClick={() => setPeriod(active ? null : p)} style={{
+          <button key={p} onClick={() => setPeriod(p)} style={{
             height: 36, padding: "0 14px", borderRadius: 8, cursor: "pointer",
             border: `1px solid ${active ? "transparent" : t.border2}`,
             background: active ? "#7C6AF7" : "transparent",

@@ -68,10 +68,10 @@ export function RevenuePage() {
 
   // Challenge tab state
   const [cQuery,  setCQuery]  = useState("");
-  // 메뉴 진입 시 오늘(GMT+9) 하루를 주별로 바로 조회한다.
+  // 메뉴 진입 시 오늘(GMT+9) 하루를 일별로 바로 조회한다.
   const [cFrom,   setCFrom]   = useState(todayInSeoul);
   const [cTo,     setCTo]     = useState(todayInSeoul);
-  const [cPeriod, setCPeriod] = useState<RevenuePeriod | null>("주별");
+  const [cPeriod, setCPeriod] = useState<RevenuePeriod | null>("일별");
   const [cState,  setCState]  = useState<RevenueSearchState>("idle");
   const [cRows,   setCRows]   = useState<ChallengeRevenueRow[]>([]);
   // 티어 열: Core 활성 챌린지 상품 기준 (고정 4개 하드코딩 대신)
@@ -84,7 +84,7 @@ export function RevenuePage() {
   const [fQuery,  setFQuery]  = useState("");
   const [fFrom,   setFFrom]   = useState("");
   const [fTo,     setFTo]     = useState("");
-  const [fPeriod, setFPeriod] = useState<RevenuePeriod | null>(null);
+  const [fPeriod, setFPeriod] = useState<RevenuePeriod | null>("일별");
   const [fState,  setFState]  = useState<RevenueSearchState>("idle");
   const [fRows,   setFRows]   = useState<FundedRevenueRow[]>([]);
   const [fSummary, setFSummary] = useState<FundedRevenueSummary | null>(null);

@@ -1,6 +1,6 @@
 import api from './axios';
 
-export type SalesReportPeriod = 'weekly' | 'monthly' | 'yearly';
+export type SalesReportPeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export interface SalesReportParams {
   period: SalesReportPeriod;

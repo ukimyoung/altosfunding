@@ -80,6 +80,13 @@ def test_challenge_sales_by_tier_including_prime(client, admin_headers):  # noqa
     weekly = client.get(URL, headers=admin_headers, params={"period": "weekly"}).json()
     assert [i["date"] for i in weekly["items"]] == ["2026-10-05", "2026-10-26", "2026-11-02", "2026-11-09"]
 
+    # 일별: 한국 시간 날짜. 10-31 15:30 UTC는 11-01 KST.
+    daily = client.get(URL, headers=admin_headers,
+                       params={"period": "daily", "start_date": "2026-11-01", "end_date": "2026-11-30"}).json()
+    assert [i["date"] for i in daily["items"]] == ["2026-11-01", "2026-11-02", "2026-11-10"]
+    assert daily["items"][0]["products"][p["Starter"]["pid"]] == {"quantity": 2, "amount": 200}
+    assert daily["summary"]["quantity"] == 5 and daily["summary"]["amount"] == 3200
+
     # 기간: 한국 시간 날짜 기준 (11-01 KST부터)
     ranged = client.get(URL, headers=admin_headers,
                         params={"period": "yearly", "start_date": "2026-11-01", "end_date": "2026-11-02"}).json()
