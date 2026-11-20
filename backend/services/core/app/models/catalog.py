@@ -20,7 +20,7 @@ class Ruleset(Base):
     max_dd_vip_pct: Mapped[Decimal] = mapped_column(server_default="10")
     max_dd_vip_amt: Mapped[Decimal | None]
     max_dd_lookback_days: Mapped[int] = mapped_column(server_default="45")
-    dd_calc_method: Mapped[str] = mapped_column(server_default="STATIC")
+    dd_calc_method: Mapped[str] = mapped_column(server_default="EOD")
     stop_out_pct: Mapped[Decimal | None]
     pass_condition_type: Mapped[str] = mapped_column(server_default="RELATIVE")
     pass_condition_pct: Mapped[Decimal | None]

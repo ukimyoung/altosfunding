@@ -28,7 +28,7 @@ def test_ruleset_crud(client, admin):
     rs = _ruleset(client, admin, max_dd_vip_pct=12.5, retry_policy="ONCE")
     assert rs["id"].startswith("RS-")
     assert rs["max_dd_vip_pct"] == 12.5
-    assert rs["dd_calc_method"] == "STATIC"
+    assert rs["dd_calc_method"] == "EOD"
     assert rs["connected_products_count"] == 0
 
     res = client.patch(f"/api/v1/admin/rulesets/{rs['id']}", headers=admin,

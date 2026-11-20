@@ -93,6 +93,16 @@ class Settings(BaseSettings):
     mt4_ingest_after_close_seconds: int = 1800
     # MT4 서버 시각의 시간대. 조회 기간(dateFrom/dateTo)을 이 시간대로 보내고, 시간대 없는 응답 시각도 이 시간대로 읽는다.
     mt4_server_timezone: str = "Europe/Athens"
+    # 트레이딩 룰 자동 검증 (Worker). 거래일 = 이 시간대의 날짜, 마감 = 그 날짜 다음 날 0시.
+    risk_enabled: bool = True
+    risk_seconds: float = 60
+    risk_trading_timezone: str = "Europe/Athens"
+    # 마감 후 이만큼 기다렸다가 결산한다 (마감 직전 청산 내역이 수집될 시간)
+    risk_close_grace_seconds: int = 300
+    # 이보다 오래된 평가금액으로는 위반 판정을 하지 않는다 (수집 실패 계좌)
+    risk_equity_max_age_seconds: int = 180
+    # 대회 종료 후 이만큼 지나 자동 최종 판정을 기록한다 (종료 후 마지막 수집을 기다림)
+    risk_final_delay_seconds: int = 600
 
     # Sumsub KYC. 비어 있으면 본인 인증 시작(토큰 발급)과 웹훅을 막는다. 상태 조회는 된다.
     sumsub_app_token: str = ""

@@ -4,7 +4,7 @@
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import BigInteger, ForeignKey, Numeric, func
@@ -213,4 +213,78 @@ class ChallengeEvaluation(Base):
     checks: Mapped[list] = mapped_column(JSONB, server_default="[]")
     rules_applied: Mapped[int] = mapped_column(server_default="0")
     evaluated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
+    # MANUAL: 관리자 '확인하기' | AUTO: 대회 종료 후 Worker 자동 판정 (20261120030000)
+    source: Mapped[str] = mapped_column(server_default="MANUAL")
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class AccountRiskState(Base):
+    """계좌별 룰 감시 상태 (Max Drawdown 기준선, 진행 중 거래일) (20261120030000)."""
+
+    __tablename__ = "account_risk_state"
+
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.trading_accounts.id"), primary_key=True
+    )
+    ruleset_id: Mapped[str | None] = mapped_column(ForeignKey("core.rulesets.id"))
+    capital: Mapped[Decimal] = mapped_column(Money)
+    dd_amount: Mapped[Decimal | None] = mapped_column(Money)
+    dd_floor: Mapped[Decimal | None] = mapped_column(Money)
+    peak_close_equity: Mapped[Decimal | None] = mapped_column(Money)
+    current_trading_date: Mapped[date]
+    day_start_balance: Mapped[Decimal] = mapped_column(Money)
+    day_start_equity: Mapped[Decimal] = mapped_column(Money)
+    last_equity: Mapped[Decimal | None] = mapped_column(Money)
+    last_checked_at: Mapped[datetime | None]
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class AccountDailyStat(Base):
+    """계좌 × 거래일 결산 (20261120030000)."""
+
+    __tablename__ = "account_daily_stats"
+
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.trading_accounts.id"), primary_key=True
+    )
+    trading_date: Mapped[date] = mapped_column(primary_key=True)
+    period_start: Mapped[datetime]
+    period_end: Mapped[datetime]
+    start_balance: Mapped[Decimal] = mapped_column(Money)
+    start_equity: Mapped[Decimal] = mapped_column(Money)
+    close_balance: Mapped[Decimal] = mapped_column(Money)
+    close_equity: Mapped[Decimal] = mapped_column(Money)
+    day_pnl: Mapped[Decimal] = mapped_column(Money)
+    low_equity: Mapped[Decimal | None] = mapped_column(Money)
+    high_equity: Mapped[Decimal | None] = mapped_column(Money)
+    fills_count: Mapped[int] = mapped_column(server_default="0")
+    is_trading_day: Mapped[bool] = mapped_column(server_default="false")
+    dd_floor_before: Mapped[Decimal | None] = mapped_column(Money)
+    dd_floor_after: Mapped[Decimal | None] = mapped_column(Money)
+    closed_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class RuleViolation(Base):
+    """룰 위반 기록 (20261120030000)."""
+
+    __tablename__ = "rule_violations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    account_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("core.trading_accounts.id"))
+    challenge_id: Mapped[str | None] = mapped_column(ForeignKey("core.challenges.id"))
+    rule_key: Mapped[str]
+    severity: Mapped[str]
+    trading_date: Mapped[date]
+    detected_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    observed_value: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
+    limit_value: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
+    detail: Mapped[str | None]
+    ruleset_snapshot: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    mode: Mapped[str] = mapped_column(server_default="SHADOW")
+    action: Mapped[str] = mapped_column(server_default="NONE")
+    status: Mapped[str] = mapped_column(server_default="OPEN")
+    reviewed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
+    reviewed_at: Mapped[datetime | None]
+    review_note: Mapped[str | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

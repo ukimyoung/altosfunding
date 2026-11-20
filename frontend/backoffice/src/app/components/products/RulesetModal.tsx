@@ -42,7 +42,7 @@ const emptyFormData: RulesetFormData = {
   minTradingDays: "",
   inactivityDays: "",
   consistency: "",
-  drawdownMethod: "STATIC",
+  drawdownMethod: "EOD",
   retryPolicy: "미설정",
   normalEvalMethod: "상대평가",
   normalEvalValue: "",
@@ -87,7 +87,7 @@ const toFormData = (ruleset: RulesetDetailResponse | null): RulesetFormData => {
     minTradingDays: String(ruleset.min_trading_days ?? ""),
     inactivityDays: String(ruleset.inactivity_days ?? ""),
     consistency: String(ruleset.consistency_pct ?? ""),
-    drawdownMethod: ruleset.dd_calc_method || "STATIC",
+    drawdownMethod: ruleset.dd_calc_method || "EOD",
     retryPolicy: retryPolicyFromApi(ruleset.retry_policy),
     normalEvalMethod,
     normalEvalValue: String(

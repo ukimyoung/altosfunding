@@ -7,11 +7,14 @@ GET /admin/accounts/{account_id}/trades   거래내역 (Worker가 MT4에서 수�
 POST /admin/accounts/{account_id}/freeze    비활성 (PENDING·ACTIVE → INACTIVE, 미결 포지션 있으면 거절)
 POST /admin/accounts/{account_id}/unfreeze  활성 복귀 (INACTIVE → 대회 상태에 맞는 원래 상태)
 POST /admin/accounts/{account_id}/ban       영구정지 (사유 필수, 되돌릴 수 없음)
+GET /admin/accounts/{account_id}/rules      룰 감시 상태·일일 결산·위반 기록 (트레이딩 룰 자동 검증)
+GET /admin/rule-violations                  룰 위반 목록 (전체 계좌)
 
 상태 변경 후 MT4 거래 잠금(ReadOnly)은 Worker가 맞춘다. 이력: core.trading_account_status_history
 """
 
 import uuid
+from datetime import date, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Query
@@ -25,7 +28,7 @@ from app.schemas.trading import (
     AdminTradePage,
 )
 from app.services import account_admin as svc
-from app.services import mt4_ingest
+from app.services import mt4_ingest, trading_rules
 from app.services.trading_query import pages
 
 router = APIRouter(tags=["admin-accounts"])
@@ -114,3 +117,116 @@ async def ban_account(account_id: str, body: BanRequest, admin: AdminUser, sessi
     await svc.ban(session, admin, account_id, body.reason)
     await session.commit()
     return await _result(session, account_id)
+
+
+# ── 트레이딩 룰 자동 검증 (1단계: 기록만) ──────────────────────────
+
+
+class RuleViolationOut(BaseModel):
+    id: int
+    account_id: str
+    challenge_id: str | None
+    rule_key: str = Field(description="MAX_DRAWDOWN | DAILY_LOSS | CONSISTENCY")
+    severity: str = Field(description="HARD(탈락·정지 사유) | WARN(경고)")
+    trading_date: date
+    detected_at: datetime
+    observed_value: float | None
+    limit_value: float | None
+    detail: str | None
+    mode: str = Field(description="SHADOW(기록만) | ENFORCED(조치까지)")
+    action: str
+    status: str = Field(description="OPEN | ACTIONED | DISMISSED")
+
+
+class RuleViolationListItem(RuleViolationOut):
+    mt4_login: int | None
+    tier: str
+    email: str
+
+
+class RuleViolationPage(BaseModel):
+    items: list[RuleViolationListItem]
+    total: int
+    page: int
+    size: int
+    pages: int
+
+
+class DailyStatOut(BaseModel):
+    trading_date: date
+    period_start: datetime
+    period_end: datetime
+    start_balance: float
+    start_equity: float
+    close_balance: float
+    close_equity: float
+    day_pnl: float
+    low_equity: float | None
+    high_equity: float | None
+    fills_count: int
+    is_trading_day: bool
+    dd_floor_before: float | None
+    dd_floor_after: float | None
+
+
+class RiskStateOut(BaseModel):
+    dd_amount: float | None
+    dd_floor: float | None
+    peak_close_equity: float | None
+    current_trading_date: date
+    day_start_balance: float
+    day_start_equity: float
+    last_equity: float | None
+    last_checked_at: datetime | None
+
+
+class AccountRulesOut(BaseModel):
+    account_id: str
+    mt4_login: int | None
+    state: RiskStateOut | None
+    daily_stats: list[DailyStatOut]
+    violations: list[RuleViolationOut]
+
+
+def _floats(obj, fields: list[str]) -> dict:
+    out = {}
+    for name in fields:
+        value = getattr(obj, name)
+        out[name] = float(value) if value is not None and name not in ("trading_date", "period_start", "period_end",
+                                                                       "current_trading_date", "last_checked_at",
+                                                                       "fills_count", "is_trading_day") else value
+    return out
+
+
+@router.get("/admin/accounts/{account_id}/rules", response_model=AccountRulesOut, summary="계좌 룰 감시 상태·일일 결산·위반")
+async def account_rules(account_id: str, admin: AdminUser, session: Session) -> AccountRulesOut:
+    account = await svc.get_account(session, account_id)
+    uid = uuid.UUID(account["account_id"])
+    state = await session.get(trading_rules.AccountRiskState, uid)
+    stats = await trading_rules.daily_stats(session, uid)
+    violations = await trading_rules.violations_of(session, uid)
+    return AccountRulesOut(
+        account_id=account["account_id"],
+        mt4_login=account["mt4_login"],
+        state=RiskStateOut(**_floats(state, list(RiskStateOut.model_fields))) if state else None,
+        daily_stats=[DailyStatOut(**_floats(s, list(DailyStatOut.model_fields))) for s in stats],
+        violations=[RuleViolationOut(**trading_rules.violation_out(v)) for v in violations],
+    )
+
+
+@router.get("/admin/rule-violations", response_model=RuleViolationPage, summary="룰 위반 목록")
+async def rule_violations(
+    admin: AdminUser,
+    session: Session,
+    rule_key: Annotated[str | None, Query(description="MAX_DRAWDOWN | DAILY_LOSS | CONSISTENCY")] = None,
+    severity: Annotated[str | None, Query(description="HARD | WARN")] = None,
+    status: Annotated[str | None, Query(description="OPEN | ACTIONED | DISMISSED")] = None,
+    tier: Annotated[str | None, Query(description="CHALLENGE | FUNDED")] = None,
+    keyword: Annotated[str | None, Query(description="MT4 계좌번호·이메일")] = None,
+    page: Page = 1,
+    size: Size = 20,
+) -> RuleViolationPage:
+    items, total = await trading_rules.list_violations(
+        session, rule_key=rule_key, severity=severity, status=status, tier=tier, keyword=keyword, page=page, size=size
+    )
+    return RuleViolationPage(items=items, total=total, page=page, size=size, pages=pages(total, size))

@@ -27,7 +27,7 @@ class RulesetFields(BaseModel):
     max_dd_vip_pct: float = Field(default=10.0, ge=0, le=100)
     max_dd_vip_amt: float | None = Field(default=None, ge=0)
     max_dd_lookback_days: int = Field(default=45, ge=0)
-    dd_calc_method: DdCalcMethod = "STATIC"
+    dd_calc_method: DdCalcMethod = "EOD"
     stop_out_pct: float | None = Pct
     pass_condition_type: PassConditionType = "RELATIVE"
     pass_condition_pct: float | None = Pct

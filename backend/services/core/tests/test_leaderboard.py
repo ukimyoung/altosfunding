@@ -162,7 +162,8 @@ def test_evaluate_account(client, admin_headers, buyer, round_, fake_mt4, monkey
     account_a = next(e for e in rows if e["mt4_login"] == a)["account_id"]
     account_b = next(e for e in rows if e["mt4_login"] == b)["account_id"]
 
-    # 룰셋 판정 로직이 아직 없으면 적용된 룰 0개로 통과
+    # 적용할 룰이 없으면 적용된 룰 0개로 통과 (실제 룰은 tests/test_trading_rules.py)
+    monkeypatch.setattr(ce, "RULE_CHECKS", [])
     res = client.post(EVAL.format(account_a), headers=admin_headers)
     assert res.status_code == 200, res.text
     ev = res.json()
