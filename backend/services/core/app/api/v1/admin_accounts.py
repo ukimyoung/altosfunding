@@ -7,6 +7,7 @@ GET /admin/accounts/{account_id}/trades   거래내역 (Worker가 MT4에서 수�
 POST /admin/accounts/{account_id}/freeze    비활성 (PENDING·ACTIVE → INACTIVE, 미결 포지션 있으면 거절)
 POST /admin/accounts/{account_id}/unfreeze  활성 복귀 (INACTIVE → 대회 상태에 맞는 원래 상태)
 POST /admin/accounts/{account_id}/ban       영구정지 (사유 필수, 되돌릴 수 없음)
+POST /admin/accounts/{account_id}/issue-funded  합격(PASSED) 챌린지 계좌의 펀디드 계좌 수동 발급 (자동 발급이 안 됐거나 실패했을 때)
 GET /admin/accounts/{account_id}/rules      룰 감시 상태·일일 결산·위반 기록 (트레이딩 룰 자동 검증)
 GET /admin/rule-violations                  룰 위반 목록 (전체 계좌)
 
@@ -117,6 +118,18 @@ async def ban_account(account_id: str, body: BanRequest, admin: AdminUser, sessi
     await svc.ban(session, admin, account_id, body.reason)
     await session.commit()
     return await _result(session, account_id)
+
+
+@router.post(
+    "/admin/accounts/{account_id}/issue-funded", response_model=AdminAccount,
+    summary="펀디드 계좌 수동 발급 (합격한 챌린지 계좌)",
+    description="합격(PASSED)한 챌린지 계좌로 펀디드 계좌를 지금 발급한다. 이미 발급(또는 발급 대기) 중인 펀디드 계좌가 "
+    "있으면 그 계좌를 돌려준다. 자동 발급 때 펀디드 상품이 연결되어 있지 않았거나 MT4 발급이 실패했을 때 쓴다.",
+)
+async def issue_funded(account_id: str, admin: AdminUser, session: Session) -> AdminAccount:
+    funded_id = await svc.issue_funded(session, account_id)
+    await session.commit()
+    return AdminAccount(**await svc.get_account(session, str(funded_id)))
 
 
 # ── 트레이딩 룰 자동 검증 (1단계: 기록만) ──────────────────────────

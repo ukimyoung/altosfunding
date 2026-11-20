@@ -17,6 +17,10 @@ mt4.close_all_and_lock — 읽기 전용으로 잠그고 미결 포지션·대�
 notify.challenge_account_issued — 계좌 발급 메일 (계좌 번호·비밀번호)
 notify.account_violated — 룰 위반으로 FAILED 처리 안내 메일
 notify.challenge_result — 챌린지 최종 결과(합격·불합격) 메일
+notify.funded_account_issued — 펀디드 계좌 발급 메일 (funding_account_issued, 계좌 번호·비밀번호)
+
+펀디드 계좌(합격한 챌린지 계좌로 만든 계좌, app.services.funded)도 mt4.provision_challenge_account로 LIVE 서버에 발급한다.
+주문이 없으므로 실패하면 환불 없이 발급 실패(FAILED)로만 남는다.
 """
 
 import logging
@@ -29,10 +33,17 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Challenge, Job, Mt4AccountIssuedHistory, Product, TradingAccount, User
+from app.models import (
+    Challenge,
+    Job,
+    Mt4AccountIssuedHistory,
+    Product,
+    TradingAccount,
+    User,
+)
 from app.security import decrypt_text, encrypt_text
 from app.services import challenge_order as orders
-from app.services import jobs, mt4, notify
+from app.services import funded, jobs, mt4, notify
 from app.services.email import get_email_sender
 
 logger = logging.getLogger(__name__)
@@ -182,7 +193,8 @@ async def _ensure_created(
             account.password_encrypted = encrypt_text(generate_password())
             account.investor_password_encrypted = encrypt_text(generate_password())
         challenge = await session.get(Challenge, account.challenge_id) if account.challenge_id else None
-        # 데모 계좌(대회 없음)는 바로 거래할 수 있게 만든다. 챌린지는 대회가 진행 중일 때만.
+        # 데모·펀디드 계좌(대회 없음)는 바로 거래할 수 있게 만든다 (펀디드는 발급 시각이 되어야 이 작업이 돈다).
+        # 챌린지는 대회가 진행 중일 때만.
         read_only = account.challenge_id is not None and not (challenge is not None and challenge.status == "ACTIVE")
         account.mt4_create_attempted_at = _now()
         await session.commit()
@@ -244,6 +256,7 @@ async def _ensure_capital(session: AsyncSession, client: mt4.Mt4Client, account:
     await session.commit()
     comment = (
         f"Challenge {account.challenge_id} capital" if account.challenge_id
+        else "Initial Funding Deposit" if account.tier == "FUNDED"
         else f"{account.tier.title()} initial capital"
     )
     order_id = await client.balance_operation(account.mt4_login, float(account.capital), comment)
@@ -270,7 +283,10 @@ async def provision_challenge_account(session: AsyncSession, job: Job) -> dict |
     await session.refresh(account, with_for_update=True)
     if account.provision_status != orders.QUEUED:
         return {"skipped": account.provision_status}
-    await orders.mark_issued(session, account)
+    if account.tier == funded.FUNDED:
+        await funded.mark_issued(session, account, _now())
+    else:
+        await orders.mark_issued(session, account)
     return {"mt4_login": account.mt4_login}
 
 
@@ -392,6 +408,31 @@ async def send_account_issued_mail(session: AsyncSession, job: Job) -> dict | No
             "challenge_name": challenge.name if challenge else "",
             "start_date": account.start_at.strftime("%Y-%m-%d %H:%M") if account.start_at else "-",
             "end_date": account.end_at.strftime("%Y-%m-%d %H:%M") if account.end_at else "-",
+        },
+        meta={"account_id": str(account.id)},
+    )
+    return {"sent": sent}
+
+
+@jobs.handler(funded.ISSUED_MAIL_JOB)
+async def send_funded_issued_mail(session: AsyncSession, job: Job) -> dict | None:
+    account = await session.get(TradingAccount, _account_id(job))
+    if account is None or account.provision_status != orders.DONE or account.password_encrypted is None:
+        return {"skipped": True}
+    user = await session.get(User, account.user_id)
+    product = await session.get(Product, account.product_id)
+    sent = await notify.to_user(
+        session,
+        get_email_sender(),
+        user,
+        "funding_account_issued",
+        {
+            "mt4_login": account.mt4_login,
+            "mt4_password": decrypt_text(account.password_encrypted),
+            "mt4_server": mt4.server_name(account.mt4_server),
+            "funding_name": product.name if product else "",
+            "start_date": account.start_at.strftime("%Y-%m-%d %H:%M") if account.start_at else "-",
+            "end_date": "",
         },
         meta={"account_id": str(account.id)},
     )
