@@ -789,7 +789,7 @@ export function MyAssetPage() {
     setKycActionModal(null);
 
     if (shouldNavigateToKyc) {
-      navigate('/my-page/kyc');
+      navigate('/my-page/security#kyc');
     }
   };
 
