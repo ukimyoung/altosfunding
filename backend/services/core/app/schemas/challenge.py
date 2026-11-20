@@ -236,9 +236,7 @@ class OfferRules(BaseModel):
     pass_condition_type: str
     pass_condition_pct: float | None
     pass_condition_amt: float | None
-    # 최대 Mini·Micro 거래 계약수, 일관성(%). null이면 제한 없음.
-    max_mini_contracts: int | None = None
-    max_micro_contracts: int | None = None
+    # 일관성(%). null이면 제한 없음.
     consistency_pct: float | None = None
 
 

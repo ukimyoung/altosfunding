@@ -20,7 +20,6 @@ export interface AccountTooltips {
   profitTarget: string;
   maxDrawdownEod: string;
   dailyLossLimit: string;
-  maxContracts: string;
   /** 최소 거래일 (룰셋) */
   minTradingDays: string;
   consistency: string;
@@ -31,7 +30,6 @@ export interface AccountTooltips {
 export interface AccountLabels {
   profitTarget: string;
   maxDrawdownEod: string;
-  maxContracts: string;
   /** 최소 거래일 (룰셋) */
   minTradingDays: string;
   consistency: string;

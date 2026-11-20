@@ -39,8 +39,6 @@ class RulesetFields(BaseModel):
     profit_target_amt: float | None = Field(default=None, ge=0)
     min_trading_days: int = Field(default=5, ge=0)
     inactivity_days: int = Field(default=30, ge=0)
-    max_mini_contracts: int | None = Field(default=None, gt=0)
-    max_micro_contracts: int | None = Field(default=None, gt=0)
     consistency_pct: float | None = Pct
     retry_policy: RetryPolicy = "NONE"
     apply_scope: ApplyScope = "NEW"
@@ -74,8 +72,6 @@ class RulesetUpdate(BaseModel):
     profit_target_amt: float | None = Field(default=None, ge=0)
     min_trading_days: int | None = Field(default=None, ge=0)
     inactivity_days: int | None = Field(default=None, ge=0, le=30)
-    max_mini_contracts: int | None = Field(default=None, gt=0)
-    max_micro_contracts: int | None = Field(default=None, gt=0)
     consistency_pct: float | None = Pct
     retry_policy: RetryPolicy | None = None
     apply_scope: ApplyScope | None = None

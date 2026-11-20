@@ -19,8 +19,6 @@ export interface AdminRuleset {
   profit_target_amt?: number | null;
   min_trading_days: number;
   inactivity_days: number;
-  max_mini_contracts?: number | null;
-  max_micro_contracts?: number | null;
   consistency_pct?: number | null;
   connected_products_count: number;
   retry_policy: RulesetRetryPolicy;
@@ -53,8 +51,6 @@ export interface RulesetRequestBody {
   profit_target_amt?: number | null;
   min_trading_days: number;
   inactivity_days: number;
-  max_mini_contracts?: number | null;
-  max_micro_contracts?: number | null;
   consistency_pct?: number | null;
   retry_policy: RulesetRetryPolicy;
   apply_scope: string;

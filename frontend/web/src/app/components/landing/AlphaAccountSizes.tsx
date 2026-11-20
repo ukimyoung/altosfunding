@@ -3,7 +3,7 @@ import { motion } from 'motion/react';
 import { Link } from 'react-router';
 import { useOptionalMeQuery } from '@/app/queries/profile';
 import { useListChallengeOffersQuery } from '@/app/queries/products';
-import type { ChallengeOffer, ChallengeOfferRules } from '@/api/products';
+import type { ChallengeOffer } from '@/api/products';
 import type { AccountLabels } from '../../i18n/locales/landing/types';
 import { useLocale } from '../../i18n/LocaleContext';
 import { InfoTooltip } from '../shared/InfoTooltip';
@@ -23,7 +23,6 @@ type TierCard = {
     profitTarget: string | null;
     maxDrawdown: string | null;
     dailyLossLimit: string | null;
-    maxContracts: string | null;
     /** 룰셋 최소 거래일 */
     minTradingDays: string | null;
     consistency: string | null;
@@ -33,7 +32,6 @@ type TierCard = {
     profitTarget: string | null;
     maxDrawdown: string | null;
     dailyLossLimit: string | null;
-    maxContracts: string | null;
     consistency: string | null;
   };
   popular: boolean;
@@ -51,15 +49,6 @@ const formatCapital = (capital: number) =>
 
 // 0이거나 없으면 '없음'
 const moneyOrNull = (amount: number | null | undefined) => (amount ? formatMoney(amount) : null);
-
-const formatContracts = (rules: ChallengeOfferRules | null | undefined) => {
-  const mini = rules?.max_mini_contracts;
-  const micro = rules?.max_micro_contracts;
-  if (mini && micro) return `${mini} Mini (${micro} Micro)`;
-  if (mini) return `${mini} Mini`;
-  if (micro) return `${micro} Micro`;
-  return null;
-};
 
 const formatPct = (pct: number | null | undefined) =>
   pct ? `${pct.toLocaleString('en-US', { maximumFractionDigits: 2 })}%` : null;
@@ -81,7 +70,6 @@ const offerToTier = (offer: ChallengeOffer, labels: AccountLabels): TierCard => 
       profitTarget: moneyOrNull(rules?.profit_target_amt),
       maxDrawdown: moneyOrNull(rules?.max_drawdown_amt),
       dailyLossLimit: moneyOrNull(rules?.daily_loss_limit_amt),
-      maxContracts: formatContracts(rules),
       // 룰셋 최소 거래일. 0이거나 없으면 '없음'
       minTradingDays: rules?.min_trading_days
         ? labels.daysFormat.replace('{n}', String(rules.min_trading_days))
@@ -95,7 +83,6 @@ const offerToTier = (offer: ChallengeOffer, labels: AccountLabels): TierCard => 
       profitTarget: moneyOrNull(fundedRules?.profit_target_amt),
       maxDrawdown: moneyOrNull(fundedRules?.max_drawdown_amt),
       dailyLossLimit: moneyOrNull(fundedRules?.daily_loss_limit_amt),
-      maxContracts: formatContracts(fundedRules),
       consistency: formatPct(fundedRules?.consistency_pct),
     },
     popular: offer.is_most_popular,
@@ -115,7 +102,6 @@ const TIERS: TierCard[] = [
       profitTarget: '$600',
       maxDrawdown: '$500',
       dailyLossLimit: null,   // null = use labels.none
-      maxContracts: '1 Mini (10 Micro)',
       minTradingDays: null,
       consistency: '40%',
       tradingPeriod: '5 Days',
@@ -124,7 +110,6 @@ const TIERS: TierCard[] = [
       profitTarget: null,
       maxDrawdown: '$500',
       dailyLossLimit: '$200',
-      maxContracts: '2 Mini (20 Micro)',
       consistency: null,
     },
     popular: false,
@@ -139,7 +124,6 @@ const TIERS: TierCard[] = [
       profitTarget: '$1,500',
       maxDrawdown: '$1,000',
       dailyLossLimit: null,
-      maxContracts: '2 Mini (20 Micro)',
       minTradingDays: null,
       consistency: '40%',
       tradingPeriod: '5 Days',
@@ -148,7 +132,6 @@ const TIERS: TierCard[] = [
       profitTarget: null,
       maxDrawdown: '$1,000',
       dailyLossLimit: '$500',
-      maxContracts: '2 Mini (20 Micro)',
       consistency: null,
     },
     popular: false,
@@ -163,7 +146,6 @@ const TIERS: TierCard[] = [
       profitTarget: '$3,000',
       maxDrawdown: '$2,000',
       dailyLossLimit: null,
-      maxContracts: '4 Mini (40 Micro)',
       minTradingDays: null,
       consistency: '40%',
       tradingPeriod: '5 Days',
@@ -172,7 +154,6 @@ const TIERS: TierCard[] = [
       profitTarget: null,
       maxDrawdown: '$2,000',
       dailyLossLimit: '$1,000',
-      maxContracts: '4 Mini (40 Micro)',
       consistency: null,
     },
     popular: true,
@@ -187,7 +168,6 @@ const TIERS: TierCard[] = [
       profitTarget: '$6,000',
       maxDrawdown: '$3,500',
       dailyLossLimit: null,
-      maxContracts: '6 Mini (60 Micro)',
       minTradingDays: null,
       consistency: '40%',
       tradingPeriod: '5 Days',
@@ -196,7 +176,6 @@ const TIERS: TierCard[] = [
       profitTarget: null,
       maxDrawdown: '$3,500',
       dailyLossLimit: '$2,000',
-      maxContracts: '6 Mini (60 Micro)',
       consistency: null,
     },
     popular: false,
@@ -329,13 +308,6 @@ export function AlphaAccountSizes() {
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
-                            <InfoTooltip content={TT.maxContracts} />
-                            {L.maxContracts}
-                          </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.challengeStage.maxContracts ?? L.none}</span>
-                        </div>
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
                             <InfoTooltip content={TT.minTradingDays} />
                             {L.minTradingDays}
                           </span>
@@ -384,13 +356,6 @@ export function AlphaAccountSizes() {
                             {L.dailyLossLimit}
                           </span>
                           <span className="text-white text-sm font-bold text-right">{tier.fundedStage.dailyLossLimit ?? L.none}</span>
-                        </div>
-                        <div className="flex items-start justify-between gap-3">
-                          <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">
-                            <InfoTooltip content={TT.maxContracts} />
-                            {L.maxContracts}
-                          </span>
-                          <span className="text-white text-sm font-bold text-right">{tier.fundedStage.maxContracts ?? L.none}</span>
                         </div>
                         <div className="flex items-start justify-between gap-3">
                           <span className="inline-flex items-center gap-1.5 text-gray-400 text-sm shrink-0">

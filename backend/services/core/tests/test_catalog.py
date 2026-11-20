@@ -40,17 +40,14 @@ def test_ruleset_crud(client, admin):
     res = client.patch(f"/api/v1/admin/rulesets/{rs['id']}", headers=admin, json={"dd_calc_method": "WRONG"})
     assert res.status_code == 422
 
-    # 거래 활동 조건: 최대 거래 계약수·일관성, 미활동 일수는 30일 이하
-    assert rs["max_mini_contracts"] is None and rs["max_micro_contracts"] is None and rs["consistency_pct"] is None
-    res = client.patch(f"/api/v1/admin/rulesets/{rs['id']}", headers=admin,
-                       json={"max_mini_contracts": 3, "max_micro_contracts": 10, "consistency_pct": 40})
-    assert (res.json()["max_mini_contracts"], res.json()["max_micro_contracts"], res.json()["consistency_pct"]) == (3, 10, 40)
-    res = client.patch(f"/api/v1/admin/rulesets/{rs['id']}", headers=admin, json={"max_mini_contracts": None})
-    assert res.json()["max_mini_contracts"] is None and res.json()["max_micro_contracts"] == 10
+    # 거래 활동 조건: 일관성, 미활동 일수는 30일 이하. 최대 거래 계약수 항목은 없다(CFD 서비스).
+    assert "max_mini_contracts" not in rs and "max_micro_contracts" not in rs and rs["consistency_pct"] is None
+    res = client.patch(f"/api/v1/admin/rulesets/{rs['id']}", headers=admin, json={"consistency_pct": 40})
+    assert res.json()["consistency_pct"] == 40
+    res = client.patch(f"/api/v1/admin/rulesets/{rs['id']}", headers=admin, json={"consistency_pct": None})
+    assert res.json()["consistency_pct"] is None
     assert client.patch(f"/api/v1/admin/rulesets/{rs['id']}", headers=admin,
                         json={"inactivity_days": 31}).status_code == 422
-    assert client.patch(f"/api/v1/admin/rulesets/{rs['id']}", headers=admin,
-                        json={"max_micro_contracts": 0}).status_code == 422
 
     _product(client, admin, ruleset_id=rs["id"])
     page = client.get("/api/v1/admin/rulesets", headers=admin).json()

@@ -355,8 +355,6 @@ def _offer_rules(ruleset: Ruleset | None, capital: Decimal) -> dict | None:
         "pass_condition_type": ruleset.pass_condition_type,
         "pass_condition_pct": None if ruleset.pass_condition_pct is None else float(ruleset.pass_condition_pct),
         "pass_condition_amt": None if ruleset.pass_condition_amt is None else float(ruleset.pass_condition_amt),
-        "max_mini_contracts": ruleset.max_mini_contracts,
-        "max_micro_contracts": ruleset.max_micro_contracts,
         "consistency_pct": None if ruleset.consistency_pct is None else float(ruleset.consistency_pct),
     }
 
