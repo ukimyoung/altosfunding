@@ -167,14 +167,14 @@ def check_consistency(ctx: EvaluationContext) -> RuleResult | None:
         return None
     total = ctx.profit
     if total <= 0:
-        return RuleResult("consistency", "Consistency", True, f"전체 순수익 {_money(total)} — 비율 계산 안 함")
+        return RuleResult("consistency", "일관성 (Consistency)", True, f"전체 순수익 {_money(total)} — 비율 계산 안 함")
     profits = daily_profits(ctx)
     best_day, best = max(profits.items(), key=lambda kv: kv[1]) if profits else (None, Decimal(0))
     ratio = (best / total * 100).quantize(Decimal("0.01")) if best > 0 else Decimal(0)
     detail = f"하루 최대 수익 {_money(best)}" + (f" ({best_day})" if best_day else "") + (
         f" / 전체 순수익 {_money(total)} = {ratio}% (기준 {pct}%)"
     )
-    return RuleResult("consistency", "Consistency", ratio <= Decimal(pct), detail)
+    return RuleResult("consistency", "일관성 (Consistency)", ratio <= Decimal(pct), detail)
 
 
 # 판정 순서대로. 룰 함수가 None을 돌려주면(룰셋에 값 없음) 적용하지 않는다.
