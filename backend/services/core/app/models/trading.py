@@ -88,6 +88,10 @@ class TradingAccount(Base):
     equity_updated_at: Mapped[datetime | None]
     # 펀디드 Daily Loss 위반으로 이 시각(다음 거래일 시작)까지 거래 정지 (상태는 ACTIVE 유지)
     trading_halted_until: Mapped[datetime | None]
+    # 펀디드 계좌: 합격한 챌린지 계좌 id (20261120050000)
+    source_account_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.trading_accounts.id")
+    )
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 

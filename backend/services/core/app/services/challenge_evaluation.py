@@ -20,7 +20,8 @@
 
 관리자 '확인하기'(source=MANUAL)와 대회 종료 후 Worker 자동 판정(source=AUTO)이 같은 룰을 쓴다.
 대회가 끝난 뒤 종료 시각까지 본 판정(최종 판정)이면 계좌 상태를 PASSED/FAILED로 바꾸고 결과 메일을 보낸다
-(RISK_ENFORCE=true, 2026-11-20 2단계). 기간 중 판정은 기록만 한다. 펀디드 계좌 발급은 하지 않는다.
+(RISK_ENFORCE=true, 2026-11-20 2단계). 기간 중 판정은 기록만 한다.
+최종 판정이 PASSED면 펀디드 계좌를 자동 발급한다 (app.services.funded).
 """
 
 import re
@@ -330,7 +331,7 @@ async def apply_result(session: AsyncSession, account: TradingAccount, result: s
     """최종 판정 결과를 계좌 상태에 반영한다. 처음 결과가 정해질 때(CLOSED에서 바뀔 때) 결과 메일을 보낸다."""
     from app.config import settings
     from app.services import challenge_order as orders
-    from app.services import jobs, trading_rules
+    from app.services import funded, jobs, trading_rules
 
     if not settings.risk_enforce or account.status not in RESULT_STATUSES or account.status == result:
         return False
@@ -344,6 +345,9 @@ async def apply_result(session: AsyncSession, account: TradingAccount, result: s
             dedupe_key=f"mail:challenge_result:{account.id}", ref_type="trading_account", ref_id=str(account.id),
         )
     await session.flush()
+    if result == "PASSED":
+        # 합격 → 펀디드 계좌 자동 발급 (계좌당 1개, 발급 시각은 상품의 '펀디드 계좌 자동 생성 시점')
+        await funded.on_passed(session, account)
     return True
 
 

@@ -253,6 +253,8 @@ class AdminAccount(AccountDetail):
     user_uid: str
     provision_error: str | None = None
     issued_at: datetime | None = None
+    # 펀디드 계좌: 합격한 챌린지 계좌 id
+    source_account_id: str | None = None
 
 
 class AdminAccountPage(BaseModel):

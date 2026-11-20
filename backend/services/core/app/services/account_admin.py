@@ -48,6 +48,7 @@ def admin_account_out(a: TradingAccount, product: Product | None, challenge: Cha
         "user_grade": user.grade,
         "provision_error": a.provision_error,
         "issued_at": a.issued_at,
+        "source_account_id": str(a.source_account_id) if a.source_account_id else None,
     }
 
 
@@ -274,3 +275,12 @@ async def latest_reasons(session: AsyncSession, account_ids: list[uuid.UUID]) ->
                   TradingAccountStatusHistory.id.desc())
     )
     return dict(rows.tuples().all())
+
+
+async def issue_funded(session: AsyncSession, identifier: str) -> uuid.UUID:
+    """합격한 챌린지 계좌의 펀디드 계좌를 지금 발급한다 (이미 있으면 그 계좌). 펀디드 계좌 id를 돌려준다."""
+    from app.services import funded
+
+    source = await _lock_account(session, identifier)
+    account = await funded.create_for(session, source, immediate=True)
+    return account.id
