@@ -28,7 +28,7 @@ export function LeaderboardEvaluationModal({
     ['판정 기간', `${formatKstDateTime(evaluation.period_start)} ~ ${formatKstDateTime(evaluation.period_end)} (KST)`],
     ['수익률 / 수익금', `${formatSignedPercent(Math.round(evaluation.profit_rate * 100) / 100)} / ${formatSignedUsdMoney(evaluation.profit)}`],
     ['청산 거래 / 미결 포지션', `${evaluation.trades_count}건 / ${evaluation.open_positions}건`],
-    ['룰셋', evaluation.ruleset_id ?? '연결된 룰셋 없음'],
+    ['룰셋', evaluation.ruleset_name ?? evaluation.ruleset_id ?? '연결된 룰셋 없음'],
     ['확인 시각', `${formatKstDateTime(evaluation.created_at)} (KST)`],
   ];
 

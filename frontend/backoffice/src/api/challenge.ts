@@ -150,6 +150,8 @@ export interface ChallengeEvaluation {
   account_id: string;
   challenge_id: string;
   ruleset_id: string | null;
+  /** 룰셋 이름 (룰셋이 삭제되었으면 null) */
+  ruleset_name?: string | null;
   result: 'PASSED' | 'FAILED';
   period_start: string;
   period_end: string;

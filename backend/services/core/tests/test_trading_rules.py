@@ -146,6 +146,10 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, ro
     # 관리자 '확인하기'도 같은 룰을 쓰고 MANUAL로 남는다
     res = client.post(f"/api/v1/admin/challenges/leaderboard/accounts/{acc}/evaluate", headers=admin_headers)
     assert res.status_code == 200 and res.json()["source"] == "MANUAL" and res.json()["rules_applied"] == 4
+    # 팝업에는 룰셋 코드 대신 이름을 보여 준다
+    assert res.json()["ruleset_id"] == "RS-TEST" and res.json()["ruleset_name"] == "Test"
+    latest = client.get(f"/api/v1/admin/challenges/leaderboard/accounts/{acc}/evaluation", headers=admin_headers)
+    assert latest.json()["ruleset_name"] == "Test"
 
 
 def test_funded_daily_loss(client, admin_headers, round_, active):  # noqa: F811
