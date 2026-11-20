@@ -8,8 +8,6 @@ export const TOOLTIP_DESCRIPTIONS = {
     "The maximum amount your account is allowed to lose. The drawdown threshold is calculated based on the End-of-Day (EOD) account balance and may adjust according to the account's trading rules.",
   dailyLossLimit:
     'The maximum loss allowed within a single trading day. Exceeding this limit may result in a rule violation or trading restriction, depending on the account type.',
-  maxContracts:
-    'The maximum number of futures contracts you are allowed to hold simultaneously. Contract limits may differ depending on the instrument and account type.',
   consistency:
     "A trading rule designed to ensure that profits are generated consistently rather than from a single large winning day. The maximum contribution of one trading day's profit is determined by the account's consistency requirements.",
   tradingPeriod:

@@ -82,7 +82,6 @@ export const landingKo: LandingTranslations = {
     labels: {
       profitTarget: '수익 목표',
       maxDrawdownEod: '최대 낙폭 (EOD)',
-      maxContracts: '최대 계약 수',
       minTradingDays: '최소 거래일',
       consistency: '일관성',
       phase: '단계',
@@ -107,7 +106,6 @@ export const landingKo: LandingTranslations = {
         profitTarget: '챌린지 단계를 통과하기 위해 달성해야 하는 목표 수익금입니다.',
         maxDrawdownEod: '장 마감(EOD) 잔액을 기준으로 적용되는 최대 허용 손실폭입니다.',
         dailyLossLimit: '하루 동안 허용되는 최대 손실 한도입니다.',
-        maxContracts: '운용 가능한 미니 및 마이크로 계약의 최대 포지션 수량입니다.',
         minTradingDays: '챌린지 단계를 통과하려면 거래해야 하는 최소 일수입니다.',
         consistency: '특정 단일 일자에 수익이 과도하게 집중되는 것을 방지하는 일관성 룰입니다.',
         tradingPeriod: '챌린지 수료를 위해 최소한으로 매매해야 하는 일수입니다.',

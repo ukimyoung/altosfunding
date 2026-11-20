@@ -42,9 +42,6 @@ export interface ChallengeOfferRules {
   pass_condition_type: 'RELATIVE' | 'ABSOLUTE' | string;
   pass_condition_pct: number | null;
   pass_condition_amt: number | null;
-  /** 최대 Mini·Micro 거래 계약수. null이면 제한 없음 */
-  max_mini_contracts?: number | null;
-  max_micro_contracts?: number | null;
   /** 일관성(%). null이면 검사 안 함 */
   consistency_pct?: number | null;
 }

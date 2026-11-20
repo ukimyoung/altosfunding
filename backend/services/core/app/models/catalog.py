@@ -32,8 +32,6 @@ class Ruleset(Base):
     profit_target_amt: Mapped[Decimal | None]
     min_trading_days: Mapped[int] = mapped_column(server_default="5")
     inactivity_days: Mapped[int] = mapped_column(server_default="30")
-    max_mini_contracts: Mapped[int | None]
-    max_micro_contracts: Mapped[int | None]
     consistency_pct: Mapped[Decimal | None]
     retry_policy: Mapped[str] = mapped_column(server_default="NONE")
     apply_scope: Mapped[str] = mapped_column(server_default="NEW")

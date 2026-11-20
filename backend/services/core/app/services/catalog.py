@@ -78,7 +78,7 @@ async def create_ruleset(session: AsyncSession, data: dict) -> Ruleset:
 def update_ruleset(ruleset: Ruleset, data: dict) -> None:
     nullable = {"max_dd_normal_amt", "max_dd_vip_amt", "stop_out_pct", "pass_condition_pct", "pass_condition_amt",
                 "pass_condition_vip_pct", "pass_condition_vip_amt", "profit_target_pct",
-                "max_mini_contracts", "max_micro_contracts", "consistency_pct", "daily_loss_limit_amt", "profit_target_amt"}
+                "consistency_pct", "daily_loss_limit_amt", "profit_target_amt"}
     for field, value in data.items():
         # 값이 필요한 항목에 null이 오면 바꾸지 않는다.
         if value is None and field not in nullable:

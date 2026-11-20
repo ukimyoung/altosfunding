@@ -83,7 +83,6 @@ export const landingEn: LandingTranslations = {
     labels: {
       profitTarget: 'Profit Target',
       maxDrawdownEod: 'Max Drawdown (EOD)',
-      maxContracts: 'Max Contracts',
       minTradingDays: 'Min. Trading Days',
       consistency: 'Consistency',
       phase: 'Phase',
@@ -108,7 +107,6 @@ export const landingEn: LandingTranslations = {
         profitTarget: 'The target profit required to pass the challenge stage.',
         maxDrawdownEod: 'Maximum allowable drawdown calculated based on the End-of-Day balance.',
         dailyLossLimit: 'The maximum amount of loss permitted within a single trading day.',
-        maxContracts: 'The maximum position size allowed across Mini and Micro contracts.',
         minTradingDays: 'The minimum number of days you must trade to pass the challenge stage.',
         consistency: 'The rule ensuring profits are distributed across multiple trading days.',
         tradingPeriod: 'Minimum required active trading days to complete the evaluation.',

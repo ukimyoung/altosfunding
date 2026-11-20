@@ -130,15 +130,6 @@ export function StartNewChallengePage() {
   const formatLimit = (amount: number | null | undefined) =>
     amount ? formatMoney(amount) : text.none;
   const formatLeverage = (leverage: number) => `1:${leverage}`;
-  // 최대 Mini·Micro 계약 수 (예: 1 Mini (10 Micro)). 둘 다 없으면 '없음'
-  const formatContracts = (rules: ChallengeOfferRules | null | undefined) => {
-    const mini = rules?.max_mini_contracts;
-    const micro = rules?.max_micro_contracts;
-    if (mini && micro) return `${mini} Mini (${micro} Micro)`;
-    if (mini) return `${mini} Mini`;
-    if (micro) return `${micro} Micro`;
-    return text.none;
-  };
   // 일관성(%). 0이거나 없으면 '없음'
   const formatPct = (pct: number | null | undefined) =>
     pct ? `${pct.toLocaleString('en-US', { maximumFractionDigits: 2 })}%` : text.none;
@@ -1037,15 +1028,6 @@ export function StartNewChallengePage() {
                             */}
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
-                                <InfoTooltip content={tooltips.maxContracts} />
-                                {text.maxContracts}
-                              </span>
-                              <span className="text-right text-sm font-bold text-white">
-                                {formatContracts(account.rules)}
-                              </span>
-                            </div>
-                            <div className="flex items-start justify-between gap-3">
-                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.minTradingDays} />
                                 {text.minTradingDaysShort}
                               </span>
@@ -1121,15 +1103,6 @@ export function StartNewChallengePage() {
                               </span>
                             </div>
                             */}
-                            <div className="flex items-start justify-between gap-3">
-                              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
-                                <InfoTooltip content={tooltips.maxContracts} />
-                                {text.maxContracts}
-                              </span>
-                              <span className="text-right text-sm font-bold text-white">
-                                {formatContracts(funded.rules)}
-                              </span>
-                            </div>
                             <div className="flex items-start justify-between gap-3">
                               <span className="inline-flex shrink-0 items-center gap-1.5 text-sm text-gray-400">
                                 <InfoTooltip content={tooltips.consistency} />
