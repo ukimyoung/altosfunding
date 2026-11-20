@@ -1,6 +1,7 @@
 import { AppBrand } from '../../components/shared/AppBrand';
 import { SecurityPage } from './SecurityPage';
-import { KYCPage } from './KYCPage';
+// KYC menu removed: Identity Verification now lives on the Security page.
+// import { KYCPage } from './KYCPage';
 import { DownloadPlatformPage } from './DownloadPlatformPage';
 import { AnnouncementsPage } from './AnnouncementsPage';
 import { AnnouncementDetailPage } from './AnnouncementDetailPage';
@@ -178,7 +179,8 @@ export function MyPage() {
         { id: 'my-account', label: text.nav.myAccount, path: '/my-page/my-account' },
         { id: 'my-asset', label: text.nav.myAsset, path: '/my-page/my-asset' },
         { id: 'security', label: text.nav.security, path: '/my-page/security' },
-        { id: 'kyc', label: text.nav.kyc, path: '/my-page/kyc' },
+        // KYC menu hidden: Identity Verification moved to Security (/my-page/security#kyc).
+        // { id: 'kyc', label: text.nav.kyc, path: '/my-page/kyc' },
       ],
     },
     {
@@ -279,6 +281,12 @@ export function MyPage() {
 
   // Map URLs to menu IDs
   useEffect(() => {
+    // The KYC menu was removed; send old /my-page/kyc links to the KYC card on Security.
+    if (location.pathname === '/my-page/kyc') {
+      navigate('/my-page/security#kyc', { replace: true });
+      return;
+    }
+
     const pathToMenuMap: Record<string, string> = {
       '/my-page': 'home',
       '/my-page/start-new-challenge': 'new-challenge',
@@ -294,7 +302,8 @@ export function MyPage() {
       '/my-page/my-account': 'my-account',
       '/my-page/my-asset': 'my-asset',
       '/my-page/security': 'security',
-      '/my-page/kyc': 'kyc',
+      // Old KYC links are redirected to /my-page/security#kyc (see effect below).
+      // '/my-page/kyc': 'kyc',
       '/my-page/announcements': 'announcements',
       '/my-page/download-platform': 'download-platform',
       '/help-center': 'help-center',
@@ -742,8 +751,10 @@ export function MyPage() {
           <MyAssetPage />
         ) : activeMenu === 'security' ? (
           <SecurityPage />
+        /* KYC menu hidden: Identity Verification is shown on the Security page.
         ) : activeMenu === 'kyc' ? (
           <KYCPage />
+        */
         ) : activeMenu === 'download-platform' ? (
           <DownloadPlatformPage />
         ) : activeMenu === 'announcements' ? (

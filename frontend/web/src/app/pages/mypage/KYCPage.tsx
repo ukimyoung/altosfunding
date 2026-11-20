@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import SumsubWebSdk from '@sumsub/websdk-react';
-import { AlertCircle, Loader2, RefreshCw, Shield } from 'lucide-react';
+import { motion } from 'motion/react';
+import { AlertCircle, Check, Clock, Loader2, RefreshCw, Shield, UserCheck, X } from 'lucide-react';
 import {
   getKycStatus,
   getSumsubAccessToken,
@@ -30,16 +31,32 @@ const getKycStatusLabel = (status: KycStatus | null, translations: KycTranslatio
   }
 };
 
+// Same pill style as the Security page's Email Verification status badge.
 const getKycStatusClassName = (status: KycStatus | null) => {
   switch (status) {
     case 'APPROVED':
-      return 'border-[#00FF94]/30 bg-[#00FF94]/10 text-[#00FF94]';
+      return 'bg-[#00FF94]/10 border border-[#00FF94]/20 text-[#00FF94]';
     case 'PENDING':
-      return 'border-[#FFB800]/30 bg-[#FFB800]/10 text-[#FFB800]';
+      return 'bg-[#FFB800]/10 border border-[#FFB800]/20 text-[#FFB800]';
     case 'REJECTED':
-      return 'border-red-500/30 bg-red-500/10 text-red-300';
+      return 'bg-red-500/10 border border-red-500/20 text-red-400';
     default:
-      return 'border-[#2a2a3a] bg-[#1a1a24] text-gray-300';
+      return 'bg-[#2a2a3a] border border-[#2a2a3a] text-gray-400';
+  }
+};
+
+const KycStatusIcon = ({ status }: { status: KycStatus | null }) => {
+  switch (status) {
+    case 'APPROVED':
+      return <Check size={16} />;
+    case 'PENDING':
+      return <Clock size={16} />;
+    case null:
+      return <Loader2 size={16} className="animate-spin" />;
+    case 'REJECTED':
+      return <X size={16} />;
+    default:
+      return <AlertCircle size={16} />;
   }
 };
 
@@ -53,7 +70,16 @@ const parseAccessToken = (response: SumsubAccessTokenResponse, translations: Kyc
 const canStartVerification = (status: KycStatus | null) =>
   status === 'NONE' || status === 'REJECTED';
 
-export function KYCPage() {
+type KycVerificationSectionProps = {
+  /** Entrance animation delay, matching the other cards on the Security page. */
+  animationDelay?: number;
+};
+
+/**
+ * Identity Verification (KYC) card shown on My Profile > Security,
+ * below Email Verification. Uses the same card layout as Email Verification.
+ */
+export function KycVerificationSection({ animationDelay = 0 }: KycVerificationSectionProps) {
   const { locale, T } = useLocale();
   const text = T.kyc;
   const [accessToken, setAccessToken] = useState('');
@@ -155,145 +181,151 @@ export function KYCPage() {
     };
   }, [text.loadFailed]);
 
+  const showStartButton =
+    !isLoading && !statusErrorMessage && !accessToken && canStartVerification(kycStatus) && !hasSubmittedInSession;
+  const showRefreshButton =
+    !isLoading &&
+    !statusErrorMessage &&
+    !accessToken &&
+    (submissionMessage !== '' || (kycStatus === 'PENDING' && !hasSubmittedInSession));
+
+  return (
+    <motion.div
+      id="kyc"
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: animationDelay }}
+      className="bg-[#0f0f17] border border-[#1a1a24] rounded-xl p-6 scroll-mt-24"
+    >
+      {/*
+        Previous manual document upload flow is intentionally disabled.
+        Sumsub WebSDK now owns the document capture and verification UI.
+      */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-4">
+          <div className="w-12 h-12 rounded-lg bg-[#0052FF]/10 flex items-center justify-center flex-shrink-0">
+            <UserCheck size={24} className="text-[#0052FF]" />
+          </div>
+          <div>
+            <h2 className="text-white text-lg font-medium mb-1">{text.sectionTitle}</h2>
+            <p className="text-gray-400 text-sm mb-4">{text.sectionSubtitle}</p>
+
+            {statusErrorMessage ? (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg w-fit mb-4 bg-red-500/10 border border-red-500/20 text-red-400">
+                <AlertCircle size={16} />
+                <span className="text-sm font-medium">{statusErrorMessage}</span>
+              </div>
+            ) : !hasSubmittedInSession ? (
+              <div
+                className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg w-fit mb-4 ${getKycStatusClassName(
+                  isLoading ? null : kycStatus,
+                )}`}
+              >
+                <KycStatusIcon status={isLoading ? null : kycStatus} />
+                <span className="text-sm font-medium">
+                  {getKycStatusLabel(isLoading ? null : kycStatus, text)}
+                </span>
+              </div>
+            ) : null}
+
+            {kycStatus === 'REJECTED' && rejectReason && !hasSubmittedInSession && (
+              <div className="mb-4 rounded-lg border border-red-500/20 bg-red-500/10 p-4">
+                <p className="mb-1 text-sm font-medium text-red-300">{text.rejectionReason}</p>
+                <p className="text-sm text-gray-300">{rejectReason}</p>
+              </div>
+            )}
+
+            {submissionMessage && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg w-fit mb-4 bg-[#00FF94]/10 border border-[#00FF94]/20 text-[#00FF94]">
+                <Check size={16} />
+                <span className="text-sm font-medium">{submissionMessage}</span>
+              </div>
+            )}
+
+            {verificationErrorMessage && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg w-fit mb-4 bg-red-500/10 border border-red-500/20 text-red-400">
+                <AlertCircle size={16} />
+                <span className="text-sm font-medium">{verificationErrorMessage}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {(showStartButton || showRefreshButton) && (
+          <div className="flex-shrink-0">
+            {showStartButton ? (
+              <button
+                type="button"
+                onClick={handleStartVerification}
+                disabled={isStartingVerification}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#0052FF] text-white text-sm rounded-lg hover:bg-[#0066FF] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isStartingVerification && <Loader2 size={16} className="animate-spin" />}
+                {kycStatus === 'REJECTED' ? text.retryVerification : text.startVerification}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleRefreshStatus}
+                disabled={isRefreshingStatus}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-[#1a1a24] text-white text-sm rounded-lg font-medium hover:bg-[#2a2a3a] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <RefreshCw size={14} className={isRefreshingStatus ? 'animate-spin' : undefined} />
+                {isRefreshingStatus ? text.refreshing : text.refreshStatus}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {accessToken && (
+        <div className="mt-6 overflow-hidden rounded-xl border border-[#1a1a24]">
+          <SumsubWebSdk
+            accessToken={accessToken}
+            expirationHandler={requestAccessToken}
+            config={{
+              lang: locale,
+              theme: 'dark',
+            }}
+            options={{
+              addViewportTag: false,
+              adaptIframeHeight: true,
+            }}
+            onMessage={handleSumsubMessage}
+            onError={() => {
+              setVerificationErrorMessage(text.sdkLoadFailed);
+              setAccessToken('');
+            }}
+          />
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/**
+ * Former standalone My Profile > KYC page.
+ * The KYC menu is hidden; KYC now lives on the Security page (KycVerificationSection).
+ * Kept for reference only, not routed.
+ */
+export function KYCPage() {
+  const { T } = useLocale();
+  const text = T.kyc;
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      {/* Page Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 rounded-lg bg-[#0052FF]/10 flex items-center justify-center">
             <Shield size={24} className="text-[#0052FF]" />
           </div>
           <div>
-            <h1 className="text-2xl text-white font-medium">{text.sectionTitle}</h1>
-            <p className="text-gray-400 text-sm mt-1">{text.sectionSubtitle}</p>
+            <h1 className="text-2xl text-white font-medium">{text.pageTitle}</h1>
+            <p className="text-gray-400 text-sm mt-1">{text.pageSubtitle}</p>
           </div>
         </div>
       </div>
-
-      {/*
-        Previous manual document upload flow is intentionally disabled.
-        Sumsub WebSDK now owns the document capture and verification UI.
-      */}
-
-      <div className="bg-[#0f0f17] border border-[#1a1a24] rounded-xl overflow-hidden">
-        {isLoading ? (
-          <div className="flex min-h-[420px] items-center justify-center p-8 text-gray-300">
-            <div className="flex items-center gap-3">
-              <Loader2 size={22} className="animate-spin text-[#00FF94]" />
-              <span className="text-sm font-medium">{text.loadingStatus}</span>
-            </div>
-          </div>
-        ) : statusErrorMessage ? (
-          <div className="p-6">
-            <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
-              {statusErrorMessage}
-            </div>
-          </div>
-        ) : accessToken ? (
-          <div>
-            <SumsubWebSdk
-              accessToken={accessToken}
-              expirationHandler={requestAccessToken}
-              config={{
-                lang: locale,
-                theme: 'dark',
-              }}
-              options={{
-                addViewportTag: false,
-                adaptIframeHeight: true,
-              }}
-              onMessage={handleSumsubMessage}
-              onError={() => {
-                setVerificationErrorMessage(text.sdkLoadFailed);
-                setAccessToken('');
-              }}
-            />
-          </div>
-        ) : (
-          <div className="p-6">
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-400">{text.verificationStatus}</p>
-
-                {!hasSubmittedInSession && (
-                  <div
-                    className={`inline-flex w-fit items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${getKycStatusClassName(kycStatus)}`}
-                  >
-                    <AlertCircle size={14} />
-                    {getKycStatusLabel(kycStatus, text)}
-                  </div>
-                )}
-              </div>
-
-              {kycStatus === 'REJECTED' && rejectReason && !hasSubmittedInSession && (
-                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertCircle size={18} className="mt-0.5 flex-shrink-0 text-red-400" />
-                    <div>
-                      <p className="mb-1 text-sm font-semibold text-red-200">
-                        {text.rejectionReason}
-                      </p>
-                      <p className="text-sm leading-6 text-gray-300">{rejectReason}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {canStartVerification(kycStatus) && !hasSubmittedInSession && (
-                <div className="space-y-4">
-                  <button
-                    type="button"
-                    onClick={handleStartVerification}
-                    disabled={isStartingVerification}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-[#0052FF] to-[#0066FF] px-6 py-3 font-semibold text-white transition-all hover:shadow-lg hover:shadow-[#0052FF]/30 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {isStartingVerification && <Loader2 size={18} className="animate-spin" />}
-                    {kycStatus === 'REJECTED' ? text.retryVerification : text.startVerification}
-                  </button>
-                </div>
-              )}
-
-              {verificationErrorMessage && (
-                <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
-                  {verificationErrorMessage}
-                </div>
-              )}
-
-              {kycStatus === 'PENDING' && !submissionMessage && (
-                <button
-                  type="button"
-                  onClick={handleRefreshStatus}
-                  disabled={isRefreshingStatus}
-                  className="inline-flex w-fit items-center gap-2 rounded-lg border border-[#FFB800]/30 px-4 py-2 text-sm font-medium text-[#FFB800] transition-colors hover:bg-[#FFB800]/10 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <RefreshCw size={15} className={isRefreshingStatus ? 'animate-spin' : undefined} />
-                  {isRefreshingStatus ? text.refreshing : text.refreshStatus}
-                </button>
-              )}
-
-              {submissionMessage && (
-                <div className="space-y-4 rounded-lg border border-[#00FF94]/20 bg-[#00FF94]/10 p-4 text-sm text-[#00FF94]">
-                  <p>{submissionMessage}</p>
-                  <button
-                    type="button"
-                    onClick={handleRefreshStatus}
-                    disabled={isRefreshingStatus}
-                    className="inline-flex items-center gap-2 rounded-lg border border-[#00FF94]/30 px-4 py-2 font-medium text-[#00FF94] transition-colors hover:bg-[#00FF94]/10 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <RefreshCw
-                      size={15}
-                      className={isRefreshingStatus ? 'animate-spin' : undefined}
-                    />
-                    {isRefreshingStatus ? text.refreshing : text.refreshStatus}
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
+      <KycVerificationSection />
     </div>
   );
 }
-

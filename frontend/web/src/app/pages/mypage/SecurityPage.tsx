@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import axios from 'axios';
 import {
   Shield,
@@ -29,6 +29,7 @@ import {
 } from '@/app/queries/security';
 import { getApiErrorMessage, isUnauthorizedError } from '@altosfunding/shared/api/errors';
 import { useLocale } from '@/app/i18n/LocaleContext';
+import { KycVerificationSection } from './KYCPage';
 
 type PasswordFormData = {
   currentPassword: string;
@@ -68,6 +69,7 @@ const formatLoginTimestamp = (value: string) =>
 
 export function SecurityPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { T } = useLocale();
   const text = T.security;
   const { data: me, error: meError, isLoading: isLoadingProfile } = useMeQuery();
@@ -503,6 +505,20 @@ export function SecurityPage() {
     setPendingDisableAction(null);
   };
 
+  // Links to the former KYC menu land here as /my-page/security#kyc.
+  // My Page scrolls to the top on menu change, so scroll to the KYC card after that.
+  useEffect(() => {
+    if (location.hash !== '#kyc') {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      document.getElementById('kyc')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [location.hash]);
+
   return (
     <>
       <Toast
@@ -667,12 +683,15 @@ export function SecurityPage() {
             </div>
           </motion.div>
 
+          {/* Identity Verification (KYC) Section — moved here from the former My Profile > KYC menu */}
+          <KycVerificationSection animationDelay={0.1} />
+
           {/* Change Password Section */}
           {!isLoadingProfile && me?.can_change_password === true && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
+              transition={{ duration: 0.3, delay: 0.15 }}
               className="bg-[#0f0f17] border border-[#1a1a24] rounded-xl p-6"
             >
               <div className="flex items-start gap-4 mb-6">
