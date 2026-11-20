@@ -23,6 +23,7 @@
 (RISK_ENFORCE=true, 2026-11-20 2단계). 기간 중 판정은 기록만 한다. 펀디드 계좌 발급은 하지 않는다.
 """
 
+import re
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -351,6 +352,53 @@ async def latest(session: AsyncSession, account_id: uuid.UUID) -> ChallengeEvalu
     return await session.scalar(
         select(ev).where(ev.account_id == account_id).order_by(ev.created_at.desc(), ev.id.desc()).limit(1)
     )
+
+
+_M = r"\$(-?[\d,]+\.\d+)"
+_DETAIL_PATTERNS: dict[str, list[tuple[re.Pattern, Callable[[re.Match], dict]]]] = {
+    "profit_target": [
+        (re.compile(rf"수익 {_M} / 목표 {_M}"), lambda m: {"profit": _f(m[1]), "target": _f(m[2])}),
+    ],
+    "min_trading_days": [
+        (re.compile(r"거래일 (\d+)일 / 최소 (\d+)일"), lambda m: {"days": int(m[1]), "required": int(m[2])}),
+    ],
+    "max_drawdown": [
+        (
+            re.compile(rf"^(\d{{4}}-\d{{2}}-\d{{2}} \d{{2}}:\d{{2}}) UTC 위반: 평가금액 {_M} ≤ 기준선 {_M} \(DD {_M}\)"),
+            lambda m: {
+                "violated_at": f"{m[1].replace(' ', 'T')}:00+00:00", "equity": _f(m[2]), "floor": _f(m[3]), "dd": _f(m[4]),
+            },
+        ),
+        (
+            re.compile(rf"위반 없음 \(DD {_M}(?:, 마지막 기준선 {_M})?\)"),
+            lambda m: {"dd": _f(m[1]), "floor": _f(m[2]) if m[2] else None},
+        ),
+    ],
+    "consistency": [
+        (re.compile(rf"전체 순수익 {_M} — 비율 계산 안 함"), lambda m: {"total": _f(m[1]), "skipped": True}),
+        (
+            re.compile(rf"하루 최대 수익 {_M}(?: \((\d{{4}}-\d{{2}}-\d{{2}})\))? / 전체 순수익 {_M} = ([\d.]+)% \(기준 ([\d.]+)%\)"),
+            lambda m: {
+                "best": _f(m[1]), "best_day": m[2], "total": _f(m[3]), "ratio": float(m[4]), "limit": float(m[5]),
+            },
+        ),
+    ],
+}
+
+
+def _f(text: str) -> float:
+    return float(text.replace(",", ""))
+
+
+def with_values(check: dict) -> dict:
+    """values가 없는 이전 판정(2026-11-20 이전)은 저장된 한국어 문구에서 숫자 값을 되살린다 (웹 영어 화면용)."""
+    if check.get("values") or not check.get("detail"):
+        return check
+    for pattern, build in _DETAIL_PATTERNS.get(check.get("key", ""), []):
+        m = pattern.search(check["detail"])
+        if m:
+            return {**check, "values": build(m)}
+    return check
 
 
 async def final_of_member(session: AsyncSession, account_id: uuid.UUID) -> ChallengeEvaluation | None:
