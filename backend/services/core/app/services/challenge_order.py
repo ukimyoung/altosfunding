@@ -20,6 +20,7 @@ from decimal import Decimal
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.errors import AppError
 from app.models import Challenge, ChallengeOrder, Mt4AccountIssuedHistory, Product, TradingAccount, User
 from app.security import generate_human_code
@@ -40,7 +41,12 @@ QUEUED, DONE = "QUEUED", "DONE"
 
 PROVISION_JOB = "mt4.provision_challenge_account"
 READ_ONLY_JOB = "mt4.set_read_only"
+# 전량 청산 + 읽기 전용 (룰 위반·대회 종료·펀디드 하루 정지)
+CLOSE_ALL_JOB = "mt4.close_all_and_lock"
 ISSUED_MAIL_JOB = "notify.challenge_account_issued"
+# 룰 위반으로 FAILED 처리 안내 (account_violated), 챌린지 최종 결과 안내 (challenge_passed / challenge_failed)
+VIOLATION_MAIL_JOB = "notify.account_violated"
+RESULT_MAIL_JOB = "notify.challenge_result"
 # 30초부터 두 배씩 기다리며 8번 → 처음 시도부터 약 1시간 동안 재시도한 뒤 환불한다.
 PROVISION_MAX_ATTEMPTS = 8
 
@@ -178,6 +184,23 @@ def _finish_if_done(order: ChallengeOrder, now: datetime) -> None:
     order.completed_at = now
 
 
+def should_be_read_only(account: TradingAccount, now: datetime | None = None) -> bool:
+    """MT4에서 읽기 전용이어야 하는가: 거래 가능 상태가 아니거나, 펀디드 하루 정지(trading_halted_until) 중."""
+    if account.status not in TRADABLE_STATUSES:
+        return True
+    halted = account.trading_halted_until
+    return halted is not None and halted > (now or _now())
+
+
+async def enqueue_close_all(session: AsyncSession, account: TradingAccount, reason: str) -> None:
+    """미결 포지션·대기 주문을 모두 청산하고 읽기 전용으로 잠그는 작업 (Worker가 MT4 호출)."""
+    await jobs.enqueue(
+        session, CLOSE_ALL_JOB, {"account_id": str(account.id), "reason": reason[:200]},
+        dedupe_key=f"closeall:{account.id}", ref_type="trading_account", ref_id=str(account.id), priority=8,
+        max_attempts=8,
+    )
+
+
 async def enqueue_read_only(session: AsyncSession, account: TradingAccount, read_only: bool) -> None:
     await jobs.enqueue(
         session, READ_ONLY_JOB, {"account_id": str(account.id), "read_only": read_only},
@@ -307,8 +330,12 @@ async def on_challenge_status_changed(session: AsyncSession, challenge: Challeng
         )
     )
     for account in accounts:
+        was_tradable = account.status in TRADABLE_STATUSES
         account.status = to_status
-        if account.is_read_only != read_only:
+        if read_only and was_tradable and settings.risk_enforce:
+            # 대회 종료·취소: 남은 포지션을 모두 청산하고 잠근다 (최종 판정은 종료 10분 뒤 Worker가 한다).
+            await enqueue_close_all(session, account, f"challenge {challenge.status.lower()}")
+        elif account.is_read_only != read_only:
             await enqueue_read_only(session, account, read_only)
     return len(accounts)
 

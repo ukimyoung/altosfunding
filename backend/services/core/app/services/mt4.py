@@ -235,6 +235,13 @@ class Mt4Client:
         items = data.get("balances") if isinstance(data, dict) else data
         return [b for b in items or [] if isinstance(b, dict)]
 
+    async def close_all(self, login: int, comment: str) -> Any:
+        """미결 포지션(시장가)과 대기 주문을 모두 청산한다. MT4 API가 열린 주문을 읽고 닫기를 몇 번 반복한다."""
+        return await self._call(
+            "close_all", "POST", f"/api/mt4/accounts/{login}/orders-pending/close",
+            params={"comment": comment, "retryAttempts": 3, "delayBetweenRetryAttemptsMsec": 1000},
+        )
+
     async def open_orders(self, login: int) -> list[dict]:
         """미결 포지션(열린 주문) 목록."""
         data = await self._call("open_orders", "GET", f"/api/mt4/accounts/{login}/orders/open")

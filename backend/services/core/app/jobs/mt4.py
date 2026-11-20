@@ -11,8 +11,12 @@ mt4.provision_challenge_account — 챌린지·데모 계좌 1개 발급 (데모
   4) 발급 완료: 주문 반영·매출 분개·발급 메일 작업 (app.services.challenge_order.mark_issued)
   재시도를 다 쓰면(약 1시간) 자동 환불하고, MT4에 계좌가 생겼을 수 있으면 번호를 ORPHANED(정리 대상)로 남긴다.
 
-mt4.set_read_only — 대회 시작·종료 때 계좌 거래 잠금 해제·잠금
+mt4.set_read_only — 대회 시작·종료 때 계좌 거래 잠금 해제·잠금 (펀디드 하루 정지 해제 포함)
+mt4.close_all_and_lock — 읽기 전용으로 잠그고 미결 포지션·대기 주문을 모두 청산 (룰 위반·대회 종료·펀디드 하루 정지).
+  청산 뒤에도 열린 포지션이 남아 있으면 오류로 재시도한다.
 notify.challenge_account_issued — 계좌 발급 메일 (계좌 번호·비밀번호)
+notify.account_violated — 룰 위반으로 FAILED 처리 안내 메일
+notify.challenge_result — 챌린지 최종 결과(합격·불합격) 메일
 """
 
 import logging
@@ -288,11 +292,85 @@ async def set_read_only(session: AsyncSession, job: Job) -> dict | None:
     if account.mt4_login is None or account.provision_status != orders.DONE:
         return {"skipped": "not_issued"}
     # 그 사이 계좌 상태가 또 바뀌었으면(예: 시작 직후 취소) 새로 들어온 작업이 맞춘다.
-    if read_only != (account.status not in orders.TRADABLE_STATUSES):
+    if read_only != orders.should_be_read_only(account):
         return {"skipped": "stale"}
     await mt4.client_for(account.mt4_server).set_read_only(account.mt4_login, read_only)
     account.is_read_only = read_only
     return {"mt4_login": account.mt4_login, "read_only": read_only}
+
+
+@jobs.handler(orders.CLOSE_ALL_JOB)
+async def close_all_and_lock(session: AsyncSession, job: Job) -> dict | None:
+    account = await session.get(TradingAccount, _account_id(job), with_for_update=True)
+    if account is None:
+        raise jobs.PermanentJobError("계좌가 없습니다.")
+    if account.mt4_login is None or account.provision_status != orders.DONE:
+        return {"skipped": "not_issued"}
+    if not orders.should_be_read_only(account):
+        # 그 사이 거래 가능 상태로 돌아왔으면(예: 하루 정지 해제) 청산하지 않는다.
+        return {"skipped": "stale"}
+    client = mt4.client_for(account.mt4_server)
+    await client.set_read_only(account.mt4_login, True)
+    account.is_read_only = True
+    await session.commit()
+    await session.refresh(account, with_for_update=True)
+    reason = str(job.payload.get("reason") or "rule")
+    await client.close_all(account.mt4_login, f"Altos {reason}"[:60])
+    left = await client.open_orders(account.mt4_login)
+    if left:
+        raise RuntimeError(f"청산 후에도 열린 주문 {len(left)}개 — 다시 시도")
+    return {"mt4_login": account.mt4_login, "closed": True}
+
+
+async def _mail_context(session: AsyncSession, account: TradingAccount) -> tuple[User | None, Challenge | None]:
+    user = await session.get(User, account.user_id)
+    challenge = await session.get(Challenge, account.challenge_id) if account.challenge_id else None
+    return user, challenge
+
+
+@jobs.handler(orders.VIOLATION_MAIL_JOB)
+async def send_violation_mail(session: AsyncSession, job: Job) -> dict | None:
+    account = await session.get(TradingAccount, _account_id(job))
+    if account is None:
+        return {"skipped": True}
+    user, _ = await _mail_context(session, account)
+    if user is None:
+        return {"skipped": True}
+    ko = (user.locale or "en").startswith("ko")
+    message = job.payload.get("message_ko" if ko else "message_en") or ""
+    sent = await notify.to_user(
+        session, get_email_sender(), user, "account_violated",
+        {
+            "account_type": account.tier.title(), "mt4_login": account.mt4_login,
+            "message": message, "rule_key": job.payload.get("rule_key", ""),
+        },
+        meta={"account_id": str(account.id)},
+    )
+    return {"sent": sent}
+
+
+@jobs.handler(orders.RESULT_MAIL_JOB)
+async def send_result_mail(session: AsyncSession, job: Job) -> dict | None:
+    account = await session.get(TradingAccount, _account_id(job))
+    if account is None or account.status not in ("PASSED", "FAILED"):
+        return {"skipped": True}
+    if account.status != job.payload.get("result"):
+        return {"skipped": "stale"}  # 그 사이 다시 판정되어 결과가 바뀌었다
+    user, challenge = await _mail_context(session, account)
+    if user is None:
+        return {"skipped": True}
+    template = "challenge_passed" if account.status == "PASSED" else "challenge_failed"
+    sent = await notify.to_user(
+        session, get_email_sender(), user, template,
+        {
+            "challenge_name": challenge.name if challenge else "",
+            "mt4_login": account.mt4_login,
+            "start_date": account.start_at.strftime("%Y-%m-%d %H:%M") if account.start_at else "-",
+            "end_date": account.end_at.strftime("%Y-%m-%d %H:%M") if account.end_at else "-",
+        },
+        meta={"account_id": str(account.id)},
+    )
+    return {"sent": sent}
 
 
 @jobs.handler(orders.ISSUED_MAIL_JOB)

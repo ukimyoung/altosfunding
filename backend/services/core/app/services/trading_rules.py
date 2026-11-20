@@ -1,4 +1,4 @@
-"""트레이딩 룰 자동 검증 1단계 (기록만). Worker가 주기마다(기본 60초) run()을 부른다.
+"""트레이딩 룰 자동 검증. Worker가 주기마다(기본 60초) run()을 부른다.
 
 설계: 트레이딩 룰 자동 검증 설계 제안 (2026-11-20 사용자 확정 사항).
 
@@ -22,7 +22,13 @@
 - 대회 종료(관리자 조기 종료면 그 시각) 후 RISK_FINAL_DELAY_SECONDS(기본 10분)가 지나면
   남은 거래일을 종료 시각까지 결산하고 challenge_evaluation.evaluate(source=AUTO)로 판정을 한 줄 기록한다.
 
-이번 단계는 기록만 한다 (rule_violations.mode = SHADOW). 계좌 상태·MT4 잠금·청산·메일은 바꾸지 않는다.
+조치 (2단계, RISK_ENFORCE=true. false면 기록만: rule_violations.mode = SHADOW)
+- Max Drawdown 위반 → 계좌 FAILED + MT4 읽기 전용 + 전량 청산 (mt4.close_all_and_lock) + 위반 안내 메일.
+- 펀디드 Daily Loss 위반 → 그날만 정지: 전량 청산 + 읽기 전용, trading_halted_until = 다음 거래일 시작.
+  상태는 ACTIVE 유지, 다음 거래일이 되면 감시가 읽기 전용을 푼다.
+- 대회 종료 → 거래 중이던 계좌 전량 청산 + 잠금 (challenge_order.on_challenge_status_changed).
+- 최종 판정(자동·관리자 확인 공통) → 계좌 상태 PASSED/FAILED + 결과 메일 (challenge_evaluation.apply_result).
+- Consistency 경고(WARN)는 조치 없음. 확정은 최종 판정에서.
 """
 
 import logging
@@ -47,9 +53,12 @@ from app.models import (
     RuleViolation,
     TradingAccount,
     TradingAccountEquitySnapshot,
+    TradingAccountStatusHistory,
     TradingAccountTrade,
     User,
 )
+from app.services import challenge_order as orders
+from app.services import jobs
 from app.services.mt4_ingest import TRADE_ACTIONS
 
 logger = logging.getLogger(__name__)
@@ -222,8 +231,12 @@ async def record_violation(
     limit: Decimal | None,
     detail: str,
     now: datetime,
+    action: str | None = None,
 ) -> bool:
-    """위반 한 줄 기록. 같은 계좌·룰·거래일이 이미 있으면 기록하지 않는다 (True = 새로 기록)."""
+    """위반 한 줄 기록. 같은 계좌·룰·거래일이 이미 있으면 기록하지 않는다 (True = 새로 기록).
+
+    action이 있으면 조치까지 하는 위반(mode ENFORCED, status ACTIONED). 없으면 기록만(SHADOW·OPEN).
+    """
     stmt = (
         insert(RuleViolation)
         .values(
@@ -237,7 +250,9 @@ async def record_violation(
             limit_value=limit,
             detail=detail,
             ruleset_snapshot=ruleset_snapshot(t.ruleset),
-            mode="SHADOW",
+            mode="ENFORCED" if action else "SHADOW",
+            action=action or "NONE",
+            status="ACTIONED" if action else "OPEN",
         )
         .on_conflict_do_nothing(index_elements=["account_id", "rule_key", "trading_date"])
         .returning(RuleViolation.id)
@@ -245,9 +260,65 @@ async def record_violation(
     new_id = await session.scalar(stmt)
     if new_id is not None:
         logger.info(
-            "룰 위반(기록만) %s %s 계좌 %s (MT4 %s) %s", severity, rule_key, t.account.id, t.account.mt4_login, detail
+            "룰 위반(%s) %s %s 계좌 %s (MT4 %s) %s", action or "기록만", severity, rule_key, t.account.id,
+            t.account.mt4_login, detail,
         )
     return new_id is not None
+
+
+async def change_status(
+    session: AsyncSession, account: TradingAccount, to_status: str, action: str, reason: str,
+    changed_by: uuid.UUID | None = None,
+) -> None:
+    """계좌 상태를 바꾸고 이력(core.trading_account_status_history)을 남긴다. 시스템 조치는 changed_by = null."""
+    session.add(
+        TradingAccountStatusHistory(
+            account_id=account.id, action=action, from_status=account.status, to_status=to_status,
+            reason=reason[:500], changed_by=changed_by,
+        )
+    )
+    account.status = to_status
+
+
+def _enforce() -> bool:
+    return bool(settings.risk_enforce)
+
+
+async def _fail_on_drawdown(session: AsyncSession, t: Target, equity: Decimal, floor: Decimal) -> None:
+    """Max Drawdown 위반 조치: FAILED + 전량 청산·읽기 전용 + 안내 메일."""
+    a = t.account
+    await change_status(session, a, "FAILED", "RULE_VIOLATION", f"Max Drawdown 위반: 평가금액 ${equity:,.2f} ≤ 기준선 ${floor:,.2f}")
+    await orders.enqueue_close_all(session, a, "max drawdown")
+    await jobs.enqueue(
+        session, orders.VIOLATION_MAIL_JOB,
+        {
+            "account_id": str(a.id), "rule_key": MAX_DRAWDOWN,
+            "message_en": f"Max Drawdown breached: equity ${equity:,.2f} reached the limit ${floor:,.2f}",
+            "message_ko": f"최대 손실 한도 위반: 평가금액 ${equity:,.2f}이 기준선 ${floor:,.2f}에 도달",
+        },
+        dedupe_key=f"mail:violated:{a.id}:{MAX_DRAWDOWN}", ref_type="trading_account", ref_id=str(a.id),
+    )
+
+
+async def _halt_for_day(session: AsyncSession, t: Target, day: date) -> None:
+    """펀디드 Daily Loss 위반 조치: 다음 거래일 시작까지 정지 (전량 청산·읽기 전용, 상태 ACTIVE 유지)."""
+    t.account.trading_halted_until = day_bounds(day)[1]
+    await orders.enqueue_close_all(session, t.account, "daily loss")
+
+
+async def release_halts(session: AsyncSession, now: datetime) -> int:
+    """하루 정지가 끝난(다음 거래일이 된) 계좌의 읽기 전용을 푼다."""
+    a = TradingAccount
+    rows = list(
+        await session.scalars(
+            select(a).where(a.trading_halted_until.is_not(None), a.trading_halted_until <= now).with_for_update()
+        )
+    )
+    for account in rows:
+        account.trading_halted_until = None
+        if account.status in orders.TRADABLE_STATUSES:
+            await orders.enqueue_read_only(session, account, False)
+    return len(rows)
 
 
 async def _has_violation(session: AsyncSession, account_id: uuid.UUID, rule_key: str) -> bool:
@@ -431,25 +502,36 @@ async def check_account(session: AsyncSession, t: Target, now: datetime) -> dict
             and await record_violation(
                 session, t, MAX_DRAWDOWN, HARD, today, equity, Decimal(floor),
                 f"평가금액 ${equity:,.2f} ≤ 기준선 ${Decimal(floor):,.2f} (DD ${Decimal(state.dd_amount):,.2f})", now,
+                action="CLOSE_ALL+READ_ONLY+FAILED" if _enforce() else None,
             )
         ):
             counts["violations"] += 1
+            if _enforce():
+                await _fail_on_drawdown(session, t, equity, Decimal(floor))
+                await session.flush()
+                return counts
 
-    if a.tier == FUNDED:
+    halted = a.trading_halted_until is not None and a.trading_halted_until > now
+    if a.tier == FUNDED and not halted:
         limit = daily_loss_amount(t.ruleset, t.capital)
         if limit is not None:
             loss = Decimal(state.day_start_balance) - equity
             if loss >= limit and await record_violation(
                 session, t, DAILY_LOSS, HARD, today, loss, limit,
                 f"오늘 손실 ${loss:,.2f} ≥ 한도 ${limit:,.2f} (시작 잔고 ${Decimal(state.day_start_balance):,.2f})", now,
+                action="CLOSE_ALL+READ_ONLY_DAY" if _enforce() else None,
             ):
                 counts["violations"] += 1
+                if _enforce():
+                    await _halt_for_day(session, t, today)
     await session.flush()
     return counts
 
 
 async def monitor(session: AsyncSession, now: datetime) -> dict[str, int]:
-    counts = {"checked": 0, "violations": 0, "days_closed": 0, "failed": 0}
+    counts = {"checked": 0, "violations": 0, "days_closed": 0, "failed": 0, "released": 0}
+    if _enforce():
+        counts["released"] = await release_halts(session, now)
     for t in await _targets(session, TradingAccount.status == "ACTIVE"):
         try:
             async with session.begin_nested():

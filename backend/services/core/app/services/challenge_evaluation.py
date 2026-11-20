@@ -19,7 +19,8 @@
   비율을 따지지 않는다 (수익 목표에서 이미 불합격).
 
 관리자 '확인하기'(source=MANUAL)와 대회 종료 후 Worker 자동 판정(source=AUTO)이 같은 룰을 쓴다.
-판정은 결과 기록만 한다. 계좌 상태(PASSED/FAILED)·MT4 읽기 전용·펀디드 발급은 바꾸지 않는다.
+대회가 끝난 뒤 종료 시각까지 본 판정(최종 판정)이면 계좌 상태를 PASSED/FAILED로 바꾸고 결과 메일을 보낸다
+(RISK_ENFORCE=true, 2026-11-20 2단계). 기간 중 판정은 기록만 한다. 펀디드 계좌 발급은 하지 않는다.
 """
 
 import uuid
@@ -310,7 +311,39 @@ async def evaluate(
     )
     session.add(evaluation)
     await session.flush()
+    if is_final(ctx):
+        await apply_result(session, ctx.account, evaluation.result, admin_id)
     return evaluation
+
+
+# 최종 판정이 바꿀 수 있는 계좌 상태 (비활성·영구정지·취소 계좌는 그대로 둔다)
+RESULT_STATUSES = ("CLOSED", "PASSED", "FAILED")
+
+
+def is_final(ctx: EvaluationContext) -> bool:
+    """대회가 끝났고 종료 시각까지 본 판정인가."""
+    return ctx.challenge.status == "CLOSED" and ctx.period_end >= leaderboard.cutoff(ctx.challenge)
+
+
+async def apply_result(session: AsyncSession, account: TradingAccount, result: str, admin_id: uuid.UUID | None) -> bool:
+    """최종 판정 결과를 계좌 상태에 반영한다. 처음 결과가 정해질 때(CLOSED에서 바뀔 때) 결과 메일을 보낸다."""
+    from app.config import settings
+    from app.services import challenge_order as orders
+    from app.services import jobs, trading_rules
+
+    if not settings.risk_enforce or account.status not in RESULT_STATUSES or account.status == result:
+        return False
+    first = account.status == "CLOSED"
+    await trading_rules.change_status(
+        session, account, result, "EVALUATION", f"챌린지 최종 판정 {result}" + ("" if admin_id else " (자동)"), admin_id
+    )
+    if first:
+        await jobs.enqueue(
+            session, orders.RESULT_MAIL_JOB, {"account_id": str(account.id), "result": result},
+            dedupe_key=f"mail:challenge_result:{account.id}", ref_type="trading_account", ref_id=str(account.id),
+        )
+    await session.flush()
+    return True
 
 
 async def latest(session: AsyncSession, account_id: uuid.UUID) -> ChallengeEvaluation | None:
