@@ -40,7 +40,7 @@ export type NavSection = { sectionLabel?: string; items: NavItem[] };
 
 export const ROOT_ROUTE = '/';
 export const LOGIN_ROUTE = '/login';
-export const DEFAULT_PAGE_ID = 'member-list';
+export const DEFAULT_PAGE_ID = 'dashboard';
 
 export const NAV: NavSection[] = [
   { items: [{ id: 'dashboard', label: '대시보드', icon: LayoutDashboard }] },

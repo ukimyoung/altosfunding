@@ -10,6 +10,7 @@ from app.api.v1.catalog import router as catalog_router
 from app.api.v1.challenges import router as challenges_router
 from app.api.v1.contacts import admin_router as admin_contacts_router
 from app.api.v1.contacts import public_router as support_router
+from app.api.v1.dashboard import router as admin_dashboard_router
 from app.api.v1.email_logs import router as admin_email_logs_router
 from app.api.v1.email_templates import router as admin_email_templates_router
 from app.api.v1.files import router as files_router
@@ -51,5 +52,6 @@ router.include_router(admin_manual_email_router)
 router.include_router(files_router)
 router.include_router(newsletter_router)
 router.include_router(admin_system_router)
+router.include_router(admin_dashboard_router)
 router.include_router(admin_mt4_account_issued_history_router)
 router.include_router(admin_accounts_router)
