@@ -12,6 +12,8 @@ from app.api.v1.contacts import admin_router as admin_contacts_router
 from app.api.v1.contacts import public_router as support_router
 from app.api.v1.email_logs import router as admin_email_logs_router
 from app.api.v1.email_templates import router as admin_email_templates_router
+from app.api.v1.faq import admin_router as admin_faq_router
+from app.api.v1.faq import public_router as faq_router
 from app.api.v1.files import router as files_router
 from app.api.v1.google import router as google_router
 from app.api.v1.kyc import router as kyc_router
@@ -42,6 +44,8 @@ router.include_router(announcements_router)
 router.include_router(rewards_router)
 router.include_router(admin_rewards_router)
 router.include_router(support_router)
+router.include_router(faq_router)
+router.include_router(admin_faq_router)
 router.include_router(admin_contacts_router)
 router.include_router(wallets_router)  # /accounts/my-asset — orders_router의 /accounts/{account_id}(UUID)와 겹치지 않음
 router.include_router(admin_wallets_router)
