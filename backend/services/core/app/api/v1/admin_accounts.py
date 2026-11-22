@@ -4,6 +4,7 @@ GET /admin/accounts                       계좌 목록 (tier·상태·상품·�
 GET /admin/accounts-stats                 계좌 수 통계 (전체·진행중)
 GET /admin/accounts/{account_id}          계좌 상세 (계좌 UUID 또는 MT4 번호)
 GET /admin/accounts/{account_id}/trades   거래내역 (Worker가 MT4에서 수집한 청산 거래)
+GET /admin/accounts/{account_id}/evaluation  챌린지 결과 (웹 Account Detail과 같은 최종 판정, 대회 종료 전이면 null)
 POST /admin/accounts/{account_id}/freeze    비활성 (PENDING·ACTIVE → INACTIVE, 미결 포지션 있으면 거절)
 POST /admin/accounts/{account_id}/unfreeze  활성 복귀 (INACTIVE → 대회 상태에 맞는 원래 상태)
 POST /admin/accounts/{account_id}/ban       영구정지 (사유 필수, 되돌릴 수 없음)
@@ -22,6 +23,7 @@ from fastapi import APIRouter, Body, Query
 from pydantic import BaseModel, Field
 
 from app.deps import AdminUser, Session
+from app.schemas.challenge import AccountFinalEvaluationOut
 from app.schemas.trading import (
     AdminAccount,
     AdminAccountPage,
@@ -29,7 +31,7 @@ from app.schemas.trading import (
     AdminTradePage,
 )
 from app.services import account_admin as svc
-from app.services import mt4_ingest, trading_rules
+from app.services import challenge_evaluation, mt4_ingest, trading_rules
 from app.services.trading_query import pages
 
 router = APIRouter(tags=["admin-accounts"])
@@ -75,6 +77,17 @@ async def account_trades(account_id: str, admin: AdminUser, session: Session, pa
     account = await svc.get_account(session, account_id)
     items, total = await mt4_ingest.closed_trades(session, uuid.UUID(account["account_id"]), page=page, size=size)
     return AdminTradePage(items=items, total=total, page=page, size=size, pages=pages(total, size))
+
+
+@router.get(
+    "/admin/accounts/{account_id}/evaluation",
+    response_model=AccountFinalEvaluationOut | None,
+    summary="계좌 챌린지 결과 (웹 Account Detail과 같은 최종 판정)",
+)
+async def account_evaluation(account_id: str, admin: AdminUser, session: Session) -> AccountFinalEvaluationOut | None:
+    """대회가 끝나고 내려진 최종 판정 (Worker 자동 또는 관리자 확인). 대회 기간 중·판정 전·챌린지 계좌가 아니면 null."""
+    account = await svc.get_account(session, account_id)
+    return await challenge_evaluation.final_out(session, uuid.UUID(account["account_id"]))
 
 
 class FreezeRequest(BaseModel):

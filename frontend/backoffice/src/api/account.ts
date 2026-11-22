@@ -147,6 +147,28 @@ export const listAccountTrades = async (
   return response.data;
 };
 
+export interface AccountEvaluationCheck {
+  key: 'profit_target' | 'min_trading_days' | 'max_drawdown' | 'consistency' | string;
+  label: string;
+  passed: boolean;
+  detail: string | null;
+  values?: Record<string, number | string | boolean | null> | null;
+}
+
+/** 챌린지 결과 (웹 Account Detail과 같은 최종 판정). 대회 기간이 끝나고 판정이 난 뒤에만 오고, 그 전에는 null. */
+export interface AccountEvaluation {
+  result: 'PASSED' | 'FAILED';
+  period_start: string;
+  period_end: string;
+  evaluated_at: string;
+  checks: AccountEvaluationCheck[];
+}
+
+export const getAccountEvaluation = async (accountId: string): Promise<AccountEvaluation | null> => {
+  const response = await api.get<AccountEvaluation | null>(`/v1/admin/accounts/${accountId}/evaluation`);
+  return response.data;
+};
+
 export const unfreezeAccount = async (accountId: string): Promise<void> => {
   const endpoint = `/v1/admin/accounts/${accountId}/unfreeze`;
   await api.post(endpoint);

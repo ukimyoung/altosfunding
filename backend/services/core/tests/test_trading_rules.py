@@ -153,6 +153,8 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, bu
     assert client.post(f"/api/v1/admin/challenges/leaderboard/accounts/{acc}/evaluate", headers=admin_headers).status_code == 200
     assert client.get(member_eval, headers=buyer).json() is None
     assert client.get(member_eval, headers=admin_headers).status_code == 404  # 본인 계좌만
+    admin_eval = f"/api/v1/admin/accounts/{acc}/evaluation"
+    assert client.get(admin_eval, headers=admin_headers).json() is None  # 백오피스 계좌 상세도 같은 기준
 
     # 대회 종료 → 10분 뒤 자동 최종 판정 (한 번만)
     ended = t1 + timedelta(minutes=2)
@@ -178,6 +180,9 @@ def test_monitor_daily_close_and_auto_final_evaluation(client, admin_headers, bu
         "profit_target", "min_trading_days", "max_drawdown", "consistency"
     ]
     values = {c["key"]: c["values"] for c in mine["checks"]}
+    assert client.get(admin_eval, headers=admin_headers).json() == mine  # 백오피스 계좌 상세 '챌린지 결과'
+    assert client.get(f"/api/v1/admin/accounts/{A}/evaluation", headers=admin_headers).json() == mine  # MT4 번호로도
+    assert client.get(admin_eval, headers=buyer).status_code in (401, 403)
     assert values["profit_target"]["target"] == 6000
     assert values["min_trading_days"]["required"] == 3
     assert values["max_drawdown"]["dd"] == 5000 and values["max_drawdown"]["floor"] == 98000

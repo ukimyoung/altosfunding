@@ -400,6 +400,16 @@ class EvaluationCheck(BaseModel):
     values: dict | None = None
 
 
+class AccountFinalEvaluationOut(BaseModel):
+    """챌린지 계좌 최종 판정 (웹 Account Detail·백오피스 계좌 상세 '챌린지 결과'). 대회 기간이 끝난 뒤 판정만."""
+
+    result: Literal["PASSED", "FAILED"]
+    period_start: datetime
+    period_end: datetime
+    evaluated_at: datetime
+    checks: list[EvaluationCheck]
+
+
 class ChallengeEvaluationOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

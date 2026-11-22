@@ -3,6 +3,7 @@ import {
   banAccount,
   freezeAccount,
   getAccountDetail,
+  getAccountEvaluation,
   getAccountStats,
   listAccountTrades,
   listAccounts,
@@ -28,6 +29,8 @@ export const accountsQueryKeys = {
     [...accountsQueryKeys.all, 'ListUserAccounts', userId, params] as const,
   getAccountDetail: (accountId: string) =>
     [...accountsQueryKeys.all, 'GetAccountDetail', accountId] as const,
+  getAccountEvaluation: (accountId: string) =>
+    [...accountsQueryKeys.all, 'GetAccountEvaluation', accountId] as const,
   listAccountTrades: (accountId: string, params: ListAccountTradesParams) =>
     [...accountsQueryKeys.all, 'ListAccountTrades', accountId, params] as const,
 };
@@ -89,6 +92,17 @@ export function useGetAccountDetailQuery(accountId?: string | null) {
   return useQuery({
     queryKey: accountsQueryKeys.getAccountDetail(resolvedAccountId),
     queryFn: () => getAccountDetail(resolvedAccountId),
+    enabled: Boolean(resolvedAccountId),
+  });
+}
+
+// 챌린지 결과: 대회가 끝나고 판정이 난 뒤에만 값이 온다 (그 전이면 null)
+export function useGetAccountEvaluationQuery(accountId?: string | null) {
+  const resolvedAccountId = accountId ?? '';
+
+  return useQuery({
+    queryKey: accountsQueryKeys.getAccountEvaluation(resolvedAccountId),
+    queryFn: () => getAccountEvaluation(resolvedAccountId),
     enabled: Boolean(resolvedAccountId),
   });
 }
