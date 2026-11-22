@@ -13,6 +13,7 @@ import { AccountManagementPage } from './pages/accounts/AccountManagementPage';
 import { MemberDetailPage } from './pages/members/MemberDetailPage';
 import { MemberListPage } from './pages/members/MemberListPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
+import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { ViolationHistoryPage } from './pages/violations/ViolationHistoryPage';
 import { ChallengeProductPage } from './pages/products/ChallengeProductPage';
 import { FundedProductPage } from './pages/products/FundedProductPage';
@@ -53,7 +54,6 @@ function appPath(path: string) {
 }
 
 const placeholderPageIds = [
-  'dashboard',
   'product-template',
   'asset-settlement',
   // 출시 시점 제외 faq, inquiry, review, promotions
@@ -76,6 +76,10 @@ export const router = createBrowserRouter([
   {
     Component: App,
     children: [
+      {
+        path: appPath(ROUTE_BY_PAGE_ID.dashboard),
+        Component: DashboardPage,
+      },
       {
         path: appPath(ROUTE_BY_PAGE_ID['challenge-product']),
         Component: ChallengeProductPage,
