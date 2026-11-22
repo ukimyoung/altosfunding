@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useLeaderboardEndDatesQuery } from '../../queries/challenges';
 import { LeaderboardStatus } from '../../types/leaderboard';
 import { STATUS_CONFIG } from '../../constants/leaderboard';
+import { todayInSeoul } from '../../utils/revenue';
 
 interface LeaderboardDateNavProps {
   dark: boolean;
@@ -54,30 +55,36 @@ export function LeaderboardDateNav({
 
   const statusCfg = status ? STATUS_CONFIG[status] : null;
   const activeDateSet = useMemo(() => new Set(normalizedActiveDates), [normalizedActiveDates]);
-  const currentIndex = normalizedActiveDates.indexOf(currentDate);
+  // 오늘(한국 시간)은 끝나는 대회가 없어도 선택할 수 있다 (메뉴 진입 시 기본값).
+  const today = todayInSeoul();
   const latestDate = normalizedActiveDates[0];
   const oldestDate = normalizedActiveDates[normalizedActiveDates.length - 1];
-  const canGoPrev = currentIndex >= 0 && currentIndex < normalizedActiveDates.length - 1;
-  const canGoNext = currentIndex > 0;
+  // 목록은 최근 순(내림차순). 현재 날짜가 목록에 없어도(오늘) 가장 가까운 앞뒤 날짜로 이동한다.
+  const prevDate = normalizedActiveDates.find((date) => date < currentDate);
+  const nextDate = [...normalizedActiveDates].reverse().find((date) => date > currentDate);
+  const canGoPrev = Boolean(prevDate);
+  const canGoNext = Boolean(nextDate);
+  const minDate = oldestDate && oldestDate < today ? oldestDate : today;
+  const maxDate = latestDate && latestDate > today ? latestDate : today;
 
   useEffect(() => {
     if (normalizedActiveDates.length === 0) {
       return;
     }
 
-    if (!activeDateSet.has(currentDate) && latestDate) {
+    if (currentDate !== today && !activeDateSet.has(currentDate) && latestDate) {
       onDateChange(latestDate);
     }
-  }, [activeDateSet, currentDate, latestDate, normalizedActiveDates.length, onDateChange]);
+  }, [activeDateSet, currentDate, latestDate, normalizedActiveDates.length, onDateChange, today]);
 
   const goPrev = () => {
-    if (!canGoPrev) return;
-    onDateChange(normalizedActiveDates[currentIndex + 1]);
+    if (!prevDate) return;
+    onDateChange(prevDate);
   };
 
   const goNext = () => {
-    if (!canGoNext) return;
-    onDateChange(normalizedActiveDates[currentIndex - 1]);
+    if (!nextDate) return;
+    onDateChange(nextDate);
   };
 
   const openPicker = () => {
@@ -132,20 +139,20 @@ export function LeaderboardDateNav({
             ref={dateInputRef}
             type="date"
             value={currentDate}
-            min={oldestDate}
-            max={latestDate}
+            min={minDate}
+            max={maxDate}
             onChange={(e) => {
-              const nextDate = e.target.value;
-              if (!nextDate) {
+              const pickedDate = e.target.value;
+              if (!pickedDate) {
                 return;
               }
 
-              if (activeDateSet.size > 0 && !activeDateSet.has(nextDate)) {
-                onInvalidDateSelect?.(nextDate);
+              if (pickedDate !== today && activeDateSet.size > 0 && !activeDateSet.has(pickedDate)) {
+                onInvalidDateSelect?.(pickedDate);
                 return;
               }
 
-              onDateChange(toInputDate(toApiDate(nextDate)));
+              onDateChange(toInputDate(toApiDate(pickedDate)));
             }}
             style={{
               height: 32,

@@ -20,6 +20,7 @@ import type {
 } from '../../../api/challenge';
 import type { LeaderboardStats, LeaderboardStatus, RankEntry, VipEntry } from '../../types/leaderboard';
 import { formatKstDateTime } from '../../utils/utils';
+import { todayInSeoul } from '../../utils/revenue';
 
 type ToastState = {
   message: string;
@@ -137,7 +138,9 @@ function mapVipEntry(entry: DailyLeaderboardEntry): VipEntry {
 export function LeaderboardPage() {
   const { dark } = useAppShell();
   const [searchParams, setSearchParams] = useSearchParams();
-  const currentDate = toInputDate(searchParams.get('date') ?? '');
+  // 날짜 = 대회 종료일(한국 시간). 메뉴로 들어와 ?date가 없으면 오늘(한국 시간)을 보여 준다.
+  // 대회 목록에서 행을 누르면 ?date=종료일로 들어오므로 그 날짜를 그대로 쓴다.
+  const currentDate = toInputDate(searchParams.get('date') ?? '') || todayInSeoul();
   const [activeTab, setActiveTab] = useState<LeaderboardTab>('normal');
   const [toast, setToast] = useState<ToastState | null>(null);
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null);
