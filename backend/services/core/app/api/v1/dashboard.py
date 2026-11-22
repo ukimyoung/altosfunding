@@ -1,7 +1,7 @@
 """백오피스 대시보드.
 
-GET /admin/dashboard/summary  시스템 상태 · 오늘 처리할 액션 · 기간 매출 · 대회 현황
-GET /admin/dashboard/trends   매출 추이(합계·상품별), 챌린지·펀디드 계좌 생성 수 추이
+GET /admin/dashboard/summary  시스템 상태 · 오늘 처리할 액션 · 기간 매출 · 대회 현황 · 회원·계좌 · 전체 입출금액
+GET /admin/dashboard/trends   매출·계좌 생성 수·가입 수·입출금액 추이
 """
 
 from typing import Annotated
@@ -28,10 +28,12 @@ async def dashboard_summary(
 async def dashboard_trends(
     admin: AdminUser,
     session: Session,
-    metric: Annotated[str, Query(description="revenue | accounts")],
+    metric: Annotated[str, Query(description="revenue | accounts | signups | funds")],
     period: Annotated[str | None, Query(description="daily | weekly | monthly (기본 daily)")] = None,
     start_date: Annotated[str | None, Query(description="YYYY-MM-DD (한국 시간). 없으면 기본 구간")] = None,
     end_date: Annotated[str | None, Query(description="YYYY-MM-DD (한국 시간). 없으면 오늘")] = None,
 ) -> dict:
-    """날짜를 안 주면 오늘까지 일별 7일 · 주별 8주 · 월별 6개월. 빈 칸도 0으로 채운다."""
+    """날짜를 안 주면 오늘까지 일별 7일 · 주별 8주 · 월별 6개월. 빈 칸도 0으로 채운다.
+
+    signups: 일반 회원 가입 수. funds: 승인 완료 입금액·출금액(승인 시각 기준)."""
     return await dashboard.trends(session, metric=metric, period=period, start_date=start_date, end_date=end_date)

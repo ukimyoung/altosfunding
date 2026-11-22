@@ -1,17 +1,19 @@
 import { useState, type CSSProperties, type ElementType, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import {
-  AlertTriangle, BadgeCheck, CalendarClock, CheckCircle2, Clock, Gift, MessageCircle, PlayCircle,
-  Server, Tag, TrendingDown, TrendingUp, Trophy, Wallet, XCircle,
+  Activity, AlertTriangle, ArrowDownCircle, ArrowUpCircle, BadgeCheck, CalendarClock, CheckCircle2, Clock, Gift,
+  Landmark, MessageCircle, PlayCircle, Server, Tag, TrendingDown, TrendingUp, Trophy, Users, Wallet, XCircle,
 } from "lucide-react";
 import type { DashboardCompetition, DashboardRange, DashboardRevenueValue, DashboardSeries } from "@/api/dashboard";
-import { DashboardTrendCard, PRODUCT_COLORS } from "../../components/dashboard/DashboardTrendCard";
+import { DashboardBarChart } from "../../components/dashboard/DashboardBarChart";
+import { DashboardTrendCard, PRODUCT_COLORS, formatBucketLabel } from "../../components/dashboard/DashboardTrendCard";
 import { ROUTE_BY_PAGE_ID } from "../../config/navigation";
 import { useAppShell } from "../../layouts/AppShell";
-import { useDashboardSummaryQuery } from "../../queries/dashboard";
+import { useDashboardSummaryQuery, useDashboardTrendsQuery } from "../../queries/dashboard";
 import { tok, type Tok } from "../../theme/tokens";
 
-// 백오피스 첫 화면. 구성: 시스템 상태 → 오늘 처리할 액션 → 핵심 매출 지표 → 매출 추이 → 대회 현황 → 계좌 생성 수 추이.
+// 백오피스 첫 화면. 구성: 시스템 상태 → 오늘 처리할 액션 → 핵심 매출 지표 → 매출 추이 → 대회 현황 → 계좌 생성 수 추이
+// → 회원·계좌 지표 → 자금 흐름(전체 입금액·출금액, 입금액·출금액 추이).
 // 기간 전환(오늘·어제·이번 주·이번 달)은 매출 지표와 '종료 대회'에 적용되고, 액션·시스템·모집/진행 대회는 항상 지금 값이다.
 // 날짜는 모두 한국 시간(GMT+9).
 
@@ -222,6 +224,54 @@ function CompetitionTable({
   );
 }
 
+function ChangeBadge({ pct, compare, t }: { pct: number | null; compare: string; t: Tok }) {
+  if (pct == null) return <span style={{ fontSize: 10, color: t.textHint, fontFamily: KR }}>{compare} -</span>;
+  const up = pct >= 0;
+  const color = up ? "#16A34A" : "#DC2626";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+      {up ? <TrendingUp size={11} color={color} /> : <TrendingDown size={11} color={color} />}
+      <span style={{ fontSize: 11, fontWeight: 600, color, fontFamily: MONO }}>{up ? "+" : ""}{pct}%</span>
+      <span style={{ fontSize: 10, color: t.textHint, fontFamily: KR }}>{compare}</span>
+    </span>
+  );
+}
+
+function MetricRow({
+  Icon, label, value, extra, sub, t,
+}: { Icon: ElementType; label: string; value: string; extra?: ReactNode; sub?: string; t: Tok }) {
+  return (
+    <div style={{ background: t.surface, border: `1px solid ${t.border2}`, borderRadius: 12, padding: "12px 16px", display: "flex", alignItems: "center", gap: 14 }}>
+      <div style={{ width: 36, height: 36, borderRadius: 10, background: t.accentBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon size={17} color="#7C6AF7" />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 11, color: t.textSec, marginBottom: 2, fontFamily: KR }}>{label}</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 20, fontWeight: 800, color: t.text, fontFamily: MONO }}>{value}</span>
+          {extra}
+        </div>
+        {sub && <div style={{ fontSize: 11, color: t.textHint, marginTop: 2, fontFamily: KR }}>{sub}</div>}
+      </div>
+    </div>
+  );
+}
+
+function FundCard({ Icon, label, amount, color, bg, t }: { Icon: ElementType; label: string; amount: number | undefined; color: string; bg: string; t: Tok }) {
+  return (
+    <div style={{ background: t.surface, border: `1px solid ${t.border2}`, borderRadius: 12, padding: "18px 20px", display: "flex", alignItems: "center", gap: 16 }}>
+      <div style={{ width: 44, height: 44, borderRadius: 12, background: bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Icon size={22} color={color} />
+      </div>
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: t.textSec, marginBottom: 6, fontFamily: KR }}>{label}</div>
+        <div style={{ fontSize: 24, fontWeight: 800, color, fontFamily: MONO }}>{fmtMoney(amount)}</div>
+        <div style={{ fontSize: 11, color: t.textHint, marginTop: 4, fontFamily: KR }}>승인 완료 누적 · 출금은 수수료 포함 신청 금액</div>
+      </div>
+    </div>
+  );
+}
+
 // ─── 페이지 ─────────────────────────────────────────────────────────────────
 
 export function DashboardPage() {
@@ -238,6 +288,11 @@ export function DashboardPage() {
   const actions = data?.actions;
   const revenue = data?.revenue;
   const comp = data?.competitions;
+  const members = data?.members;
+  const accounts = data?.accounts;
+  const funds = data?.funds;
+  // 최근 7일 신규 가입 막대 차트 (기간 전환과 상관없이 오늘까지 7일)
+  const signupTrend = useDashboardTrendsQuery({ metric: "signups", period: "daily" }).data?.signups;
   const periodText = data
     ? data.start_date === data.end_date ? data.start_date : `${data.start_date} ~ ${data.end_date}`
     : "";
@@ -403,6 +458,61 @@ export function DashboardPage() {
           title="펀디드 계좌 생성 수 추이" metric="accounts" caption="상품별 발급 계좌 수"
           pick={(d) => productSeries(d.funded)}
           formatAxis={fmtCountAxis} formatValue={(v) => `${fmtCount(v)}개`} legend integer emptyText="이 구간에 생성된 계좌가 없습니다" t={t}
+        />
+      </div>
+
+      {/* ── 회원 · 계좌 지표 ── */}
+      <div style={{ marginTop: 24 }}>
+        <SectionTitle label="회원 · 계좌 지표" sub={rangeInfo.label} t={t} />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 14, marginBottom: 24 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+          <MetricRow Icon={Users} label="누적 가입자" value={members ? fmtCount(members.total_users) : "-"}
+            extra={members && <ChangeBadge pct={members.total_change_pct} compare={rangeInfo.compare} t={t} />} t={t} />
+          <MetricRow Icon={Activity} label={`${rangeInfo.label} 신규 가입자`} value={members ? fmtCount(members.new_signups) : "-"}
+            extra={members && <ChangeBadge pct={members.new_signups_change_pct} compare={rangeInfo.compare} t={t} />} t={t} />
+          <MetricRow Icon={TrendingUp} label="진행 중 챌린지 계좌" value={accounts ? fmtCount(accounts.challenge_active) : "-"}
+            sub={accounts ? `${rangeInfo.label} 발급 ${fmtCount(accounts.challenge_issued)}개` : undefined}
+            extra={accounts && <ChangeBadge pct={accounts.challenge_issued_change_pct} compare={`발급 ${rangeInfo.compare}`} t={t} />} t={t} />
+          <MetricRow Icon={Landmark} label="펀디드 활성 계좌" value={accounts ? fmtCount(accounts.funded_active) : "-"}
+            sub={accounts ? `${rangeInfo.label} 발급 ${fmtCount(accounts.funded_issued)}개 · 거래 정지 중 ${fmtCount(accounts.funded_halted)}개` : undefined}
+            extra={accounts && <ChangeBadge pct={accounts.funded_issued_change_pct} compare={`발급 ${rangeInfo.compare}`} t={t} />} t={t} />
+        </div>
+        <div style={{ ...card, padding: "18px 18px 10px" }}>
+          <div style={{ marginBottom: 10 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.text }}>최근 7일 신규 가입 추이</div>
+            <div style={{ fontSize: 11, color: t.textSec, marginTop: 2, fontFamily: KR }}>일별 신규 가입자 수 (GMT+9)</div>
+          </div>
+          {signupTrend ? (
+            <DashboardBarChart labels={signupTrend.labels.map((l) => formatBucketLabel(l, "daily"))} values={signupTrend.totals} t={t} />
+          ) : (
+            <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: t.textHint }}>불러오는 중…</div>
+          )}
+        </div>
+      </div>
+
+      {/* ── 자금 흐름 ── */}
+      <SectionTitle label="자금 흐름" t={t}
+        right={
+          <button onClick={() => go("transaction-history")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#7C6AF7", fontWeight: 600, fontFamily: KR, padding: 0 }}>
+            입출금 내역 보기 →
+          </button>
+        }
+      />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12, marginBottom: 16 }}>
+        <FundCard Icon={ArrowDownCircle} label="전체 입금액" amount={funds?.total_deposit_amount} color="#16A34A" bg="rgba(22,163,74,0.12)" t={t} />
+        <FundCard Icon={ArrowUpCircle} label="전체 출금액" amount={funds?.total_withdraw_amount} color="#D97706" bg="rgba(217,119,6,0.14)" t={t} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <DashboardTrendCard
+          title="입금액 추이" metric="funds" caption="승인 완료 입금액 (승인 시각 기준)"
+          pick={(d) => d.deposit ? { labels: d.deposit.labels, series: [{ label: "입금액", color: "#16A34A", values: d.deposit.totals }] } : null}
+          formatAxis={fmtMoneyAxis} formatValue={fmtMoney} area pointLabels emptyText="이 구간에 승인된 입금이 없습니다" t={t}
+        />
+        <DashboardTrendCard
+          title="출금액 추이" metric="funds" caption="승인 완료 출금액 (승인 시각 기준, 수수료 포함)"
+          pick={(d) => d.withdraw ? { labels: d.withdraw.labels, series: [{ label: "출금액", color: "#D97706", values: d.withdraw.totals }] } : null}
+          formatAxis={fmtMoneyAxis} formatValue={fmtMoney} area pointLabels emptyText="이 구간에 승인된 출금이 없습니다" t={t}
         />
       </div>
     </div>
