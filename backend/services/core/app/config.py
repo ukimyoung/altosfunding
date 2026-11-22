@@ -96,6 +96,8 @@ class Settings(BaseSettings):
     # 트레이딩 룰 자동 검증 (Worker). 거래일 = 이 시간대의 날짜, 마감 = 그 날짜 다음 날 0시.
     risk_enabled: bool = True
     risk_seconds: float = 60
+    # 평가금액만 따로 이 주기로 일괄 조회해 Max Drawdown·Daily Loss를 바로 판정한다 (0이면 끔)
+    risk_equity_watch_seconds: float = 5
     risk_trading_timezone: str = "Europe/Athens"
     # 마감 후 이만큼 기다렸다가 결산한다 (마감 직전 청산 내역이 수집될 시간)
     risk_close_grace_seconds: int = 300

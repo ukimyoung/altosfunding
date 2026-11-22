@@ -7,6 +7,11 @@
   마감 = 그 날짜 다음 날 0시 (KST 06:00 여름 / 07:00 겨울, 뉴욕 17:00과 같음).
 - 마감 후 RISK_CLOSE_GRACE_SECONDS(기본 5분) 기다렸다가 결산한다 (마감 직전 청산 내역 수집 대기).
 
+5초 평가금액 감시 (RISK_EQUITY_WATCH_SECONDS, 기본 5초. 0이면 끔)
+- 1분 수집과 따로, 잔고 일괄 조회(POST /accounts/balances, 서버 캐시) 한 번으로 ACTIVE 계좌 평가금액을 받아
+  메모리에서 기준선·Daily Loss 한도와 비교한다. 넘은 계좌만 DB에 평가금액을 쓰고 아래 1분 감시와 같은 판정(check_account)을
+  돌린다 → 60초 사이에 잠깐 기준선을 찍는 경우도 5초 안에 잡는다. 감시 상태가 아직 없는 계좌는 1분 감시가 먼저 만든다.
+
 1분 감시 (거래 가능한 ACTIVE 챌린지·펀디드 계좌, 최근 평가금액이 3분 이내인 계좌만)
 - Max Drawdown: 평가금액(미실현 포함) ≤ 기준선(floor)이면 위반(HARD).
   floor 시작 = 자본금 − DD금액. 룰셋 dd_calc_method가 EOD면 마감마다 floor = max(floor, 마감 평가금액 − DD금액),
@@ -38,7 +43,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import String, and_, case, cast, func, or_, select
+from sqlalchemy import String, and_, case, cast, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -541,6 +546,95 @@ async def monitor(session: AsyncSession, now: datetime) -> dict[str, int]:
         except Exception:
             logger.exception("룰 감시 실패: 계좌 %s", t.account.id)
             counts["failed"] += 1
+    return counts
+
+
+# ── 5초 평가금액 감시 ───────────────────────────────────────────────
+
+
+def needs_check(t: Target, state: AccountRiskState, equity: Decimal, now: datetime) -> bool:
+    """메모리 비교: 이 평가금액으로 판정(DB 쓰기)이 필요한가."""
+    if state.dd_amount is not None and state.dd_floor is not None:
+        floor = Decimal(state.dd_floor)
+        if equity <= floor:
+            return True
+        # INTRADAY는 장중 고점마다 기준선을 올린다
+        if dd_method(t.ruleset) == "INTRADAY" and equity - Decimal(state.dd_amount) > floor:
+            return True
+    a = t.account
+    halted = a.trading_halted_until is not None and a.trading_halted_until > now
+    if a.tier == FUNDED and not halted:
+        limit = daily_loss_amount(t.ruleset, t.capital)
+        if limit is not None and Decimal(state.day_start_balance) - equity >= limit:
+            return True
+    return False
+
+
+async def watch_equity(sessionmaker: async_sessionmaker[AsyncSession], now: datetime | None = None) -> dict[str, int]:
+    """Worker 5초 주기: 평가금액만 일괄 조회해 기준선을 넘은 계좌를 바로 판정한다."""
+    from app.services import mt4, mt4_ingest
+
+    now = now or datetime.now(UTC)
+    counts = {"accounts": 0, "fetched": 0, "checked": 0, "violations": 0, "failed": 0}
+    async with sessionmaker() as session:
+        targets = await _targets(session, TradingAccount.status == "ACTIVE")
+        ids = [t.account.id for t in targets]
+        states = (
+            {s.account_id: s for s in await session.scalars(select(AccountRiskState).where(AccountRiskState.account_id.in_(ids)))}
+            if ids else {}
+        )
+    # 감시 상태(기준선)가 있는 계좌만. 처음 보는 계좌는 1분 감시가 상태를 만든 뒤부터 본다.
+    targets = [t for t in targets if t.account.id in states]
+    counts["accounts"] = len(targets)
+    if not targets:
+        return counts
+
+    by_server: dict[str, list[Target]] = {}
+    for t in targets:
+        by_server.setdefault(t.account.mt4_server, []).append(t)
+    due: list[tuple[Target, dict]] = []
+    for server, group in by_server.items():
+        client = mt4.client_for(server)
+        if not client.base_url or not client.api_key:
+            continue
+        async with client:
+            balances = await mt4_ingest._balances(client, [int(t.account.mt4_login) for t in group])
+        for t in group:
+            data = balances.get(int(t.account.mt4_login))
+            equity = mt4_ingest._dec(data.get("equity")) if data else None
+            if equity is None:
+                continue
+            counts["fetched"] += 1
+            if needs_check(t, states[t.account.id], equity, now):
+                due.append((t, data))
+    if not due:
+        return counts
+
+    async with sessionmaker() as session:
+        for t, data in due:
+            try:
+                async with session.begin_nested():
+                    await session.execute(
+                        update(TradingAccount)
+                        .where(TradingAccount.id == t.account.id)
+                        .values(
+                            balance=mt4_ingest._dec(data.get("balance"), Decimal(t.account.balance or 0)),
+                            equity=mt4_ingest._dec(data.get("equity")),
+                            equity_updated_at=now,
+                            updated_at=TradingAccount.updated_at,
+                        )
+                    )
+                    fresh = await _targets(session, TradingAccount.id == t.account.id, TradingAccount.status == "ACTIVE")
+                    if not fresh:
+                        continue
+                    await session.refresh(fresh[0].account)
+                    result = await check_account(session, fresh[0], now)
+                counts["checked"] += result["checked"]
+                counts["violations"] += result["violations"]
+            except Exception:
+                logger.exception("5초 평가금액 감시 실패: 계좌 %s", t.account.id)
+                counts["failed"] += 1
+        await session.commit()
     return counts
 
 
