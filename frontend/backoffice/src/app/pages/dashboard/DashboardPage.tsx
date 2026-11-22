@@ -2,7 +2,7 @@ import { useState, type CSSProperties, type ElementType, type ReactNode } from "
 import { useNavigate } from "react-router";
 import {
   Activity, AlertTriangle, ArrowDownCircle, ArrowUpCircle, BadgeCheck, CalendarClock, CheckCircle2, Clock, Gift,
-  Landmark, MessageCircle, PlayCircle, Server, Tag, TrendingDown, TrendingUp, Trophy, Users, Wallet, XCircle,
+  MessageCircle, PlayCircle, Server, Tag, TrendingDown, TrendingUp, Trophy, Users, Wallet, XCircle,
 } from "lucide-react";
 import type { DashboardCompetition, DashboardRange, DashboardRevenueValue, DashboardSeries } from "@/api/dashboard";
 import { DashboardBarChart } from "../../components/dashboard/DashboardBarChart";
@@ -289,7 +289,6 @@ export function DashboardPage() {
   const revenue = data?.revenue;
   const comp = data?.competitions;
   const members = data?.members;
-  const accounts = data?.accounts;
   const funds = data?.funds;
   // 최근 7일 신규 가입 막대 차트 (기간 전환과 상관없이 오늘까지 7일)
   const signupTrend = useDashboardTrendsQuery({ metric: "signups", period: "daily" }).data?.signups;
@@ -466,17 +465,11 @@ export function DashboardPage() {
         <SectionTitle label="회원 · 계좌 지표" sub={rangeInfo.label} t={t} />
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.3fr", gap: 14, marginBottom: 24 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr)", gap: 10 }}>
           <MetricRow Icon={Users} label="누적 가입자" value={members ? fmtCount(members.total_users) : "-"}
             extra={members && <ChangeBadge pct={members.total_change_pct} compare={rangeInfo.compare} t={t} />} t={t} />
           <MetricRow Icon={Activity} label={`${rangeInfo.label} 신규 가입자`} value={members ? fmtCount(members.new_signups) : "-"}
             extra={members && <ChangeBadge pct={members.new_signups_change_pct} compare={rangeInfo.compare} t={t} />} t={t} />
-          <MetricRow Icon={TrendingUp} label="진행 중 챌린지 계좌" value={accounts ? fmtCount(accounts.challenge_active) : "-"}
-            sub={accounts ? `${rangeInfo.label} 발급 ${fmtCount(accounts.challenge_issued)}개` : undefined}
-            extra={accounts && <ChangeBadge pct={accounts.challenge_issued_change_pct} compare={`발급 ${rangeInfo.compare}`} t={t} />} t={t} />
-          <MetricRow Icon={Landmark} label="펀디드 활성 계좌" value={accounts ? fmtCount(accounts.funded_active) : "-"}
-            sub={accounts ? `${rangeInfo.label} 발급 ${fmtCount(accounts.funded_issued)}개 · 거래 정지 중 ${fmtCount(accounts.funded_halted)}개` : undefined}
-            extra={accounts && <ChangeBadge pct={accounts.funded_issued_change_pct} compare={`발급 ${rangeInfo.compare}`} t={t} />} t={t} />
         </div>
         <div style={{ ...card, padding: "18px 18px 10px" }}>
           <div style={{ marginBottom: 10 }}>
