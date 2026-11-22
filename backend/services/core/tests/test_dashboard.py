@@ -56,6 +56,18 @@ def test_summary_and_trends(client, admin_headers, buyer, round_, fake_mt4):  # 
     assert comp["recruiting"][0]["participants"] == 2 and comp["recruiting"][0]["product_name"] == "Challenge Starter"
     assert comp["ended"]["competitions"] == 0 and comp["pass_rate"]["rate"] is None
 
+    # 회원·계좌·자금 (P2)
+    assert body["members"]["total_users"] == 1 and body["members"]["new_signups"] == 1  # 구매 회원(USER)만
+    assert body["members"]["new_signups_prev"] == 0 and body["members"]["new_signups_change_pct"] is None
+    assert body["accounts"]["challenge_issued"] == 2 and body["accounts"]["challenge_active"] == 0
+    assert body["accounts"]["funded_active"] == 0 and body["accounts"]["funded_halted"] == 0
+    assert body["funds"] == {"total_deposit_amount": 300, "total_withdraw_amount": 0}
+
+    signups = client.get(TRENDS, headers=admin_headers, params={"metric": "signups"}).json()["signups"]
+    assert len(signups["labels"]) == 7 and signups["totals"][-1] == 1 and signups["sum"] == 1
+    funds = client.get(TRENDS, headers=admin_headers, params={"metric": "funds", "period": "monthly"}).json()
+    assert funds["deposit"]["sum"] == 300 and funds["deposit"]["totals"][-1] == 300 and funds["withdraw"]["sum"] == 0
+
     # 어제 매출로 옮기면 오늘 0, 전일 대비는 '어제' 선택 시 계산된다
     yesterday = client.get(SUMMARY, headers=admin_headers, params={"range": "yesterday"}).json()
     assert yesterday["revenue"]["challenge"]["prev_amount"] == 0

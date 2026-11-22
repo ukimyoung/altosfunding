@@ -58,6 +58,33 @@ export interface DashboardCompetitions {
   pass_rate: { days: number; passed: number; failed: number; rate: number | null };
 }
 
+export interface DashboardMembers {
+  total_users: number;
+  total_users_at_end: number;
+  total_users_prev: number;
+  total_change_pct: number | null;
+  new_signups: number;
+  new_signups_prev: number;
+  new_signups_change_pct: number | null;
+}
+
+export interface DashboardAccounts {
+  challenge_active: number;
+  challenge_issued: number;
+  challenge_issued_prev: number;
+  challenge_issued_change_pct: number | null;
+  funded_active: number;
+  funded_issued: number;
+  funded_issued_prev: number;
+  funded_issued_change_pct: number | null;
+  funded_halted: number;
+}
+
+export interface DashboardFunds {
+  total_deposit_amount: number;
+  total_withdraw_amount: number;
+}
+
 export interface DashboardSummary {
   range: DashboardRange;
   start_date: string;
@@ -69,6 +96,9 @@ export interface DashboardSummary {
   actions: DashboardActions;
   revenue: DashboardRevenue;
   competitions: DashboardCompetitions;
+  members: DashboardMembers;
+  accounts: DashboardAccounts;
+  funds: DashboardFunds;
 }
 
 export interface DashboardSeriesProduct {
@@ -84,21 +114,33 @@ export interface DashboardSeries {
   sum: number;
 }
 
+/** 상품 구분 없는 한 줄 추이 */
+export interface DashboardSimpleSeries {
+  labels: string[];
+  totals: number[];
+  sum: number;
+}
+
+export type DashboardTrendMetric = 'revenue' | 'accounts' | 'signups' | 'funds';
+
 export interface DashboardTrendParams {
-  metric: 'revenue' | 'accounts';
+  metric: DashboardTrendMetric;
   period: DashboardTrendPeriod;
   start_date?: string | null;
   end_date?: string | null;
 }
 
 export interface DashboardTrends {
-  metric: 'revenue' | 'accounts';
+  metric: DashboardTrendMetric;
   period: DashboardTrendPeriod;
   start_date: string;
   end_date: string;
   revenue?: DashboardSeries;
   challenge?: DashboardSeries;
   funded?: DashboardSeries;
+  signups?: DashboardSimpleSeries;
+  deposit?: DashboardSimpleSeries;
+  withdraw?: DashboardSimpleSeries;
 }
 
 export async function getDashboardSummary(range: DashboardRange): Promise<DashboardSummary> {

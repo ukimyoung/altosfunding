@@ -263,6 +263,90 @@ async def _competitions(session: AsyncSession, start: date, end: date, now: date
     }
 
 
+# ── 회원 · 계좌 · 자금 (P2) ─────────────────────────────────
+
+
+def _member_filter():
+    """회원 수는 회원 목록과 같이 일반 회원(USER)만, 탈퇴 회원은 뺀다."""
+    return (User.role == "USER", User.status != "WITHDRAWN")
+
+
+async def _members(session: AsyncSession, start: date, end: date, prev_start: date, prev_end: date) -> dict:
+    s, e = _utc_bounds(start, end)
+    ps, pe = _utc_bounds(prev_start, prev_end)
+    total, new, prev_new, total_prev = (
+        await session.execute(
+            select(
+                func.count(),
+                func.count().filter(User.created_at >= s, User.created_at < e),
+                func.count().filter(User.created_at >= ps, User.created_at < pe),
+                # 비교 기간 끝 시점의 누적 (그 뒤 가입자를 뺀 값)
+                func.count().filter(User.created_at < pe),
+            ).where(*_member_filter())
+        )
+    ).one()
+    # 선택 기간 끝(오늘이면 지금)까지의 누적
+    total_at_end = await session.scalar(
+        select(func.count()).select_from(User).where(*_member_filter(), User.created_at < e)
+    )
+    return {
+        "total_users": total or 0,
+        "total_users_at_end": total_at_end or 0,
+        "total_users_prev": total_prev or 0,
+        "total_change_pct": _change(float(total_at_end or 0), float(total_prev or 0)),
+        "new_signups": new or 0,
+        "new_signups_prev": prev_new or 0,
+        "new_signups_change_pct": _change(float(new or 0), float(prev_new or 0)),
+    }
+
+
+async def _accounts(
+    session: AsyncSession, start: date, end: date, prev_start: date, prev_end: date, now: datetime
+) -> dict:
+    s, e = _utc_bounds(start, end)
+    ps, pe = _utc_bounds(prev_start, prev_end)
+    ok = TradingAccount.provision_status != "FAILED"
+    is_funded = TradingAccount.tier == "FUNDED"
+    row = (
+        await session.execute(
+            select(
+                func.count().filter(TradingAccount.tier == "CHALLENGE", TradingAccount.status == "ACTIVE"),
+                func.count().filter(TradingAccount.tier == "CHALLENGE", TradingAccount.created_at >= s, TradingAccount.created_at < e),
+                func.count().filter(TradingAccount.tier == "CHALLENGE", TradingAccount.created_at >= ps, TradingAccount.created_at < pe),
+                func.count().filter(is_funded, TradingAccount.status == "ACTIVE"),
+                func.count().filter(is_funded, TradingAccount.created_at >= s, TradingAccount.created_at < e),
+                func.count().filter(is_funded, TradingAccount.created_at >= ps, TradingAccount.created_at < pe),
+                func.count().filter(
+                    is_funded, TradingAccount.status == "ACTIVE", TradingAccount.trading_halted_until > now
+                ),
+            ).where(ok)
+        )
+    ).one()
+    ch_active, ch_new, ch_new_prev, f_active, f_new, f_new_prev, f_halted = (v or 0 for v in row)
+    return {
+        "challenge_active": ch_active,
+        "challenge_issued": ch_new,
+        "challenge_issued_prev": ch_new_prev,
+        "challenge_issued_change_pct": _change(float(ch_new), float(ch_new_prev)),
+        "funded_active": f_active,
+        "funded_issued": f_new,
+        "funded_issued_prev": f_new_prev,
+        "funded_issued_change_pct": _change(float(f_new), float(f_new_prev)),
+        "funded_halted": f_halted,
+    }
+
+
+async def _funds(session: AsyncSession) -> dict:
+    """전체(누적) 승인 완료 입금액·출금액. 입출금 내역 상단 카드와 같은 기준 (출금은 수수료 포함 신청 금액)."""
+    deposit = await session.scalar(
+        select(func.coalesce(func.sum(DepositRequest.amount), 0)).where(DepositRequest.status == "APPROVED")
+    )
+    withdraw = await session.scalar(
+        select(func.coalesce(func.sum(WithdrawalRequest.amount), 0)).where(WithdrawalRequest.status == "APPROVED")
+    )
+    return {"total_deposit_amount": as_float(deposit) or 0.0, "total_withdraw_amount": as_float(withdraw) or 0.0}
+
+
 async def summary(session: AsyncSession, range_: str | None, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     range_ = range_ or "today"
@@ -278,6 +362,9 @@ async def summary(session: AsyncSession, range_: str | None, now: datetime | Non
         "actions": await _actions(session),
         "revenue": await _revenue(session, start, end, prev_start, prev_end),
         "competitions": await _competitions(session, start, end, now),
+        "members": await _members(session, start, end, prev_start, prev_end),
+        "accounts": await _accounts(session, start, end, prev_start, prev_end, now),
+        "funds": await _funds(session),
     }
 
 
@@ -399,7 +486,23 @@ async def _account_trend(session, tier, period, start, end, buckets) -> dict:
     return out
 
 
-TREND_METRICS = ("revenue", "accounts")
+async def _simple_trend(session, period, start, end, buckets, time_col, value, filters, integer=False) -> dict:
+    """상품 구분 없는 한 줄 추이: {labels, totals, sum}."""
+    s, e = _utc_bounds(start, end)
+    bucket = func.date_trunc(q.PERIOD_UNIT[period], func.timezone(TZ.key, time_col)).label("bucket")
+    rows = await session.execute(select(bucket, value).where(*filters, time_col >= s, time_col < e).group_by(bucket))
+    index = {b: i for i, b in enumerate(buckets)}
+    totals = [0.0] * len(buckets)
+    for b, v in rows.tuples():
+        i = index.get(b.date() if isinstance(b, datetime) else b)
+        if i is not None:
+            totals[i] = round(totals[i] + float(v or 0), 2)
+    if integer:
+        totals = [int(v) for v in totals]
+    return {"labels": [_label(b, period) for b in buckets], "totals": totals, "sum": round(sum(totals), 2)}
+
+
+TREND_METRICS = ("revenue", "accounts", "signups", "funds")
 
 
 async def trends(
@@ -411,13 +514,27 @@ async def trends(
     if period not in DEFAULT_BUCKETS:
         raise AppError(400, "invalid_period", "period는 daily, weekly, monthly 중 하나여야 합니다.")
     if metric not in TREND_METRICS:
-        raise AppError(400, "invalid_metric", "metric은 revenue, accounts 중 하나여야 합니다.")
+        raise AppError(400, "invalid_metric", "metric은 revenue, accounts, signups, funds 중 하나여야 합니다.")
     start, end = trend_window(period, start_date, end_date, now)
     buckets = _buckets(start, end, period)
     out = {"metric": metric, "period": period, "start_date": start.isoformat(), "end_date": end.isoformat()}
     if metric == "revenue":
         out["revenue"] = await _revenue_trend(session, period, start, end, buckets)
-    else:
+    elif metric == "accounts":
         out["challenge"] = await _account_trend(session, "CHALLENGE", period, start, end, buckets)
         out["funded"] = await _account_trend(session, "FUNDED", period, start, end, buckets)
+    elif metric == "signups":
+        out["signups"] = await _simple_trend(
+            session, period, start, end, buckets, User.created_at, func.count(), _member_filter(), integer=True
+        )
+    else:
+        # 승인 완료 금액을 승인 시각(processed_at) 기준으로 묶는다
+        out["deposit"] = await _simple_trend(
+            session, period, start, end, buckets, DepositRequest.processed_at,
+            func.coalesce(func.sum(DepositRequest.amount), 0), (DepositRequest.status == "APPROVED",),
+        )
+        out["withdraw"] = await _simple_trend(
+            session, period, start, end, buckets, WithdrawalRequest.processed_at,
+            func.coalesce(func.sum(WithdrawalRequest.amount), 0), (WithdrawalRequest.status == "APPROVED",),
+        )
     return out
