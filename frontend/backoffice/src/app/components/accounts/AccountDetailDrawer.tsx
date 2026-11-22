@@ -6,10 +6,11 @@ import {
   useBanAccountMutation,
   useFreezeAccountMutation,
   useGetAccountDetailQuery,
+  useGetAccountEvaluationQuery,
   useListAccountTradesQuery,
   useUnfreezeAccountMutation,
 } from '../../queries/accounts';
-import type { AccountStatus, AccountTrade } from '@/api/account';
+import type { AccountEvaluationCheck, AccountStatus, AccountTrade } from '@/api/account';
 import {
   copyTextToClipboard,
   formatKstDateTimeParts,
@@ -29,6 +30,61 @@ const tradePageSize = 20;
 const asDisplay = (value: unknown, fallback = emptyValue) => {
   if (value === undefined || value === null || value === '') return fallback;
   return String(value);
+};
+
+const formatRuleUsd = (value: unknown) =>
+  typeof value === 'number'
+    ? `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    : emptyValue;
+
+const formatRulePlain = (value: unknown) =>
+  typeof value === 'number' ? value.toLocaleString('en-US', { maximumFractionDigits: 2 }) : emptyValue;
+
+/** 챌린지 결과 한 줄 ('이름', '내용'). 웹 Account Detail(한국어)과 같은 문구. 숫자 값이 없는 이전 판정은 Core가 저장한 문구를 쓴다. */
+const describeRuleCheck = (check: AccountEvaluationCheck): [string, string | null] => {
+  const v = check.values ?? null;
+  switch (check.key) {
+    case 'profit_target':
+      return [
+        '수익 목표',
+        v ? `수익 ${formatRuleUsd(v.profit)} / 목표 ${formatRuleUsd(v.target)}` : check.detail,
+      ];
+    case 'min_trading_days':
+      return [
+        '최소 거래일',
+        v ? `거래일 ${formatRulePlain(v.days)}일 / 최소 ${formatRulePlain(v.required)}일` : check.detail,
+      ];
+    case 'max_drawdown': {
+      const name = '최대 손실 한도 (Max Drawdown)';
+      if (!v) return [name, check.detail];
+      if (typeof v.violated_at === 'string') {
+        const at = formatKstDateTimeParts(v.violated_at);
+        return [
+          name,
+          `${at.date} ${at.time} (GMT+9) 위반 (평가금액 ${formatRuleUsd(v.equity)} / 기준선 ${formatRuleUsd(v.floor)})`,
+        ];
+      }
+      return [
+        name,
+        typeof v.floor === 'number'
+          ? `위반 없음 (DD ${formatRuleUsd(v.dd)}, 마지막 기준선 ${formatRuleUsd(v.floor)})`
+          : `위반 없음 (DD ${formatRuleUsd(v.dd)})`,
+      ];
+    }
+    case 'consistency': {
+      const name = '일관성 (Consistency)';
+      if (!v) return [name, check.detail];
+      if (v.skipped) return [name, `전체 순수익 ${formatRuleUsd(v.total)} — 비율 계산 안 함`];
+      const bestDay = typeof v.best_day === 'string' ? ` (${v.best_day})` : '';
+      const ratio = typeof v.ratio === 'number' ? v.ratio.toFixed(2) : emptyValue;
+      return [
+        name,
+        `하루 최대 수익 ${formatRuleUsd(v.best)}${bestDay} / 전체 순수익 ${formatRuleUsd(v.total)} = ${ratio}% (기준 ${formatRulePlain(v.limit)}%)`,
+      ];
+    }
+    default:
+      return [check.label, check.detail];
+  }
 };
 
 const getMt4Login = (acct: Account) => {
@@ -389,6 +445,10 @@ export function AccountDetailDrawer({
   const { data: detail, refetch: refetchDetail } = useGetAccountDetailQuery(
     useApi ? requestAccountId : null,
   );
+  // 챌린지 결과: 대회가 끝나고 판정이 난 뒤에만 값이 온다 (웹 Account Detail과 같은 기준)
+  const { data: evaluation } = useGetAccountEvaluationQuery(
+    useApi && detail?.tier === 'CHALLENGE' ? requestAccountId : null,
+  );
   const tradeParams = useMemo(() => ({ page: tradePage, size: tradePageSize }), [tradePage]);
   const { data: tradeData, isPlaceholderData } = useListAccountTradesQuery(
     useApi && showTradeHistory ? requestAccountId : null,
@@ -411,6 +471,7 @@ export function AccountDetailDrawer({
   });
   const accountId = detail?.mt4_login ? String(detail.mt4_login) : acct.id;
   const capital = detail ? formatUsdMoney(detail.capital) : acct.size;
+  const balance = detail ? formatUsdMoney(detail.balance) : asDisplay(acct.balance);
   const totalProfit = detail ? formatSignedUsdMoney(detail.total_profit) : acct.profit;
   const login = asDisplay(detail?.mt4_login ?? mt4Login);
   const password = asDisplay(detail?.mt4_password);
@@ -592,10 +653,11 @@ export function AccountDetailDrawer({
         <div style={{ flex: 1, overflowY: 'auto', scrollbarWidth: 'none', padding: 22 }}>
           {/* Summary cards */}
           <div
-            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 16 }}
           >
             {[
               { label: '자본금', value: capital, color: t.text },
+              { label: '계좌잔고', value: balance, color: t.text },
               { label: '총 수익', value: totalProfit, color: profitColor(totalProfit) },
             ].map((c) => (
               <div key={c.label} style={{ background: t.surface2, borderRadius: 8, padding: 12 }}>
@@ -693,6 +755,65 @@ export function AccountDetailDrawer({
               </div>
             ))}
           </div>
+
+          {/* Challenge Result (웹 Account Detail '챌린지 결과'와 같은 내용, 대회 종료 후 판정이 있을 때만) */}
+          {evaluation && evaluation.checks.length > 0 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: t.text }}>챌린지 결과</span>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    padding: '1px 8px',
+                    borderRadius: 20,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    background:
+                      evaluation.result === 'PASSED' ? 'rgba(22,163,74,0.15)' : 'rgba(220,38,38,0.15)',
+                    color: evaluation.result === 'PASSED' ? '#16A34A' : '#DC2626',
+                  }}
+                >
+                  {evaluation.result === 'PASSED' ? '통과' : '불통과'}
+                </span>
+              </div>
+              <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden' }}>
+                {evaluation.checks.map((check, i, arr) => {
+                  const [name, detailText] = describeRuleCheck(check);
+                  return (
+                    <div
+                      key={check.key}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: 12,
+                        padding: '9px 12px',
+                        fontSize: 12,
+                        borderBottom: i < arr.length - 1 ? `1px solid ${t.border}` : 'none',
+                      }}
+                    >
+                      <span style={{ color: t.text, fontWeight: 500 }}>
+                        {name}
+                        {detailText ? (
+                          <span style={{ color: t.textSec, fontWeight: 400 }}> : {detailText}</span>
+                        ) : null}
+                      </span>
+                      <span
+                        style={{
+                          flexShrink: 0,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: check.passed ? '#16A34A' : '#DC2626',
+                        }}
+                      >
+                        {check.passed ? '통과' : '위반'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {showTradeHistory && (
             <>

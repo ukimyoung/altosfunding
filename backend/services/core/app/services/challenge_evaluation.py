@@ -426,3 +426,14 @@ async def final_of_member(session: AsyncSession, account_id: uuid.UUID) -> Chall
         .order_by(ev.created_at.desc(), ev.id.desc())
         .limit(1)
     )
+
+
+async def final_out(session: AsyncSession, account_id: uuid.UUID) -> dict | None:
+    """final_of_member를 화면 응답 모양으로 (룰별 숫자 값 포함). 웹 Account Detail·백오피스 계좌 상세가 같이 쓴다."""
+    ev = await final_of_member(session, account_id)
+    if ev is None:
+        return None
+    return {
+        "result": ev.result, "period_start": ev.period_start, "period_end": ev.period_end,
+        "evaluated_at": ev.created_at, "checks": [with_values(c) for c in ev.checks or []],
+    }
