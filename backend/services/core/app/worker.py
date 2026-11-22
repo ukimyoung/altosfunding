@@ -6,6 +6,8 @@ Core API와 같은 코드·같은 DB를 쓰고, 사람이 누르지 않아도 �
   (백오피스 '지금 실행'과 같은 app.services.challenge.run_due_jobs).
 - 예약 수동 메일: 1분마다 예약 시각이 된 발송 작업을 보낸다 (app.services.manual_email.run_due_jobs).
 - 작업 큐(core.jobs): 몇 초마다 실행할 작업을 꺼내 처리한다 (app.services.jobs).
+- 평가금액 감시: 5초마다 ACTIVE 계좌 평가금액을 일괄 조회해 Max Drawdown·Daily Loss를 바로 판정한다
+  (app.services.trading_rules.watch_equity, RISK_EQUITY_WATCH_SECONDS).
 - MT4 거래·잔고 수집: 1분마다 거래 가능 계좌의 거래 내역·잔고를 브로커 API에서 받아 저장한다 (app.services.mt4_ingest).
 - MT4 연결 확인: 시작할 때와 10분마다 실제 브로커 API(서버 시각)를 불러 주소·API 키가 맞는지 로그로 남긴다.
 - 생존 기록: core.worker_heartbeats에 마지막 실행 시각과 결과를 남긴다 (GET /api/v1/admin/system/worker).
@@ -122,7 +124,7 @@ class Worker:
                     for status, n in result.items():
                         self.jobs_since_report[status] = self.jobs_since_report.get(status, 0) + n
                 # 거래 수집은 매분 같은 건수가 나와서 실패가 있을 때만 따로 남긴다 (평소 결과는 상태 줄에 나온다).
-                if name in ("mt4_ingest", "trading_rules") and not result.get("failed") and not result.get("violations"):
+                if name in ("mt4_ingest", "trading_rules", "equity_watch") and not result.get("failed") and not result.get("violations"):
                     pass
                 elif any(result.values()):
                     logger.info("%s: %s", name, result)
@@ -190,7 +192,7 @@ class Worker:
 
         next_start = state["next_start"]
         logger.info(
-            "상태: 대회[%s] 예약메일[%s] 작업큐[%s] MT4[%s] 거래수집[%s] 룰감시[%s] | 활성 스케줄 %d, 모집 중 대회 %d (다음 시작 %s), "
+            "상태: 대회[%s] 예약메일[%s] 작업큐[%s] MT4[%s] 거래수집[%s] 룰감시[%s] 평가금액감시[%s] | 활성 스케줄 %d, 모집 중 대회 %d (다음 시작 %s), "
             "진행 중 대회 %d, 대기 작업 %d",
             result("challenges"),
             result("manual_emails"),
@@ -198,6 +200,7 @@ class Worker:
             result("mt4"),
             result("mt4_ingest"),
             result("trading_rules"),
+            result("equity_watch"),
             state["schedules"],
             state["pending_rounds"],
             f"{next_start:%Y-%m-%d %H:%M} UTC" if next_start else "없음",
@@ -221,6 +224,13 @@ class Worker:
             loops.append(
                 self._every("trading_rules", settings.risk_seconds, lambda: trading_rules.run(self.sessionmaker))
             )
+            if settings.risk_equity_watch_seconds > 0:
+                loops.append(
+                    self._every(
+                        "equity_watch", settings.risk_equity_watch_seconds,
+                        lambda: trading_rules.watch_equity(self.sessionmaker),
+                    )
+                )
         logger.info("Worker 시작: %s (주기 %ss, 작업 큐 %ss)", WORKER_ID, tick, settings.worker_poll_seconds)
         await asyncio.gather(*loops)
         logger.info("Worker 종료: %s", WORKER_ID)
@@ -243,6 +253,15 @@ async def main() -> None:
         await db.dispose_engine()
 
 
+class _QuietBalances(logging.Filter):
+    """5초마다 부르는 잔고 일괄 조회의 정상 응답(httpx INFO)은 로그에 남기지 않는다. 실패 응답은 그대로 남긴다."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        message = record.getMessage()
+        return not ("/api/mt4/accounts/balances" in message and " 200 " in message)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.getLogger("httpx").addFilter(_QuietBalances())
     asyncio.run(main())

@@ -272,3 +272,57 @@ def test_stale_equity_is_not_judged(round_, active):  # noqa: F811
     _equity(active[A], 90000, now - timedelta(minutes=10))
     result = _run(now)
     assert result["checked"] == 0 and result["violations"] == 0
+
+
+def _watch(now):
+    from app import db
+
+    db.get_engine()
+    return asyncio.run(trading_rules.watch_equity(db._sessionmaker, now))
+
+
+def test_equity_watch_catches_drawdown_between_minutes(round_, active, broker):  # noqa: F811
+    """1분 감시 사이(5초 감시)에 평가금액이 기준선을 찍으면 바로 위반·조치한다."""
+    from tests.test_mt4_ingest import _bal
+
+    _ruleset(round_["product_id"])
+    now = datetime.now(UTC)
+    _equity(active[A], 100000, now)
+    _equity(active[B], 100000, now)
+    # 감시 상태(기준선 95,000)가 없으면 5초 감시는 건너뛴다
+    broker.balances[A] = _bal(A, 100000, 94000)
+    assert _watch(now)["accounts"] == 0
+    _run(now)
+
+    # A는 기준선 아래, B는 위 → A만 DB에 쓰고 판정한다
+    broker.balances[A] = _bal(A, 100000, 94900)
+    broker.balances[B] = _bal(B, 100000, 99000)
+    t1 = now + timedelta(seconds=5)
+    result = _watch(t1)
+    assert result == {"accounts": 2, "fetched": 2, "checked": 1, "violations": 1, "failed": 0}
+    v = run_sql("select * from core.rule_violations where rule_key = 'MAX_DRAWDOWN'")
+    assert len(v) == 1 and v[0]["account_id"] == uuid.UUID(active[A]) and float(v[0]["observed_value"]) == 94900
+    assert v[0]["detected_at"] == t1
+    assert _status(active[A]) == "FAILED"
+    rows = {str(r["id"]): r for r in run_sql("select id, equity from core.trading_accounts")}
+    assert float(rows[active[A]]["equity"]) == 94900
+    assert float(rows[active[B]]["equity"]) == 100000  # 기준선 위 계좌는 DB에 쓰지 않는다
+
+    # FAILED 계좌는 더 보지 않는다
+    assert _watch(t1 + timedelta(seconds=5))["accounts"] == 1
+
+
+def test_equity_watch_funded_daily_loss(round_, active, broker):  # noqa: F811
+    from tests.test_mt4_ingest import _bal
+
+    _ruleset(round_["product_id"])
+    run_sql("update core.trading_accounts set tier = 'FUNDED' where mt4_login = $1", B)
+    now = datetime.now(UTC)
+    _equity(active[B], 100000, now)
+    _run(now)
+    broker.balances[B] = _bal(B, 100000, 97900)  # 손실 2,100 ≥ 한도 2,000
+    assert _watch(now + timedelta(seconds=5))["violations"] == 1
+    row = run_sql("select status, trading_halted_until from core.trading_accounts where id = $1", uuid.UUID(active[B]))[0]
+    assert row["status"] == "ACTIVE" and row["trading_halted_until"] is not None
+    # 그날 정지 중에는 다시 판정하지 않는다
+    assert _watch(now + timedelta(seconds=10))["checked"] == 0
