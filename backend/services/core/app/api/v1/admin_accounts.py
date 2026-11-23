@@ -8,7 +8,7 @@ GET /admin/accounts/{account_id}/evaluation  챌린지 결과 (웹 Account Detai
 POST /admin/accounts/{account_id}/freeze    비활성 (PENDING·ACTIVE → INACTIVE, 미결 포지션 있으면 거절)
 POST /admin/accounts/{account_id}/unfreeze  활성 복귀 (INACTIVE → 대회 상태에 맞는 원래 상태)
 POST /admin/accounts/{account_id}/ban       영구정지 (사유 필수, 되돌릴 수 없음)
-POST /admin/accounts/{account_id}/issue-funded  합격(PASSED) 챌린지 계좌의 펀디드 계좌 수동 발급 (자동 발급이 안 됐거나 실패했을 때)
+POST /admin/accounts/{account_id}/issue-funded  합격(PASSED) 챌린지 계좌의 펀디드 계좌 수동 발급 (수동 발급 상품, 자동 발급이 안 됐거나 실패했을 때)
 GET /admin/accounts/{account_id}/rules      룰 감시 상태·일일 결산·위반 기록 (트레이딩 룰 자동 검증)
 GET /admin/rule-violations                  룰 위반 목록 (전체 계좌)
 

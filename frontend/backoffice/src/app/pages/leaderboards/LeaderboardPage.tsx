@@ -8,6 +8,8 @@ import { LeaderboardStatCards } from '../../components/leaderboard/LeaderboardSt
 import { NormalRankTable } from '../../components/leaderboard/NormalRankTable';
 import { VipRankTable } from '../../components/leaderboard/VipRankTable';
 import { LeaderboardEvaluationModal } from '../../components/leaderboard/LeaderboardEvaluationModal';
+import { IssueFundedModal } from '../../components/accounts/IssueFundedModal';
+import { useIssueFundedAccountMutation } from '../../queries/accounts';
 import {
   useChallengeSummaryStatsQuery,
   useDailyLeaderboardQuery,
@@ -128,6 +130,11 @@ function mapEntry(entry: DailyLeaderboardEntry): RankEntry {
     profit: entry.profit,
     evaluationResult: entry.evaluation_result ?? null,
     evaluatedAt: entry.evaluated_at ?? null,
+    fundedIssueMethod: entry.funded_issue_method ?? 'AUTO',
+    fundedAccountId: entry.funded_account_id ?? null,
+    fundedMt4Login: entry.funded_mt4_login ?? null,
+    fundedProvisionStatus: entry.funded_provision_status ?? null,
+    fundedStartAt: entry.funded_start_at ?? null,
   };
 }
 
@@ -171,6 +178,9 @@ export function LeaderboardPage() {
     grade: 'VIP',
   });
   const evaluateMutation = useEvaluateLeaderboardAccountMutation();
+  const issueFundedMutation = useIssueFundedAccountMutation();
+  const [issueTarget, setIssueTarget] = useState<RankEntry | null>(null);
+  const [issuingId, setIssuingId] = useState<string | null>(null);
 
   const normalRows = useMemo(() => (normalData?.entries ?? []).map(mapEntry), [normalData?.entries]);
   const vipRows = useMemo(() => (vipData?.entries ?? []).map(mapVipEntry), [vipData?.entries]);
@@ -193,6 +203,24 @@ export function LeaderboardPage() {
         });
       },
       onSettled: () => setEvaluatingId(null),
+    });
+  };
+
+  // '펀디드계좌' 열의 '펀디드 계좌 발급' → 확인 팝업 → 지금 발급
+  const handleIssueFunded = (entry: RankEntry) => {
+    setIssueTarget(null);
+    setIssuingId(entry.id);
+    issueFundedMutation.mutate(entry.id, {
+      onSuccess: () => {
+        setToast({ message: `${entry.accountNumber} 펀디드 계좌 발급을 시작했습니다`, type: 'success' });
+      },
+      onError: (error) => {
+        setToast({
+          message: getApiErrorMessage(error, '펀디드 계좌 발급에 실패했습니다'),
+          type: 'warning',
+        });
+      },
+      onSettled: () => setIssuingId(null),
     });
   };
 
@@ -294,6 +322,8 @@ export function LeaderboardPage() {
             data={normalRows}
             evaluatingId={evaluatingId}
             onEvaluate={handleEvaluate}
+            issuingId={issuingId}
+            onIssueFunded={setIssueTarget}
           />
         ) : (
           <VipRankTable
@@ -301,6 +331,8 @@ export function LeaderboardPage() {
             data={vipRows}
             evaluatingId={evaluatingId}
             onEvaluate={handleEvaluate}
+            issuingId={issuingId}
+            onIssueFunded={setIssueTarget}
           />
         )}
       </div>
@@ -311,6 +343,15 @@ export function LeaderboardPage() {
           accountNumber={evaluationView.accountNumber}
           evaluation={evaluationView.evaluation}
           onClose={() => setEvaluationView(null)}
+        />
+      )}
+      {issueTarget && (
+        <IssueFundedModal
+          dark={dark}
+          accountNumber={issueTarget.accountNumber}
+          manual={issueTarget.fundedIssueMethod === 'MANUAL'}
+          onCancel={() => setIssueTarget(null)}
+          onConfirm={() => handleIssueFunded(issueTarget)}
         />
       )}
       {toast && (

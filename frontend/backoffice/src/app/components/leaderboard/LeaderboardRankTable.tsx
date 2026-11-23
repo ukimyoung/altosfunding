@@ -1,6 +1,7 @@
 import type { RankEntry, VipEntry } from '../../types/leaderboard';
 import { getLeaderboardTierConfig, toLeaderboardTierLabel } from '../../constants/leaderboard';
-import { formatSignedPercent, formatSignedUsdMoney } from '../../utils/utils';
+import { formatKstDateTimeParts, formatSignedPercent, formatSignedUsdMoney } from '../../utils/utils';
+import { fundedProvisionLabel } from '../accounts/AccountDetailDrawer';
 
 type LeaderboardRankTableVariant = 'normal' | 'vip';
 type LeaderboardRankTableEntry = RankEntry | VipEntry;
@@ -12,6 +13,9 @@ interface LeaderboardRankTableProps<T extends LeaderboardRankTableEntry> {
   /** '확인하기' 진행 중인 계좌 */
   evaluatingId: string | null;
   onEvaluate: (id: string) => void;
+  /** '펀디드 계좌 발급' 진행 중인 계좌 */
+  issuingId: string | null;
+  onIssueFunded: (entry: T) => void;
 }
 
 const PASS_BADGE = {
@@ -40,6 +44,8 @@ export function LeaderboardRankTable<T extends LeaderboardRankTableEntry>({
   data,
   evaluatingId,
   onEvaluate,
+  issuingId,
+  onIssueFunded,
 }: LeaderboardRankTableProps<T>) {
   const t = {
     surface: dark ? '#0F1829' : '#ffffff',
@@ -47,6 +53,7 @@ export function LeaderboardRankTable<T extends LeaderboardRankTableEntry>({
     border: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.09)',
     text: dark ? '#E8EAF0' : '#1A1A1A',
     textSec: dark ? '#8B8FA8' : '#4A4A58',
+    textHint: dark ? '#5A6080' : '#A0A0AA',
     accent: '#7C6AF7',
   };
 
@@ -70,7 +77,7 @@ export function LeaderboardRankTable<T extends LeaderboardRankTableEntry>({
         <thead>
           <tr style={{ background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
             {/* 승격 대상 선택 체크박스는 '승격 대상 목록' 영역과 함께 제거 */}
-            {['순위', '계좌번호 (챌린지)', '상품', '수익률', '수익금', '통과 여부', '결과'].map(
+            {['순위', '계좌번호 (챌린지)', '상품', '수익률', '수익금', '통과 여부', '결과', '펀디드계좌'].map(
               (label) => (
                 <th
                   key={label}
@@ -93,7 +100,7 @@ export function LeaderboardRankTable<T extends LeaderboardRankTableEntry>({
           {data.length === 0 && (
             <tr>
               <td
-                colSpan={7}
+                colSpan={8}
                 style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: t.textSec }}
               >
                 표시할 계좌가 없습니다
@@ -209,6 +216,63 @@ export function LeaderboardRankTable<T extends LeaderboardRankTableEntry>({
                   >
                     {isEvaluating ? '확인 중...' : '확인하기'}
                   </button>
+                </td>
+
+                {/* 펀디드계좌: 발급된 계좌(번호·상태) / 합격했고 아직 없으면 '펀디드 계좌 발급' 버튼 / 그 외 - */}
+                <td style={{ padding: '16px', whiteSpace: 'nowrap' }}>
+                  {entry.fundedAccountId ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: t.text,
+                          fontFamily: "'DM Mono', monospace",
+                        }}
+                      >
+                        {entry.fundedMt4Login ?? '번호 할당 전'}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: entry.fundedProvisionStatus === 'DONE' ? '#16A34A' : '#D97706',
+                        }}
+                      >
+                        {fundedProvisionLabel(entry.fundedProvisionStatus)}
+                        {entry.fundedProvisionStatus !== 'DONE' && entry.fundedStartAt ? (
+                          <span style={{ fontWeight: 400, color: t.textHint }}>
+                            {' '}
+                            · {formatKstDateTimeParts(entry.fundedStartAt).date}{' '}
+                            {formatKstDateTimeParts(entry.fundedStartAt).time}
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
+                  ) : entry.accountStatus === 'PASSED' ? (
+                    <button
+                      type="button"
+                      onClick={() => onIssueFunded(entry)}
+                      disabled={issuingId !== null}
+                      style={{
+                        height: 30,
+                        padding: '0 14px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: t.accent,
+                        color: '#ffffff',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        whiteSpace: 'nowrap',
+                        cursor: issuingId !== null ? 'not-allowed' : 'pointer',
+                        opacity: issuingId !== null && issuingId !== entry.id ? 0.5 : 1,
+                      }}
+                    >
+                      {issuingId === entry.id ? '발급 중...' : '펀디드 계좌 발급'}
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 13, color: t.textSec }}>-</span>
+                  )}
                 </td>
               </tr>
             );

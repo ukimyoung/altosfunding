@@ -5,6 +5,7 @@ import {
   getAccountDetail,
   getAccountEvaluation,
   getAccountStats,
+  issueFundedAccount,
   listAccountTrades,
   listAccounts,
   unfreezeAccount,
@@ -16,6 +17,7 @@ import type {
   ListAccountTradesParams,
 } from '@/api/account';
 import { violationQueryKeys } from './violations';
+import { challengeQueryKeys } from './challenges';
 
 export const accountsQueryKeys = {
   all: ['admin', 'accounts'] as const,
@@ -139,6 +141,19 @@ export function useUnfreezeAccountMutation() {
 
 export function useFreezeAccountMutation() {
   return useAccountStatusMutation(freezeAccount);
+}
+
+export function useIssueFundedAccountMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (accountId: string) => issueFundedAccount(accountId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: accountsQueryKeys.all });
+      // Leaderboard '펀디드계좌' 열
+      queryClient.invalidateQueries({ queryKey: challengeQueryKeys.all });
+    },
+  });
 }
 
 export function useBanAccountMutation() {

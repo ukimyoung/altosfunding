@@ -143,3 +143,40 @@ def test_no_linked_product_then_manual_issue(client, admin_headers, round_, acti
     _work(rounds=2)
     rows = _funded_rows()
     assert [r["provision_status"] for r in rows] == ["FAILED", "DONE"]
+
+
+def test_manual_issue_product_skips_auto_issue(client, admin_headers, round_, active, broker, live):  # noqa: F811
+    # 챌린지 상품이 수동 발급이면 합격해도 펀디드 계좌를 자동으로 만들지 않는다
+    _funded_product(client, admin_headers, round_["product_id"])
+    res = client.put(f"/api/v1/catalog/products/{round_['product_id']}", headers=admin_headers,
+                     json={"funded_issue_method": "MANUAL", "funding_start_delay_hours": 48})
+    assert res.status_code == 200, res.text
+    _finish(round_, active)
+    assert _status(active[A]) == "PASSED" and not _funded_rows()
+
+    # 계좌 상세: 발급 방법과 아직 펀디드 계좌 없음
+    detail = client.get(f"/api/v1/admin/accounts/{active[A]}", headers=admin_headers).json()
+    assert detail["funded_issue_method"] == "MANUAL" and detail["funded_account_id"] is None
+
+    # 관리자가 발급하면 지금 바로 발급 대기로 만들고, 상세에 펀디드 계좌가 보인다
+    before = datetime.now(UTC)
+    res = client.post(f"/api/v1/admin/accounts/{active[A]}/issue-funded", headers=admin_headers)
+    assert res.status_code == 200, res.text
+    out = res.json()
+    assert out["tier"] == "FUNDED" and before - timedelta(seconds=5) <= datetime.fromisoformat(out["start_at"])
+    detail = client.get(f"/api/v1/admin/accounts/{active[A]}", headers=admin_headers).json()
+    assert detail["funded_account_id"] == out["account_id"] and detail["funded_provision_status"] == "QUEUED"
+
+    # Leaderboard 행에도 발급된 펀디드 계좌가 보인다
+    day = client.get("/api/v1/admin/challenges/leaderboard/end-dates", headers=admin_headers).json()[0]
+    board = client.get("/api/v1/admin/challenges/leaderboard/daily", headers=admin_headers,
+                       params={"date": day}).json()
+    rows = {e["account_id"]: e for e in board["entries"]}
+    assert rows[active[A]]["funded_account_id"] == out["account_id"]
+    assert rows[active[A]]["funded_issue_method"] == "MANUAL"
+    assert rows[active[A]]["funded_provision_status"] == "QUEUED"
+    assert rows[active[B]]["funded_account_id"] is None
+
+    # 한 번 더 눌러도 새로 만들지 않는다
+    again = client.post(f"/api/v1/admin/accounts/{active[A]}/issue-funded", headers=admin_headers)
+    assert again.json()["account_id"] == out["account_id"] and len(_funded_rows()) == 1

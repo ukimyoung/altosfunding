@@ -138,7 +138,24 @@ async def get_account(session: AsyncSession, identifier: str) -> dict:
         raise AppError(404, "account_not_found", "계좌를 찾을 수 없습니다.")
     a = row[0]
     reasons = await latest_reasons(session, [a.id]) if a.status in REASON_STATUSES else {}
-    return _with_reason(admin_account_out(*row), a, reasons)
+    out = _with_reason(admin_account_out(*row), a, reasons)
+    if a.tier == "CHALLENGE":
+        out.update(await _funded_info(session, a, row[1]))
+    return out
+
+
+async def _funded_info(session: AsyncSession, a: TradingAccount, product: Product | None) -> dict:
+    """챌린지 계좌 상세: 상품의 펀디드 발급 방법과 이 계좌로 만든 펀디드 계좌 (계좌 상세 '펀디드 계좌 발급' 버튼용)."""
+    from app.services import funded
+
+    f = await funded.existing_for(session, a.id)
+    return {
+        "funded_issue_method": product.funded_issue_method if product else None,
+        "funded_account_id": str(f.id) if f else None,
+        "funded_mt4_login": f.mt4_login if f else None,
+        "funded_provision_status": f.provision_status if f else None,
+        "funded_start_at": f.start_at if f else None,
+    }
 
 
 async def account_stats(session: AsyncSession, tier: str | None) -> dict:

@@ -12,6 +12,8 @@
    작업은 챌린지 계좌와 같은 mt4.provision_challenge_account가 LIVE 서버에 한다 (번호 할당·생성·자본금 입금·재시도).
    발급이 끝나면 바로 거래할 수 있고(ACTIVE) 펀디드 계좌 발급 메일(funding_account_issued)을 보낸다.
    재시도를 다 써서 실패하면 발급 실패(FAILED)로 남고, 관리자가 수동 발급 API로 다시 발급할 수 있다.
+5. 챌린지 상품의 '펀디드 계좌 발급 방법'(funded_issue_method)이 수동(MANUAL)이면 자동 발급을 하지 않는다
+   (2026-11-23 사용자 결정). 관리자가 백오피스 계좌 상세의 '펀디드 계좌 발급' 버튼(수동 발급 API)으로 발급한다.
 
 중복 발급 방지: 챌린지 계좌 1개당 발급 실패가 아닌 펀디드 계좌는 1개만 (source_account_id 부분 유니크 인덱스).
 합격 뒤 관리자가 다시 판정해 FAILED가 되어도 이미 만든 펀디드 계좌는 건드리지 않는다.
@@ -35,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 FUNDED = "FUNDED"
 ISSUED_MAIL_JOB = "notify.funded_account_issued"
+MANUAL_ISSUE = "MANUAL"
 
 
 def _now() -> datetime:
@@ -131,7 +134,14 @@ async def create_for(
 
 
 async def on_passed(session: AsyncSession, source: TradingAccount, now: datetime | None = None) -> TradingAccount | None:
-    """최종 판정 PASSED 직후 (자동 판정·관리자 확인 공통). 펀디드 상품이 없으면 로그만 남기고 None."""
+    """최종 판정 PASSED 직후 (자동 판정·관리자 확인 공통). 펀디드 상품이 없으면 로그만 남기고 None.
+
+    챌린지 상품이 수동 발급(MANUAL)이면 만들지 않는다 (관리자가 수동 발급 API로 발급).
+    """
+    challenge_product = await session.get(Product, source.product_id)
+    if challenge_product is not None and challenge_product.funded_issue_method == MANUAL_ISSUE:
+        logger.info("펀디드 계좌 자동 발급 안 함 (수동 발급 상품 %s): 챌린지 계좌 %s", source.product_id, source.id)
+        return None
     try:
         async with session.begin_nested():
             return await create_for(session, source, now)

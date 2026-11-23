@@ -354,6 +354,12 @@ class LeaderboardEntry(BaseModel):
     # 마지막 판정이 통과면 true
     is_passed: bool
     rank: int
+    # 펀디드 계좌: 상품의 발급 방법(AUTO|MANUAL)과 이 계좌로 만든 펀디드 계좌 (발급 실패 제외, 없으면 null)
+    funded_issue_method: str = "AUTO"
+    funded_account_id: str | None = None
+    funded_mt4_login: int | None = None
+    funded_provision_status: str | None = None
+    funded_start_at: datetime | None = None
 
 
 class LeaderboardChallenge(BaseModel):
