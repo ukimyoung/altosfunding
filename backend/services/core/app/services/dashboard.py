@@ -102,7 +102,8 @@ async def _system(session: AsyncSession, now: datetime) -> dict:
         if last:
             mt4_checked_at = last.get("at")
             if last.get("ok"):
-                mt4 = {k: str(v) for k, v in (last.get("result") or {}).items()}
+                # Worker는 서버 이름을 소문자(demo·live)로 남긴다 → 화면 키(DEMO·LIVE)에 맞춘다
+                mt4 = {k.upper(): str(v) for k, v in (last.get("result") or {}).items()}
             else:
                 mt4 = {"DEMO": "확인 실패", "LIVE": "확인 실패"}
 

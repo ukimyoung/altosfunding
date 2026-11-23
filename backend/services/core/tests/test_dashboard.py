@@ -108,3 +108,16 @@ def test_summary_and_trends(client, admin_headers, buyer, round_, fake_mt4):  # 
 
 def test_dashboard_requires_admin(client, buyer):  # noqa: F811
     assert client.get(SUMMARY, headers=buyer).status_code == 403
+
+
+def test_summary_mt4_status_keys(client, admin_headers):  # noqa: F811
+    # Worker는 MT4 확인 결과를 소문자 서버 이름(demo·live)으로 남긴다 → 화면은 DEMO·LIVE 키로 읽는다
+    run_sql(
+        """insert into core.worker_heartbeats (worker_id, started_at, last_seen_at, last_tick)
+        values ('w1', now(), now(), '{"mt4": {"at": "2026-11-23T00:00:00+00:00", "ok": true,
+        "result": {"demo": "OK", "live": "미설정"}}}'::jsonb)"""
+    )
+    sys = client.get(SUMMARY, headers=admin_headers).json()["system"]
+    assert sys["worker_alive"] is True
+    assert sys["mt4"] == {"DEMO": "OK", "LIVE": "미설정"}
+    assert sys["mt4_checked_at"] == "2026-11-23T00:00:00+00:00"
