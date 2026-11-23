@@ -13,6 +13,13 @@ export interface RankEntry {
   /** '확인하기' 마지막 판정 (판정 전이면 null) */
   evaluationResult: EvaluationResult | null;
   evaluatedAt: string | null;
+  /** 펀디드 계좌 발급 방법 (상품 설정) */
+  fundedIssueMethod: 'AUTO' | 'MANUAL';
+  /** 이 계좌로 만든 펀디드 계좌 (없으면 null) */
+  fundedAccountId: string | null;
+  fundedMt4Login: number | null;
+  fundedProvisionStatus: string | null;
+  fundedStartAt: string | null;
 }
 
 export interface VipEntry extends RankEntry {

@@ -62,6 +62,12 @@ export interface DailyLeaderboardEntry {
   /** 마지막 판정이 통과면 true */
   is_passed: boolean;
   rank: number;
+  /** 펀디드 계좌: 상품의 발급 방법과 이 계좌로 만든 펀디드 계좌 (없으면 null) */
+  funded_issue_method?: 'AUTO' | 'MANUAL';
+  funded_account_id?: string | null;
+  funded_mt4_login?: number | null;
+  funded_provision_status?: string | null;
+  funded_start_at?: string | null;
 }
 
 export interface DailyLeaderboardParams {

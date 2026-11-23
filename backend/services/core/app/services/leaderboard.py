@@ -128,6 +128,18 @@ async def _latest_evaluations(session: AsyncSession, account_ids: list[uuid.UUID
     return {r.account_id: r for r in rows}
 
 
+async def _funded_accounts(session: AsyncSession, account_ids: list[uuid.UUID]) -> dict:
+    """챌린지 계좌 id → 그 계좌로 만든 펀디드 계좌 (발급 실패 제외)."""
+    if not account_ids:
+        return {}
+    rows = await session.scalars(
+        select(TradingAccount).where(
+            TradingAccount.source_account_id.in_(account_ids), TradingAccount.provision_status != "FAILED"
+        )
+    )
+    return {r.source_account_id: r for r in rows}
+
+
 def _sort_key(entry: dict):
     return (-entry["profit_rate"], -entry["profit"], entry["mt4_login"] or 0)
 
@@ -163,6 +175,7 @@ async def build(
     snapshots = await _snapshots_before_end(session, ended_ids)
 
     evaluations = await _latest_evaluations(session, [a.id for a, *_ in rows])
+    funded = await _funded_accounts(session, [a.id for a, *_ in rows])
 
     entries: list[dict] = []
     for account, user, product in rows:
@@ -172,6 +185,7 @@ async def build(
         profit = equity - capital
         rate = float(round(profit / capital * 100, 4)) if capital > 0 else 0.0
         evaluation = evaluations.get(account.id)
+        f = funded.get(account.id)
         name = " ".join(p for p in (user.first_name, user.last_name) if p)
         entries.append({
             "account_id": str(account.id),
@@ -196,6 +210,12 @@ async def build(
             "evaluation_result": evaluation.result if evaluation else None,
             "evaluated_at": evaluation.created_at if evaluation else None,
             "is_passed": bool(evaluation and evaluation.result == "PASSED"),
+            # 펀디드 계좌 (Leaderboard '펀디드계좌' 열: 발급된 계좌 또는 '펀디드 계좌 발급' 버튼)
+            "funded_issue_method": product.funded_issue_method,
+            "funded_account_id": str(f.id) if f else None,
+            "funded_mt4_login": f.mt4_login if f else None,
+            "funded_provision_status": f.provision_status if f else None,
+            "funded_start_at": f.start_at if f else None,
         })
 
     entries.sort(key=_sort_key)

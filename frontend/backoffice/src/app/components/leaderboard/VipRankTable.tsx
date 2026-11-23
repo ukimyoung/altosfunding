@@ -6,6 +6,9 @@ interface VipRankTableProps {
   data: VipEntry[];
   evaluatingId: string | null;
   onEvaluate: (id: string) => void;
+  /** '펀디드 계좌 발급' 진행 중인 계좌 */
+  issuingId: string | null;
+  onIssueFunded: (entry: VipEntry) => void;
 }
 
 export function VipRankTable(props: VipRankTableProps) {

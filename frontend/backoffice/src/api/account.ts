@@ -67,6 +67,12 @@ export interface AdminAccount {
   leverage?: number | null;
   mt4_server?: string | null;
   provision_status?: string | null;
+  // 챌린지 계좌 상세에만: 상품의 펀디드 발급 방법과 이 계좌로 만든 펀디드 계좌 (발급 실패 제외)
+  funded_issue_method?: 'AUTO' | 'MANUAL' | null;
+  funded_account_id?: string | null;
+  funded_mt4_login?: number | null;
+  funded_provision_status?: string | null;
+  funded_start_at?: string | null;
 }
 
 export interface ListAccountsResponse {
@@ -177,6 +183,12 @@ export const unfreezeAccount = async (accountId: string): Promise<void> => {
 export const freezeAccount = async (accountId: string): Promise<void> => {
   const endpoint = `/v1/admin/accounts/${accountId}/freeze`;
   await api.post(endpoint);
+};
+
+/** 합격(PASSED)한 챌린지 계좌의 펀디드 계좌를 지금 발급한다. 만든 펀디드 계좌를 돌려준다. */
+export const issueFundedAccount = async (accountId: string): Promise<AdminAccount> => {
+  const response = await api.post<AdminAccount>(`/v1/admin/accounts/${accountId}/issue-funded`);
+  return response.data;
 };
 
 export const banAccount = async (accountId: string, payload: BanAccountRequest): Promise<void> => {

@@ -229,6 +229,9 @@ export function AccountInactiveModal({
   );
 }
 
+export const fundedProvisionLabel = (status?: string | null) =>
+  status === 'DONE' ? '발급 완료' : status === 'QUEUED' ? '발급 대기' : asDisplay(status);
+
 // Account Banned modal (account drawer)
 
 export function AccountBannedModal({
@@ -811,6 +814,56 @@ export function AccountDetailDrawer({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Funded Account: 이 챌린지 계좌로 발급된 펀디드 계좌 (발급 버튼은 Leaderboard '펀디드계좌' 열) */}
+          {detail?.tier === 'CHALLENGE' && detail.funded_account_id && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: t.text }}>펀디드 계좌</span>
+                <span style={{ fontSize: 10, color: t.textHint }}>
+                  {detail.funded_issue_method === 'MANUAL' ? '수동 발급 상품' : '자동 발급 상품'}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  padding: '10px 12px',
+                  border: `1px solid ${t.border}`,
+                  borderRadius: 10,
+                  fontSize: 12,
+                }}
+              >
+                <>
+                  <span style={{ color: t.text }}>
+                    MT4{' '}
+                    <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 600 }}>
+                      {asDisplay(detail.funded_mt4_login, '번호 할당 전')}
+                    </span>
+                    {detail.funded_start_at && detail.funded_provision_status !== 'DONE' ? (
+                      <span style={{ color: t.textSec }}>
+                        {' '}
+                        · 발급 예정 {formatKstDateTimeParts(detail.funded_start_at).date}{' '}
+                        {formatKstDateTimeParts(detail.funded_start_at).time}
+                      </span>
+                    ) : null}
+                  </span>
+                  <span
+                    style={{
+                      flexShrink: 0,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: detail.funded_provision_status === 'DONE' ? '#16A34A' : '#D97706',
+                    }}
+                  >
+                    {fundedProvisionLabel(detail.funded_provision_status)}
+                  </span>
+                </>
               </div>
             </div>
           )}

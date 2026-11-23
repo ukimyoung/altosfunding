@@ -255,6 +255,12 @@ class AdminAccount(AccountDetail):
     issued_at: datetime | None = None
     # 펀디드 계좌: 합격한 챌린지 계좌 id
     source_account_id: str | None = None
+    # 챌린지 계좌 상세에만: 상품의 펀디드 발급 방법(AUTO|MANUAL)과 이 계좌로 만든 펀디드 계좌 (발급 실패 제외)
+    funded_issue_method: str | None = None
+    funded_account_id: str | None = None
+    funded_mt4_login: int | None = None
+    funded_provision_status: str | None = None
+    funded_start_at: datetime | None = None
 
 
 class AdminAccountPage(BaseModel):
