@@ -2,6 +2,8 @@ import api from './axios';
 
 export type CatalogProductTierType = 'CHALLENGE' | 'FUNDED' | 'DEMO' | 'LIVE';
 
+export type FundedIssueMethod = 'AUTO' | 'MANUAL';
+
 export interface CatalogProduct {
   product_id: string;
   name: string | null;
@@ -22,6 +24,8 @@ export interface CatalogProduct {
   /** 펀디드 상품에만: 연관 챌린지 상품 id (예: 1001) */
   related_id?: string | null;
   funding_start_delay_hours: number | null;
+  /** 챌린지 상품: 펀디드 계좌 발급 방법 AUTO(자동) | MANUAL(수동) */
+  funded_issue_method?: FundedIssueMethod;
   leverage: number | null;
   duration_days: number | null;
 }
@@ -59,6 +63,7 @@ export interface CreateCatalogProductRequest {
   margin_call_pct?: number | null;
   stop_out_pct?: number | null;
   funding_start_delay_hours?: number | null;
+  funded_issue_method?: FundedIssueMethod | null;
   mt4_login_pool_start?: number | null;
   mt4_login_pool_end?: number | null;
   ruleset_id?: string | null;

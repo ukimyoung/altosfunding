@@ -11,6 +11,11 @@ import { formatRulesetLimit } from "../../utils/rulesetFormat";
 //   { value: "Y", label: "추천" },
 // ] as const;
 
+const FUNDED_ISSUE_METHOD_OPTIONS = [
+  { value: "AUTO", label: "자동 발급" },
+  { value: "MANUAL", label: "수동 발급" },
+] as const;
+
 interface ChallengeProductModalProps {
   product: ChallengeProduct | null;
   isOpen: boolean;
@@ -52,6 +57,7 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
       profitTarget: "N/A",
       dailyDrawdown: "N/A",
       creationDelayHours: null,
+      fundedIssueMethod: "AUTO",
       challengeNameTemplate: "",
       seasonLabel: "",
       scheduleStatus: "ACTIVE",
@@ -96,6 +102,7 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
       profitTarget: "",
       dailyDrawdown: "",
       creationDelayHours: null,
+      fundedIssueMethod: "AUTO",
       challengeNameTemplate: "",
       seasonLabel: "",
       scheduleStatus: "ACTIVE",
@@ -128,6 +135,9 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
     accent: "#7C6AF7",
     accentBg: "rgba(124,106,247,0.12)",
   };
+
+  const fundedIssueMethod = formData.fundedIssueMethod ?? "AUTO";
+  const isAutoIssue = fundedIssueMethod === "AUTO";
 
   const handleSubmit = () => {
     if (formData.discountAmount != null && formData.amount != null && formData.discountAmount > formData.amount) {
@@ -306,11 +316,45 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
                 </div>
               </div>
 
-              {/* Auto-Creation Timing Section */}
+              {/* Funded Issue Method Section */}
               <div style={{
                 padding: 16, borderRadius: 8, background: t.accentBg,
                 border: `1px solid ${t.border}`,
               }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 12 }}>
+                  펀디드 계좌 발급 방법 선택
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 20 }}>
+                  {FUNDED_ISSUE_METHOD_OPTIONS.map((opt) => (
+                    <label key={opt.value} style={{
+                      display: "flex", alignItems: "center", gap: 6, cursor: "pointer",
+                    }}>
+                      <input
+                        type="radio"
+                        name="fundedIssueMethod"
+                        checked={fundedIssueMethod === opt.value}
+                        onChange={() => setFormData({ ...formData, fundedIssueMethod: opt.value })}
+                        style={{ accentColor: t.accent }}
+                      />
+                      <span style={{ fontSize: 13, color: t.text }}>{opt.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <div style={{ fontSize: 11, color: t.textHint, marginTop: 8 }}>
+                  {fundedIssueMethod === "AUTO"
+                    ? "챌린지 합격 시 아래 설정한 시점에 펀디드 계좌를 자동으로 발급합니다."
+                    : "챌린지 합격 후 관리자가 직접 펀디드 계좌를 발급합니다."}
+                </div>
+              </div>
+
+              {/* Auto-Creation Timing Section (수동 발급이면 비활성) */}
+              <div style={{
+                padding: 16, borderRadius: 8, background: t.accentBg,
+                border: `1px solid ${t.border}`,
+                opacity: isAutoIssue ? 1 : 0.45,
+              }}
+                aria-disabled={!isAutoIssue}
+              >
                 <div style={{ fontSize: 13, fontWeight: 600, color: t.text, marginBottom: 12 }}>
                   챌린지 종료 후 펀디드 계좌 자동 생성 시점
                 </div>
@@ -333,7 +377,9 @@ export function ChallengeProductModal({ product, isOpen, onClose, onSave, onNavi
                       value={formData.creationDelayHours ?? ""}
                       onChange={(e) => setFormData({ ...formData, creationDelayHours: e.target.value === "" ? null : Number(e.target.value) })}
                       placeholder="48"
+                      disabled={!isAutoIssue}
                       style={{
+                        cursor: isAutoIssue ? "text" : "not-allowed",
                         width: "100%", height: 36, padding: "0 64px 0 12px",
                         borderRadius: 8, border: `1px solid ${t.border}`,
                         background: t.surface2, color: t.text, fontSize: 13,

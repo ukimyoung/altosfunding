@@ -44,6 +44,7 @@ export const mapCatalogProductToChallengeProduct = (
   profitTarget: '-',
   dailyDrawdown: '-',
   creationDelayHours: product.funding_start_delay_hours,
+  fundedIssueMethod: product.funded_issue_method ?? 'AUTO',
   challengeNameTemplate: '-',
   seasonLabel: '-',
   scheduleStatus: '-',

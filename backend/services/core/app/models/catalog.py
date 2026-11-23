@@ -65,6 +65,8 @@ class Product(Base):
     # 펀디드 상품에만: 연관 챌린지 상품 id (예: 1001)
     related_id: Mapped[str | None] = mapped_column(ForeignKey("core.products.id"))
     funding_start_delay_hours: Mapped[int] = mapped_column(server_default="0")
+    # 챌린지 상품에만: 펀디드 계좌 발급 방법 AUTO(자동, 기본) | MANUAL(수동)
+    funded_issue_method: Mapped[str] = mapped_column(server_default="AUTO")
     duration_days: Mapped[int] = mapped_column(server_default="30")
     margin_call_pct: Mapped[Decimal | None]
     stop_out_pct: Mapped[Decimal | None]
