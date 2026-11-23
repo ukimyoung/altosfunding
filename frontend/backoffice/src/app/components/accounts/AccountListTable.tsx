@@ -370,7 +370,17 @@ function ChallengeFundedRow({
             whiteSpace: 'nowrap',
           }}
         >
-          {row.period}
+          {(() => {
+            const sepIndex = row.period.indexOf(' ~ ');
+            if (sepIndex < 0) return row.period;
+            return (
+              <>
+                {row.period.slice(0, sepIndex + 2)}
+                <br />
+                {row.period.slice(sepIndex + 3)}
+              </>
+            );
+          })()}
         </span>
       </td>
       <td style={{ padding: '0 16px' }}>
