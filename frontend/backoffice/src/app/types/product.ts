@@ -28,6 +28,8 @@ export interface ChallengeProduct {
   profitTarget: string;
   dailyDrawdown: string;
   creationDelayHours?: number | null;
+  /** 펀디드 계좌 발급 방법: AUTO(자동 발급) | MANUAL(수동 발급) */
+  fundedIssueMethod?: 'AUTO' | 'MANUAL';
   challengeNameTemplate: string;
   seasonLabel: string;
   scheduleStatus: string;

@@ -165,6 +165,10 @@ export function ChallengeProductPage() {
               product.creationDelayHours ?? null,
               exists.creationDelayHours ?? null,
             ),
+            funded_issue_method:
+              product.fundedIssueMethod === exists.fundedIssueMethod
+                ? undefined
+                : product.fundedIssueMethod,
             mt4_login_pool_start: getCatalogProductUpdateValue(
               product.accountRangeStart,
               exists.accountRangeStart,
@@ -200,6 +204,7 @@ export function ChallengeProductPage() {
           margin_call_pct: product.marginCall === '' ? null : Number(product.marginCall),
           stop_out_pct: product.stopOut === '' ? null : Number(product.stopOut),
           funding_start_delay_hours: product.creationDelayHours,
+          funded_issue_method: product.fundedIssueMethod ?? 'AUTO',
           mt4_login_pool_start: product.accountRangeStart,
           mt4_login_pool_end: product.accountRangeEnd,
           ruleset_id: product.ruleset ?? '',

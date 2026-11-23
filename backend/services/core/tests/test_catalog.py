@@ -96,6 +96,13 @@ def test_product_create_list_update_status(client, admin):
     res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"is_most_popular": True})
     assert res.status_code == 200 and res.json()["is_most_popular"] is True
 
+    # 펀디드 계좌 발급 방법: 기본 AUTO, MANUAL로 바꿀 수 있고 그 밖의 값은 거절
+    assert p["funded_issue_method"] == "AUTO"
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"funded_issue_method": "MANUAL"})
+    assert res.status_code == 200 and res.json()["funded_issue_method"] == "MANUAL"
+    res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"funded_issue_method": "LATER"})
+    assert res.status_code == 422
+
     res = client.put("/api/v1/catalog/products/1001", headers=admin, json={"ruleset_id": "missing"})
     assert res.json()["error_code"] == "ruleset_not_found"
 
@@ -247,7 +254,9 @@ def test_product_code_migration(client, admin):
 
 def test_funded_related_challenge(client, admin):
     challenge = _product(client, admin).json()["product_id"]
-    other = _product(client, admin, name="C2", mt4_login_pool_start=1100000, mt4_login_pool_end=1199999).json()
+    other = _product(client, admin, name="C2", mt4_login_pool_start=1100000, mt4_login_pool_end=1199999,
+                     funded_issue_method="MANUAL").json()
+    assert other["funded_issue_method"] == "MANUAL"
     body = {"tier_type": "FUNDED", "name": "Funded", "mt4_login_pool_start": 2000000, "mt4_login_pool_end": 2099999}
     res = _product(client, admin, related_id=challenge, **body)
     assert res.status_code == 200, res.text

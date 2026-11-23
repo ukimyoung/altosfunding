@@ -11,6 +11,7 @@ RetryPolicy = Literal["NONE", "ONCE", "UNLIMITED", "FORBIDDEN"]
 ViolationPolicy = Literal["AUTO_SUSPEND", "ALERT_ONLY", "MANUAL_BLOCK"]
 PassConditionType = Literal["RELATIVE", "ABSOLUTE"]
 ApplyScope = Literal["NEW", "ALL"]
+FundedIssueMethod = Literal["AUTO", "MANUAL"]
 
 Pct = Field(default=None, ge=0, le=100)
 
@@ -117,6 +118,7 @@ class ProductCreate(BaseModel):
     # 펀디드 상품에만: 연관 챌린지 상품 id (예: 1001)
     related_id: str | None = None
     funding_start_delay_hours: int = Field(default=0, ge=0)
+    funded_issue_method: FundedIssueMethod = "AUTO"
     duration_days: int = Field(default=30, ge=0)
     margin_call_pct: float | None = Field(default=None, ge=0)
     stop_out_pct: float | None = Field(default=None, ge=0)
@@ -143,6 +145,7 @@ class ProductUpdateRequest(BaseModel):
     next_product_id: str | None = None
     related_id: str | None = None
     funding_start_delay_hours: int | None = Field(default=None, ge=0)
+    funded_issue_method: FundedIssueMethod | None = None
     duration_days: int | None = Field(default=None, ge=0)
     margin_call_pct: float | None = Field(default=None, ge=0)
     stop_out_pct: float | None = Field(default=None, ge=0)
@@ -178,6 +181,7 @@ class ProductOut(BaseModel):
     next_product_id: str | None
     related_id: str | None = None
     funding_start_delay_hours: int
+    funded_issue_method: str = "AUTO"
     duration_days: int
     margin_call_pct: float | None
     stop_out_pct: float | None
