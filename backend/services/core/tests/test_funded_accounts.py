@@ -180,3 +180,36 @@ def test_manual_issue_product_skips_auto_issue(client, admin_headers, round_, ac
     # 한 번 더 눌러도 새로 만들지 않는다
     again = client.post(f"/api/v1/admin/accounts/{active[A]}/issue-funded", headers=admin_headers)
     assert again.json()["account_id"] == out["account_id"] and len(_funded_rows()) == 1
+
+
+def test_issue_now_moves_queued_auto_issue_forward(client, admin_headers, round_, active, broker, live):  # noqa: F811
+    # 자동 발급 상품: 합격하면 '종료 + 48시간'으로 발급 대기. 관리자가 '지금 발급'하면 예약을 지금으로 당긴다.
+    _funded_product(client, admin_headers, round_["product_id"])
+    run_sql("update core.products set funding_start_delay_hours = 48 where id = $1", round_["product_id"])
+    _finish(round_, active)
+    f = _funded_rows()[0]
+    assert f["provision_status"] == "QUEUED" and f["start_at"] > datetime.now(UTC) + timedelta(hours=40)
+
+    before = datetime.now(UTC)
+    res = client.post(f"/api/v1/admin/accounts/{active[A]}/issue-funded", headers=admin_headers)
+    assert res.status_code == 200, res.text
+    assert res.json()["account_id"] == str(f["id"])  # 새로 만들지 않고 같은 계좌
+    after = datetime.now(UTC)
+    f = _funded_rows()[0]
+    assert before - timedelta(seconds=5) <= f["start_at"] <= after
+    job = [j for j in _jobs("mt4.provision_challenge_account") if j["payload"]["account_id"] == str(f["id"])][0]
+    assert job["status"] == "PENDING" and job["run_at"] <= after
+
+    # Worker가 바로 발급한다 (재시도 대기 건너뛰기용 run_at 조정 없이 1번)
+    from app import db
+    from app.jobs import mt4 as _handlers  # noqa: F401
+    from app.worker import run_job_queue
+    import asyncio
+
+    db.get_engine()
+    asyncio.run(run_job_queue(db._sessionmaker))
+    assert _funded_rows()[0]["provision_status"] == "DONE"
+
+    # 발급이 끝난 뒤 다시 눌러도 바뀌는 것이 없다
+    res = client.post(f"/api/v1/admin/accounts/{active[A]}/issue-funded", headers=admin_headers)
+    assert res.json()["account_id"] == str(f["id"]) and len(_funded_rows()) == 1
