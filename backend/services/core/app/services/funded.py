@@ -24,11 +24,11 @@ import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
-from app.models import Challenge, Product, TradingAccount
+from app.models import Challenge, Job, Product, TradingAccount
 from app.services import challenge as challenge_svc
 from app.services import challenge_order as orders
 from app.services import jobs, leaderboard, mt4
@@ -84,12 +84,15 @@ async def create_for(
     """합격한 챌린지 계좌로 펀디드 계좌를 만들고 발급 작업을 넣는다 (커밋은 호출한 쪽).
 
     이미 있으면 그 계좌를 돌려준다. immediate=True(관리자 수동 발급)면 생성 시점 설정과 상관없이 지금 발급한다.
+    이미 발급 대기(자동 발급 예약) 중이면 예약 시각을 지금으로 앞당긴다 (Leaderboard '지금 발급', 2026-11-23).
     """
     now = now or _now()
     if source.tier != "CHALLENGE" or source.status != "PASSED":
         raise AppError(400, "account_not_passed", "합격(PASSED)한 챌린지 계좌만 펀디드 계좌를 발급할 수 있습니다.")
     found = await existing_for(session, source.id)
     if found is not None:
+        if immediate:
+            await issue_now(session, found, now)
         return found
     challenge = await session.get(Challenge, source.challenge_id) if source.challenge_id else None
     challenge_product = await session.get(Product, source.product_id)
@@ -131,6 +134,23 @@ async def create_for(
         source.id, account.id, product.product_id, at.isoformat(),
     )
     return account
+
+
+async def issue_now(session: AsyncSession, account: TradingAccount, now: datetime) -> bool:
+    """발급 대기(QUEUED) 펀디드 계좌의 예약 발급 시각을 지금으로 앞당긴다. 바꿨으면 True.
+
+    아직 실행 전(PENDING)인 발급 작업의 run_at만 당긴다. 실행 중·재시도 대기 중인 작업은 그대로 둔다.
+    """
+    if account.provision_status != orders.QUEUED or account.start_at is None or account.start_at <= now:
+        return False
+    account.start_at = now
+    await session.execute(
+        update(Job)
+        .where(Job.dedupe_key == f"provision:{account.id}", Job.status == jobs.PENDING, Job.attempts == 0)
+        .values(run_at=now)
+    )
+    logger.info("펀디드 계좌 발급 앞당김: %s → 지금 (%s)", account.id, now.isoformat())
+    return True
 
 
 async def on_passed(session: AsyncSession, source: TradingAccount, now: datetime | None = None) -> TradingAccount | None:

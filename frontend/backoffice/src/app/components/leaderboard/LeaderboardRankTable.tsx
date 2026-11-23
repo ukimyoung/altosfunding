@@ -248,6 +248,33 @@ export function LeaderboardRankTable<T extends LeaderboardRankTableEntry>({
                           </span>
                         ) : null}
                       </span>
+                      {/* 발급 대기(자동 발급 예약) → '지금 발급': 예약 시각을 지금으로 앞당겨 바로 발급 */}
+                      {entry.fundedProvisionStatus === 'QUEUED' &&
+                      entry.fundedStartAt &&
+                      new Date(entry.fundedStartAt).getTime() > Date.now() ? (
+                        <button
+                          type="button"
+                          onClick={() => onIssueFunded(entry)}
+                          disabled={issuingId !== null}
+                          style={{
+                            alignSelf: 'flex-start',
+                            marginTop: 4,
+                            height: 26,
+                            padding: '0 12px',
+                            borderRadius: 6,
+                            border: `1px solid ${t.accent}`,
+                            background: 'transparent',
+                            color: t.accent,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                            cursor: issuingId !== null ? 'not-allowed' : 'pointer',
+                            opacity: issuingId !== null && issuingId !== entry.id ? 0.5 : 1,
+                          }}
+                        >
+                          {issuingId === entry.id ? '발급 중...' : '지금 발급'}
+                        </button>
+                      ) : null}
                     </div>
                   ) : entry.accountStatus === 'PASSED' ? (
                     <button
