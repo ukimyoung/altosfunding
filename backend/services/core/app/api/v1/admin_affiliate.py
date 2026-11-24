@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from app.deps import AdminUser, Session
 from app.errors import AppError
 from app.services import affiliate as svc
+from app.services import ib_commission, wallet
 
 router = APIRouter(prefix="/admin/affiliate", tags=["admin-affiliate"])
 
@@ -152,3 +153,42 @@ async def relocate(body: RelocateBody, admin: AdminUser, session: Session) -> di
     )
     await session.commit()
     return await svc.partner_detail(session, body.member_id)
+
+
+# ── 커미션 (3단계) ──
+
+
+@router.get("/commissions", summary="IB 커미션 지급 내역 (커미션 상세)")
+async def list_commissions(
+    admin: AdminUser,
+    session: Session,
+    keyword: str | None = None,
+    ib_user_id: uuid.UUID | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=200)] = 20,
+) -> dict:
+    start, end = wallet.day_range(start_date, end_date)
+    return await ib_commission.list_commissions(
+        session, keyword=keyword, ib_user_id=ib_user_id, start=start, end=end, page=page, size=size
+    )
+
+
+@router.get("/commission-flows", summary="주문별 예산·지급·회사 귀속 (커미션 플로우 목록)")
+async def list_commission_flows(
+    admin: AdminUser,
+    session: Session,
+    keyword: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    page: Annotated[int, Query(ge=1)] = 1,
+    size: Annotated[int, Query(ge=1, le=200)] = 20,
+) -> dict:
+    start, end = wallet.day_range(start_date, end_date)
+    return await ib_commission.list_batches(session, keyword=keyword, start=start, end=end, page=page, size=size)
+
+
+@router.get("/commission-flows/{order_id}", summary="주문 1건의 커미션 플로우 (결제 시점 경로 스냅샷)")
+async def get_commission_flow(order_id: str, admin: AdminUser, session: Session) -> dict:
+    return await ib_commission.batch_detail(session, order_id)

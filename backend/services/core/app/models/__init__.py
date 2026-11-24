@@ -26,6 +26,9 @@ from app.models.trading import (
     TradingAccountTrade,
 )
 from app.models.affiliate import (
+    IbCommissionBatch,
+    IbCommissionClawback,
+    IbCommissionLine,
     IbLevelRate,
     IbLevelRateSet,
     IbProfile,
@@ -99,6 +102,9 @@ __all__ = [
     "MemberRelation",
     "IbLevelRate",
     "IbLevelRateSet",
+    "IbCommissionBatch",
+    "IbCommissionClawback",
+    "IbCommissionLine",
     "IbProfile",
     "IbProfileHistory",
     "MarketingPolicyVersion",

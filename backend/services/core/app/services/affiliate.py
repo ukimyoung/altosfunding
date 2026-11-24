@@ -413,6 +413,9 @@ async def _partner_items(session: AsyncSession, rows: list[tuple[IbProfile, User
     for parent_id, child in child_rows:
         children.setdefault(parent_id, []).append(child)
     counts = await _descendant_counts(session, ids)
+    from app.services import ib_commission  # 순환 import 방지
+
+    commissions = await ib_commission.totals_by_member(session, ids)
     items = []
     for profile, user in rows:
         relation = relations.get(user.id)
@@ -429,6 +432,7 @@ async def _partner_items(session: AsyncSession, rows: list[tuple[IbProfile, User
                 "downline_ibs": [_user_brief(c) for c in downline_ibs[:5]],
                 "downline_ib_count": len(downline_ibs),
                 "downline_count": counts.get(user.id, 0),
+                "commission_total": float(commissions.get(user.id, 0)),
             }
         )
     return items
@@ -567,6 +571,11 @@ async def network(session: AsyncSession, root: User) -> dict:
     ids = [uuid.UUID(str(r.id)) for r in rows]
     users = {u.id: u for u in await session.scalars(select(User).where(User.id.in_(ids)))}
     profiles = {p.user_id: p for p in await session.scalars(select(IbProfile).where(IbProfile.user_id.in_(ids)))}
+    from app.services import (
+        ib_commission,  # 순환 import 방지 (ib_commission이 affiliate를 쓴다)
+    )
+
+    commissions = await ib_commission.totals_by_member(session, ids)
     nodes: dict[uuid.UUID, dict] = {}
     for r in rows:
         uid = uuid.UUID(str(r.id))
@@ -579,8 +588,7 @@ async def network(session: AsyncSession, root: User) -> dict:
             "level": profile.level if profile else None,
             "ib_status": profile.status if profile else None,
             "member_status": user.status,
-            # 3단계(커미션 적립) 전까지는 0
-            "commission_total": 0.0,
+            "commission_total": float(commissions.get(uid, 0)),
             "children": [],
         }
         if r.parent_id is not None:
