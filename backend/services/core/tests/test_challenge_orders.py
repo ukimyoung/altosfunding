@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -176,6 +177,8 @@ def test_purchase_issue_start_close(client, admin_headers, buyer, round_, fake_m
     assert res.status_code == 201, res.text
     order = res.json()
     assert order["status"] == "PENDING" and order["quantity"] == 2
+    # 주문 번호 = ORD-YYYYMMDD(UTC)-무작위 4자리
+    assert re.fullmatch(rf"ORD-{datetime.now(UTC):%Y%m%d}-[A-HJ-NP-Z2-9]{{4}}", order["order_id"]), order["order_id"]
     assert order["unit_price"] == 80 and order["total_price"] == 160 and order["discount_amount"] == 40
     assert order["total_asset"] == 140
     assert [a["provision_status"] for a in order["accounts"]] == ["QUEUED", "QUEUED"]
