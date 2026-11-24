@@ -75,6 +75,16 @@ _CONTACT_CATEGORY_RESET = (
 )
 
 
+def _ib_policy_seed() -> str:
+    """마이그레이션이 넣는 마케팅 비율·레벨 비율 기본값을 테스트마다 다시 넣는다."""
+    sql = next(MIGRATIONS_DIR.glob("*_core_ib_program.sql")).read_text(encoding="utf-8")
+    start = sql.index("insert into core.marketing_policy_versions")
+    return (
+        "truncate core.marketing_policy_versions, core.ib_level_rate_sets restart identity cascade;\n"
+        + sql[start:]
+    )
+
+
 async def _truncate() -> None:
     import asyncpg
 
@@ -86,6 +96,7 @@ async def _truncate() -> None:
         await conn.execute("truncate core.contact_messages, core.announcements, core.announcement_categories, core.faqs, core.faq_categories, core.email_verifications, core.users, core.challenges, core.challenge_schedules, core.holidays, core.products, core.rulesets, core.platform_config_history, core.jobs, core.worker_heartbeats restart identity cascade")
         await conn.execute("alter sequence core.wallet_request_id_seq restart")
         await conn.execute(_email_template_seed())
+        await conn.execute(_ib_policy_seed())
     finally:
         await conn.close()
 
