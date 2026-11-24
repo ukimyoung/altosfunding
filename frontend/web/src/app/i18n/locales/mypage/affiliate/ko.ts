@@ -3,7 +3,7 @@ import type { AffiliateTranslations } from './types';
 export const affiliateKo: AffiliateTranslations = {
   eyebrow: 'IB 파트너 프로그램',
   overviewTitle: '제휴 성과',
-  overviewSubtitle: '직접 고객과 다단계 IB 네트워크에서 발생한 커미션을 한눈에 확인하세요.',
+  overviewSubtitle: '직접 고객과 IB 네트워크에서 발생한 커미션을 한눈에 확인하세요.',
   currentLevel: '현재 IB 레벨',
   commissionRate: '커미션 비율',
   totalCommission: '총 누적 커미션',
