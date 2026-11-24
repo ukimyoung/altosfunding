@@ -271,6 +271,21 @@ def test_close_retries_while_positions_remain(client, admin_headers, round_, act
     assert job["status"] == "PENDING" and job["attempts"] == 1 and "열린 주문 1개" in job["last_error"]
 
 
+def test_close_unlocks_already_read_only_account(client, admin_headers, round_, active, broker):  # noqa: F811
+    """MT4에서 이미 읽기 전용인 계좌는 잠깐 풀고 청산한 뒤 다시 잠근다 (읽기 전용이면 청산이 400 Trade is disabled)."""
+    broker.fake.open_positions[A] = [{"order": 3}]
+    broker.fake.accounts[A]["isReadOnly"] = True
+    client.post(f"/api/v1/admin/challenges/{round_['challenge_id']}/close", headers=admin_headers)
+    _work(rounds=2)
+    assert A in broker.fake.closed_all and A not in broker.fake.open_positions
+    assert broker.fake.accounts[A]["isReadOnly"] is True
+    job = next(j for j in _jobs("mt4.close_all_and_lock") if j["payload"]["account_id"] == active[A])
+    assert job["status"] == "SUCCEEDED"
+    # 청산 요청은 잠금을 푼 뒤에만 성공한다: 마지막 readonly 호출은 잠금(True)
+    calls = [(p, b) for m, p, b in broker.fake.calls if p.endswith(f"/{A}/readonly")]
+    assert calls[-1][1] == {"value": True}
+
+
 def test_stale_equity_is_not_judged(round_, active):  # noqa: F811
     _ruleset(round_["product_id"])
     now = datetime.now(UTC)

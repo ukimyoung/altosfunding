@@ -12,7 +12,8 @@ mt4.provision_challenge_account — 챌린지·데모 계좌 1개 발급 (데모
   재시도를 다 쓰면(약 1시간) 자동 환불하고, MT4에 계좌가 생겼을 수 있으면 번호를 ORPHANED(정리 대상)로 남긴다.
 
 mt4.set_read_only — 대회 시작·종료 때 계좌 거래 잠금 해제·잠금 (펀디드 하루 정지 해제 포함)
-mt4.close_all_and_lock — 읽기 전용으로 잠그고 미결 포지션·대기 주문을 모두 청산 (룰 위반·대회 종료·펀디드 하루 정지).
+mt4.close_all_and_lock — 미결 포지션·대기 주문을 모두 청산하고 읽기 전용으로 잠금 (룰 위반·대회 종료·펀디드 하루 정지).
+  MT4는 읽기 전용 계좌를 청산하지 못하므로(400 Trade is disabled) 청산 → 잠금 순서. 이미 잠겨 있으면 잠깐 풀고 청산 후 다시 잠근다.
   청산 뒤에도 열린 포지션이 남아 있으면 오류로 재시도한다.
 notify.challenge_account_issued — 계좌 발급 메일 (계좌 번호·비밀번호)
 notify.account_violated — 룰 위반으로 FAILED 처리 안내 메일
@@ -315,6 +316,10 @@ async def set_read_only(session: AsyncSession, job: Job) -> dict | None:
     return {"mt4_login": account.mt4_login, "read_only": read_only}
 
 
+def is_trade_disabled(exc: mt4.Mt4Error) -> bool:
+    return exc.status == 400 and "trade is disabled" in str(exc).lower()
+
+
 @jobs.handler(orders.CLOSE_ALL_JOB)
 async def close_all_and_lock(session: AsyncSession, job: Job) -> dict | None:
     account = await session.get(TradingAccount, _account_id(job), with_for_update=True)
@@ -326,13 +331,27 @@ async def close_all_and_lock(session: AsyncSession, job: Job) -> dict | None:
         # 그 사이 거래 가능 상태로 돌아왔으면(예: 하루 정지 해제) 청산하지 않는다.
         return {"skipped": "stale"}
     client = mt4.client_for(account.mt4_server)
-    await client.set_read_only(account.mt4_login, True)
+    login = account.mt4_login
+    comment = f"Altos {job.payload.get('reason') or 'rule'}"[:60]
+    # MT4는 읽기 전용 계좌의 주문을 API로도 닫지 못한다 (400 "Trade is disabled").
+    # 그래서 먼저 청산하고 나서 잠근다. 이미 잠겨 있으면(지난 시도·대회 종료 잠금 등) 잠깐 풀고 청산한 뒤 다시 잠근다.
+    try:
+        await client.close_all(login, comment)
+    except mt4.Mt4Error as exc:
+        if not is_trade_disabled(exc):
+            raise
+        logger.info("MT4 %s 계좌 %s가 잠겨 있어 잠깐 풀고 청산합니다", account.mt4_server, login)
+        try:
+            await client.set_read_only(login, False)
+            await client.close_all(login, comment)
+        finally:
+            await client.set_read_only(login, True)
+    await client.set_read_only(login, True)
     account.is_read_only = True
     await session.commit()
     await session.refresh(account, with_for_update=True)
-    reason = str(job.payload.get("reason") or "rule")
-    await client.close_all(account.mt4_login, f"Altos {reason}"[:60])
-    left = await client.open_orders(account.mt4_login)
+    # 청산과 잠금 사이에 새로 연 주문이 있으면 다음 시도에서 다시 청산한다.
+    left = await client.open_orders(login)
     if left:
         raise RuntimeError(f"청산 후에도 열린 주문 {len(left)}개 — 다시 시도")
     return {"mt4_login": account.mt4_login, "closed": True}
