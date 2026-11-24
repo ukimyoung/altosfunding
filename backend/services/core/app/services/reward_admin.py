@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.errors import AppError
-from app.models import ChallengeOrder, MemberRelation, RewardRecord, TradingBonusRecord, User
+from app.models import ChallengeOrder, IbProfile, MemberRelation, RewardRecord, TradingBonusRecord, User
 from app.services import member_relations, reward_policy
 from app.services.wallet import USER_WALLET, Line, _change_balance, _post_journal, as_float, get_wallet
 
@@ -66,6 +66,9 @@ async def on_order_completed(session: AsyncSession, order: ChallengeOrder) -> Re
     buyer = await session.get(User, order.user_id)
     sponsor_id = await member_relations.sponsor_id_of(session, order.user_id) if buyer else None
     if buyer is None or sponsor_id is None:
+        return None
+    # 추천인이 IB 파트너면(상태 무관) $40 추천인 리워드 대신 IB 커미션만 받는다 (2026-11-24 사용자 결정).
+    if await session.scalar(select(IbProfile.user_id).where(IbProfile.user_id == sponsor_id)):
         return None
     policy = await reward_policy.get_policy(session)
     if policy.referral_reward_condition != "FIRST_PURCHASE":

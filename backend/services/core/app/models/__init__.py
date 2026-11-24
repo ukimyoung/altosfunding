@@ -25,6 +25,13 @@ from app.models.trading import (
     TradingAccountSync,
     TradingAccountTrade,
 )
+from app.models.affiliate import (
+    IbLevelRate,
+    IbLevelRateSet,
+    IbProfile,
+    IbProfileHistory,
+    MarketingPolicyVersion,
+)
 from app.models.user import (
     EmailVerification,
     LoginHistory,
@@ -90,6 +97,11 @@ __all__ = [
     "TradingAccountStatusHistory",
     "UploadedFile",
     "MemberRelation",
+    "IbLevelRate",
+    "IbLevelRateSet",
+    "IbProfile",
+    "IbProfileHistory",
+    "MarketingPolicyVersion",
     "MemberRelationHistory",
     "User",
     "UserBackupCode",
