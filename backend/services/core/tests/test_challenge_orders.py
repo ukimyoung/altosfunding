@@ -70,6 +70,9 @@ class FakeMt4:
             self.accounts[login]["isReadOnly"] = body["value"]
             return httpx.Response(200)
         if parts[4:] == ["orders-pending", "close"] and request.method == "POST":
+            # 실제 MT4처럼 읽기 전용 계좌는 청산할 수 없다.
+            if self.accounts.get(login, {}).get("isReadOnly"):
+                return httpx.Response(400, json={"code": "TradeDisabled", "message": "Trade is disabled"})
             self.closed_all.append(login)
             self.open_positions.pop(login, None)
             return httpx.Response(200, json={"message": "closed"})
