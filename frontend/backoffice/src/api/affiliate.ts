@@ -192,15 +192,15 @@ export const apiErrorMessage = (error: unknown, fallback: string) => {
 };
 
 /** ISO 시각 → 'YYYY-MM-DD HH:mm' (KST) */
-export const formatKst = (value: string | null | undefined) => {
+export const formatKst = (value: string | null | undefined, withSeconds = false) => {
   if (!value) return '-';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+    timeZone: 'Asia/Seoul', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', ...(withSeconds ? { second: '2-digit' } : {}), hour12: false,
   }).formatToParts(date);
   const get = (type: string) => parts.find(part => part.type === type)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')} ${get('hour') === '24' ? '00' : get('hour')}:${get('minute')}`;
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour') === '24' ? '00' : get('hour')}:${get('minute')}${withSeconds ? `:${get('second')}` : ''}`;
 };
 
 /** datetime-local 값(KST로 입력) → ISO */

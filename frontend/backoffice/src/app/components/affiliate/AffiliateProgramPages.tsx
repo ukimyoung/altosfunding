@@ -119,7 +119,7 @@ function toPartner(p: IbPartner): Partner {
     level: p.level,
     status: PARTNER_STATUS[p.status],
     downline: p.downline_count,
-    registeredAt: `${formatKst(p.registered_at)} (GMT+9)`,
+    registeredAt: `${formatKst(p.registered_at, true)} (GMT+9)`,
     commission: p.commission_total,
   };
 }
@@ -275,7 +275,7 @@ function NetworkTreeRows({ node, depth = 0 }: { node: NetworkTreeNode; depth?: n
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", padding: "0 14px" }}>
-          <span style={{ display: "inline-flex", padding: "4px 9px", borderRadius: 7, border: "1px solid rgba(37,99,235,.18)", background: "rgba(37,99,235,.07)", color: "#2563EB", fontSize: 10, fontWeight: 550, whiteSpace: "nowrap" }}>{node.userType}</span>
+          <span style={{ display: "inline-flex", padding: "4px 9px", borderRadius: 7, border: `1px solid ${node.userType === "Direct User" ? "#E2E8F0" : "rgba(37,99,235,.18)"}`, background: node.userType === "Direct User" ? "#F1F5F9" : "rgba(37,99,235,.07)", color: node.userType === "Direct User" ? "#64748B" : "#2563EB", fontSize: 10, fontWeight: 550, whiteSpace: "nowrap" }}>{node.userType}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 16px", color: "#16A34A", fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono',monospace", whiteSpace: "nowrap" }}>{node.commission}</div>
         <div style={{ display: "flex", alignItems: "center", padding: "0 12px" }}>
@@ -975,7 +975,7 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(320px, 1fr)", gap: 16, alignItems: "start", marginBottom: 16 }}>
         <div style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,.09)", borderRadius: 12, overflow: "hidden", minWidth: 0 }}>
           <div style={{ padding: "15px 18px", borderBottom: "1px solid rgba(0,0,0,.09)", background: "#FFFFFF" }}>
-            <div><div style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A" }}>Downline IB &amp; Client Network</div><div style={{ fontSize: 10, color: "#A0A0AA", marginTop: 3 }}>폴더 노드를 선택해 Sub-IB와 Direct User 계층을 확장하거나 축소하세요.</div></div>
+            <div><div style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A" }}>Downline IB &amp; Client Network</div><div style={{ fontSize: 10, color: "#A0A0AA", marginTop: 3 }}>폴더 노드를 선택해 Sub-IB와 Direct User 계층을 확장하거나 축소하세요. 아래 'COMMISSION' 항목의 값은 사용자가 현재까지 수령한 총 커미션입니다.</div></div>
           </div>
           {treeRoot
             ? <NetworkTreeTable root={treeRoot} />
@@ -1434,7 +1434,7 @@ const COMMISSION_STATUS: Record<CommissionItem["status"], string> = { CREDITED: 
 
 function toCommissionRow(item: CommissionItem) {
   return {
-    date: `${formatKst(item.created_at)} GMT+9`,
+    date: `${formatKst(item.created_at, true)} GMT+9`,
     member: displayName(item.ib),
     email: item.ib?.email ?? "",
     ibNumber: uidLabel(item.ib?.uid),
@@ -1574,16 +1574,16 @@ export function AffiliateCommissionDetailPage({ dark, onToast }: { dark: boolean
         </div>
 
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: 1350, borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <table style={{ width: "100%", minWidth: 1310, borderCollapse: "collapse", tableLayout: "fixed" }}>
             <colgroup>
-              <col style={{ width: 175 }} />
-              <col style={{ width: 250 }} />
+              <col style={{ width: 195 }} />
+              <col style={{ width: 190 }} />
               <col style={{ width: 110 }} />
-              <col style={{ width: 180 }} />
+              <col style={{ width: 150 }} />
+              <col style={{ width: 200 }} />
               <col style={{ width: 110 }} />
-              <col style={{ width: 110 }} />
-              <col style={{ width: 125 }} />
-              <col style={{ width: 140 }} />
+              <col style={{ width: 115 }} />
+              <col style={{ width: 130 }} />
               <col style={{ width: 110 }} />
             </colgroup>
             <thead><tr>{["DATE", "IB", "UID", "POSITION", "ORDER / BUYER", "AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION", "STATUS"].map(header => <th key={header} style={{ ...thStyle, textAlign: ["AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION"].includes(header) ? "right" : "left" }}>{header}</th>)}</tr></thead>
@@ -1602,9 +1602,9 @@ export function AffiliateCommissionDetailPage({ dark, onToast }: { dark: boolean
                     <td style={{ ...tdStyle, color: "#475569", fontFamily: "'DM Mono',monospace", fontWeight: 650, whiteSpace: "nowrap" }}>{row.ibNumber}</td>
                     <td style={tdStyle}><span style={{ display: "inline-flex", padding: "4px 8px", borderRadius: 7, border: `1px solid ${isIb ? "rgba(37,99,235,.18)" : "#E2E8F0"}`, background: isIb ? "rgba(37,99,235,.07)" : "#F8FAFC", color: isIb ? "#2563EB" : "#475569", fontSize: 10, whiteSpace: "nowrap" }}>{row.userType}</span></td>
                     <td style={{ ...tdStyle, color: "#1A1A1A", fontWeight: 550 }}>
-                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.accountType}</div>
-                      <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 3, fontFamily: "'DM Mono',monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.orderId}</div>
-                      <div style={{ fontSize: 9, color: "#64748B", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.buyer}</div>
+                      <div style={{ wordBreak: "break-word" }}>{row.accountType}</div>
+                      <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 3, fontFamily: "'DM Mono',monospace", wordBreak: "break-all" }}>{row.orderId}</div>
+                      <div style={{ fontSize: 9, color: "#64748B", marginTop: 2, wordBreak: "break-word" }}>{row.buyer}</div>
                     </td>
                     <td style={{ ...tdStyle, color: "#1A1A1A", fontWeight: 650, fontFamily: "'DM Mono',monospace", textAlign: "right" }}>{row.amount}</td>
                     <td style={{ ...tdStyle, color: "#334155", fontWeight: 650, textAlign: "right" }}>{row.rate}</td>
