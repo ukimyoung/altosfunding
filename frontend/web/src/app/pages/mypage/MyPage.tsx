@@ -24,6 +24,7 @@ import { useLogoutMutation } from '@/app/queries/auth';
 // 사용하지 않는 my-asset 중복 호출을 막기 위해 이 쿼리는 비활성 상태로 둔다.
 // import { useAssetSummaryQuery } from '@/app/queries/assets';
 import { useMeQuery } from '@/app/queries/profile';
+import { useAffiliateMeQuery } from '@/app/queries/affiliate';
 import {
   Home,
   TrendingUp,
@@ -97,6 +98,9 @@ export function MyPage() {
   const { locale, setLocale, T } = useLocale();
   const text = T.dashboard;
   const { data: me, error: meError, isLoading: isLoadingMe } = useMeQuery();
+  // Affiliate Program 메뉴는 IB 파트너에게만 보인다.
+  const { data: affiliateMe } = useAffiliateMeQuery(Boolean(me));
+  const isIbPartner = affiliateMe?.is_ib === true;
   const { data: contentLanguages } = useContentLanguagesQuery();
   // 자산/이체/라이브 계좌 금액은 MyAssetPage에서 사용한다.
   // MyPage에서는 현재 사용하지 않으므로 불필요한 조회를 막기 위해 주석 처리한다.
@@ -510,7 +514,7 @@ export function MyPage() {
         {/* 가로 스크롤 삭제위해 overflow-y-auto 제거 > 문제 생기면 추가*/}
         <nav className="flex-1 py-6 px-3">
           <ul className="space-y-1">
-            {menuItems.map((item) => (
+            {menuItems.filter((item) => item.id !== 'affiliate' || isIbPartner).map((item) => (
               <li key={item.id}>
                 <button
                   onClick={() => handleMenuClick(item.id, item.path, !!item.subItems)}

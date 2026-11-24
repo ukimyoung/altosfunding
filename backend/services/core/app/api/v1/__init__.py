@@ -4,6 +4,7 @@ from app.api.v1.account import router as account_router
 from app.api.v1.admin_accounts import router as admin_accounts_router
 from app.api.v1.admin_affiliate import router as admin_affiliate_router
 from app.api.v1.admin_users import router as admin_users_router
+from app.api.v1.affiliate import router as affiliate_router
 from app.api.v1.announcements import admin_router as admin_announcements_router
 from app.api.v1.announcements import public_router as announcements_router
 from app.api.v1.auth import router as auth_router
@@ -20,7 +21,9 @@ from app.api.v1.files import router as files_router
 from app.api.v1.google import router as google_router
 from app.api.v1.kyc import router as kyc_router
 from app.api.v1.manual_email import router as admin_manual_email_router
-from app.api.v1.mt4_account_issued_history import router as admin_mt4_account_issued_history_router
+from app.api.v1.mt4_account_issued_history import (
+    router as admin_mt4_account_issued_history_router,
+)
 from app.api.v1.newsletter import router as newsletter_router
 from app.api.v1.orders import admin_router as admin_orders_router
 from app.api.v1.orders import router as orders_router
@@ -60,4 +63,5 @@ router.include_router(admin_system_router)
 router.include_router(admin_dashboard_router)
 router.include_router(admin_mt4_account_issued_history_router)
 router.include_router(admin_affiliate_router)
+router.include_router(affiliate_router)
 router.include_router(admin_accounts_router)
