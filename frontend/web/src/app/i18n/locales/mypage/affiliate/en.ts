@@ -20,7 +20,7 @@ export const affiliateEn: AffiliateTranslations = {
   ibNumber: 'UID',
   type: 'User Type',
   status: 'Status',
-  commissionContribution: 'Commission',
+  commissionContribution: 'Commission Contribution',
   directClient: 'Direct Client',
   downlineIb: 'Downline IB',
   myAccount: 'My IB Account',
