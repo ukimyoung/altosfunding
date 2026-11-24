@@ -275,7 +275,7 @@ function NetworkTreeRows({ node, depth = 0 }: { node: NetworkTreeNode; depth?: n
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", padding: "0 14px" }}>
-          <span style={{ display: "inline-flex", padding: "4px 9px", borderRadius: 7, border: "1px solid rgba(37,99,235,.18)", background: "rgba(37,99,235,.07)", color: "#2563EB", fontSize: 10, fontWeight: 550, whiteSpace: "nowrap" }}>{node.userType}</span>
+          <span style={{ display: "inline-flex", padding: "4px 9px", borderRadius: 7, border: `1px solid ${node.userType === "Direct User" ? "#E2E8F0" : "rgba(37,99,235,.18)"}`, background: node.userType === "Direct User" ? "#F1F5F9" : "rgba(37,99,235,.07)", color: node.userType === "Direct User" ? "#64748B" : "#2563EB", fontSize: 10, fontWeight: 550, whiteSpace: "nowrap" }}>{node.userType}</span>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 16px", color: "#16A34A", fontSize: 12, fontWeight: 700, fontFamily: "'DM Mono',monospace", whiteSpace: "nowrap" }}>{node.commission}</div>
         <div style={{ display: "flex", alignItems: "center", padding: "0 12px" }}>
@@ -975,7 +975,7 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 2fr) minmax(320px, 1fr)", gap: 16, alignItems: "start", marginBottom: 16 }}>
         <div style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,.09)", borderRadius: 12, overflow: "hidden", minWidth: 0 }}>
           <div style={{ padding: "15px 18px", borderBottom: "1px solid rgba(0,0,0,.09)", background: "#FFFFFF" }}>
-            <div><div style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A" }}>Downline IB &amp; Client Network</div><div style={{ fontSize: 10, color: "#A0A0AA", marginTop: 3 }}>폴더 노드를 선택해 Sub-IB와 Direct User 계층을 확장하거나 축소하세요.</div></div>
+            <div><div style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A" }}>Downline IB &amp; Client Network</div><div style={{ fontSize: 10, color: "#A0A0AA", marginTop: 3 }}>폴더 노드를 선택해 Sub-IB와 Direct User 계층을 확장하거나 축소하세요. 아래 'COMMISSION' 항목의 값은 사용자가 현재까지 수령한 총 커미션입니다.</div></div>
           </div>
           {treeRoot
             ? <NetworkTreeTable root={treeRoot} />
