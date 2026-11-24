@@ -1275,7 +1275,7 @@ export function AffiliateCommissionFlowPage({ dark, onToast }: { dark: boolean; 
             <input
               value={orderQuery}
               onChange={event => setOrderQuery(event.target.value)}
-              placeholder="주문 번호 입력 (예: ORD-20261124-AB12CD34)"
+              placeholder="주문 번호 입력 (예: ORD-20261124-AB12)"
               aria-label="챌린지 티켓 주문 번호"
               style={{ width: "100%", height: 40, padding: "0 13px 0 36px", borderRadius: 8, border: `1px solid ${dark ? t.border2 : "#E2E8F0"}`, background: dark ? t.surface2 : "#F8FAFC", color: t.text, fontSize: 12, fontFamily: "'DM Mono',monospace", outline: "none" }}
             />

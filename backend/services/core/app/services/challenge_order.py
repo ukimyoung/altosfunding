@@ -64,7 +64,7 @@ def unit_price_of(product: Product) -> Decimal:
 
 async def _new_order_id(session: AsyncSession, now: datetime) -> str:
     for _ in range(10):
-        order_id = f"ORD-{now:%Y%m%d}-{generate_human_code(8)}"
+        order_id = f"ORD-{now:%Y%m%d}-{generate_human_code(4)}"
         if await session.get(ChallengeOrder, order_id) is None:
             return order_id
     raise AppError(500, "id_generation_failed", "주문 번호를 만들지 못했습니다.")
