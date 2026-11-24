@@ -125,6 +125,7 @@ export const NAV: NavSection[] = [
       { id: 'email-notification', label: '이메일/알림 관리', icon: Mail },
       { id: 'mt4-login-management', label: '계좌 관리', icon: Ban },
       { id: 'profit-split-settings', label: '수익 분배 / 출금 수수료 설정', icon: Percent },
+      { id: 'marketing-rate-management', label: '마케팅 비율 관리', icon: Percent },
     ],
   },
   // 출시 시점 제외 faq, inquiry, review, promotions
@@ -192,6 +193,7 @@ export const BC: Record<string, { parts: string[] }> = {
   'email-notification': { parts: ['운영 관리', '이메일/알림 관리'] },
   'mt4-login-management': { parts: ['운영 관리', '계좌 관리'] },
   'profit-split-settings': { parts: ['운영 관리', '수익 분배 / 출금 수수료 설정'] },
+  'marketing-rate-management': { parts: ['운영 관리', '마케팅 비율 관리'] },
   // 출시 시점 제외 faq, inquiry, review, promotions
   // faq: { parts: ['지원', 'FAQ'] },
   // inquiry: { parts: ['지원', '1:1 문의'] },
@@ -239,6 +241,7 @@ export const ROUTE_BY_PAGE_ID: Record<string, string> = {
   'email-notification': '/email-notification',
   'mt4-login-management': '/mt4-login-management',
   'profit-split-settings': '/profit-split-settings',
+  'marketing-rate-management': '/marketing-rate-management',
   // 출시 시점 제외 faq, inquiry, review, promotions
   // faq: '/faq',
   // inquiry: '/inquiry',

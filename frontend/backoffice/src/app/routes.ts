@@ -47,6 +47,7 @@ import {
   AffiliateNetworkPage,
   IbPartnerManagementPage,
 } from './pages/affiliate/AffiliatePages';
+import { MarketingRatePage } from './pages/affiliate/MarketingRatePage';
 
 function RedirectToLogin() {
   return createElement(Navigate, { to: LOGIN_ROUTE, replace: true });
@@ -226,6 +227,10 @@ export const router = createBrowserRouter([
       {
         path: appPath(ROUTE_BY_PAGE_ID['profit-split-settings']),
         Component: ProfitSplitPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['marketing-rate-management']),
+        Component: MarketingRatePage,
       },
       ...placeholderPageIds.map((pageId) => ({
         path: appPath(ROUTE_BY_PAGE_ID[pageId]),

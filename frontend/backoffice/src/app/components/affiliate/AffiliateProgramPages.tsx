@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ArrowUp,
   ArrowRightLeft,
@@ -32,6 +32,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./AffiliateAlertDialog";
+import {
+  addPartner,
+  apiErrorMessage,
+  formatKst,
+  getCommissionFlow,
+  getLevelRates,
+  getNetwork,
+  listCommissionFlows,
+  listCommissions,
+  listPartners,
+  pct,
+  relocate,
+  saveLevelRates,
+  searchCandidates,
+  updatePartner,
+  usd,
+} from "../../../api/affiliate";
+import type { CommissionFlow, CommissionItem, IbCandidate, IbPartner, IbStatus, NetworkNode } from "../../../api/affiliate";
 
 type ToastHandler = (message: string, type?: "success" | "warning") => void;
 type PartnerStatus = "Active" | "Suspended" | "Withdrawn" | "Blacklist";
@@ -40,21 +58,24 @@ type NetworkStatus = "Active" | "Inactive" | "PermanentlySuspended";
 
 interface Partner {
   id: string;
+  userId: string;
   name: string;
   phone: string;
   email: string;
   uplineId: string | null;
   downlineIbId: string | null;
+  downlineIbCount: number;
   level: number;
   status: PartnerStatus;
   downline: number;
   registeredAt: string;
+  commission: number;
 }
 
 interface TreeNode {
   id: string;
   name: string;
-  level: number;
+  level: number | null;
   status: PartnerStatus;
   volume: string;
   children?: TreeNode[];
@@ -62,6 +83,8 @@ interface TreeNode {
 
 interface NetworkTreeNode {
   id: string;
+  userId: string;
+  isIb: boolean;
   name: string;
   email: string;
   userType: string;
@@ -75,135 +98,65 @@ function formatUid(identifier: string) {
   return identifier.replace(/^(?:IB|UID)-/, "UID-");
 }
 
-const PARTNERS: Partner[] = [
-  { id: "IB-10482", name: "Daniel Kim", phone: "+82 10-2847-1930", email: "daniel.kim@vertex.io", uplineId: null, downlineIbId: "IB-10811", level: 12, status: "Active", downline: 126, registeredAt: "2026-06-04 14:30 (GMT+9)" },
-  { id: "IB-10396", name: "Sophia Chen", phone: "+65 9123 4088", email: "sophia@orbitcapital.sg", uplineId: null, downlineIbId: "IB-11018", level: 9, status: "Active", downline: 84, registeredAt: "2026-05-22 09:18 (GMT+9)" },
-  { id: "IB-10271", name: "Marcus Lee", phone: "+44 7700 912801", email: "marcus@northstar.uk", uplineId: "IB-10482", downlineIbId: "IB-11102", level: 18, status: "Suspended", downline: 213, registeredAt: "2026-04-17 16:42 (GMT+9)" },
-  { id: "IB-10144", name: "Aiko Tanaka", phone: "+81 90-3841-7260", email: "aiko@horizon.jp", uplineId: "IB-10396", downlineIbId: "IB-11304", level: 7, status: "Active", downline: 57, registeredAt: "2026-03-08 11:05 (GMT+9)" },
-  { id: "IB-10093", name: "Oliver Smith", phone: "+1 415 555 0192", email: "oliver@apextrading.com", uplineId: "IB-10271", downlineIbId: "IB-11621", level: 21, status: "Withdrawn", downline: 302, registeredAt: "2026-02-14 18:20 (GMT+9)" },
-  { id: "IB-10038", name: "Nadia Rahman", phone: "+971 50 927 4431", email: "nadia@meridian.ae", uplineId: "IB-10093", downlineIbId: null, level: 14, status: "Blacklist", downline: 0, registeredAt: "2026-01-29 10:12 (GMT+9)" },
-];
+// ── Core 응답 → 화면 모델 ──
+const uidLabel = (uid: string | null | undefined) => (uid ? `UID-${uid}` : "");
+const displayName = (user: { name: string | null; email: string } | null | undefined) => user?.name || user?.email || "-";
 
-const MEMBER_SEARCH_RESULTS = [
-  { id: "UID-20841", ibNumber: "IB-20841", name: "Grace Yoon", email: "grace.yoon@altos.io" },
-  { id: "UID-20796", ibNumber: "IB-20796", name: "Alex Morgan", email: "alex.morgan@altos.io" },
-  { id: "UID-20682", ibNumber: "IB-20682", name: "김서준", email: "seojun.kim@altos.io" },
-];
+const PARTNER_STATUS: Record<IbStatus, PartnerStatus> = { ACTIVE: "Active", INACTIVE: "Suspended", BANNED: "Blacklist" };
+const STATUS_TO_API: Record<PartnerStatus, IbStatus> = { Active: "ACTIVE", Suspended: "INACTIVE", Withdrawn: "INACTIVE", Blacklist: "BANNED" };
+const FILTER_TO_API: Record<PartnerStatusFilter, IbStatus | undefined> = { All: undefined, Active: "ACTIVE", Inactive: "INACTIVE", PermanentlySuspended: "BANNED" };
 
-const TREE: TreeNode = {
-  id: "IB-10482", name: "Daniel Kim", level: 12, status: "Active", volume: "$148,320",
-  children: [
-    {
-      id: "IB-10811", name: "Minseo Park", level: 8, status: "Active", volume: "$62,410",
-      children: [
-        { id: "IB-11102", name: "Ethan Wong", level: 4, status: "Active", volume: "$21,800" },
-        { id: "IB-11218", name: "Liam Cho", level: 3, status: "Suspended", volume: "$12,650" },
-      ],
-    },
-    {
-      id: "IB-10829", name: "Emma Wilson", level: 7, status: "Active", volume: "$54,890",
-      children: [
-        { id: "IB-11304", name: "Mia Santos", level: 4, status: "Active", volume: "$18,720" },
-        {
-          id: "IB-11342", name: "Noah Lim", level: 5, status: "Active", volume: "$24,100",
-          children: [{ id: "IB-11621", name: "Leo Martin", level: 2, status: "Active", volume: "$8,440" }],
-        },
-      ],
-    },
-    { id: "IB-10907", name: "Lucas Meyer", level: 6, status: "Withdrawn", volume: "$31,020" },
-  ],
-};
+function toPartner(p: IbPartner): Partner {
+  return {
+    id: uidLabel(p.uid),
+    userId: p.user_id,
+    name: displayName(p),
+    phone: p.phone || "-",
+    email: p.email,
+    uplineId: p.upline ? uidLabel(p.upline.uid) : null,
+    downlineIbId: p.downline_ibs[0] ? uidLabel(p.downline_ibs[0].uid) : null,
+    downlineIbCount: p.downline_ib_count,
+    level: p.level,
+    status: PARTNER_STATUS[p.status],
+    downline: p.downline_count,
+    registeredAt: `${formatKst(p.registered_at)} (GMT+9)`,
+    commission: p.commission_total,
+  };
+}
 
-const NETWORK_TREES: NetworkTreeNode[] = [
-  {
-    id: "IB-10482",
-    name: "Daniel K.",
-    email: "daniel@vertex.io",
-    userType: "My IB Account - Level 1",
-    status: "Active",
-    generatedVolume: "$428,600",
-    commission: "+$18,420.50",
-    children: [
-      {
-        id: "IB-10811",
-        name: "Minji K.",
-        email: "minjik@naver.com",
-        userType: "Downline IB - Level 2",
-        status: "Active",
-        generatedVolume: "$142,800",
-        commission: "+$4,284.00",
-        children: [
-          { id: "UID-21408", name: "Ethan W.", email: "ethan@gmail.com", userType: "Direct User", status: "Active", generatedVolume: "$38,500", commission: "+$770.00" },
-          { id: "UID-21562", name: "Liam C.", email: "liam@outlook.com", userType: "Direct User", status: "Inactive", generatedVolume: "$18,200", commission: "+$364.00" },
-        ],
-      },
-      {
-        id: "IB-10829",
-        name: "Emma W.",
-        email: "emma@altos.io",
-        userType: "Downline IB - Level 2",
-        status: "Active",
-        generatedVolume: "$118,400",
-        commission: "+$3,552.00",
-        children: [
-          {
-            id: "IB-11342",
-            name: "Noah L.",
-            email: "noah@gmail.com",
-            userType: "Downline IB - Level 3",
-            status: "Active",
-            generatedVolume: "$74,900",
-            commission: "+$1,498.00",
-            children: [
-              { id: "UID-22116", name: "Leo M.", email: "leom@mail.com", userType: "Direct User", status: "PermanentlySuspended", generatedVolume: "$24,100", commission: "+$482.00" },
-            ],
-          },
-        ],
-      },
-      { id: "UID-20841", name: "Grace Y.", email: "grace@altos.io", userType: "Direct User", status: "Active", generatedVolume: "$54,300", commission: "+$1,086.00" },
-    ],
-  },
-  {
-    id: "IB-10396",
-    name: "Sophia C.",
-    email: "sophia@orbitcapital.sg",
-    userType: "My IB Account - Level 1",
-    status: "Active",
-    generatedVolume: "$316,200",
-    commission: "+$12,648.00",
-    children: [
-      { id: "IB-11018", name: "Oliver T.", email: "oliver@proton.me", userType: "Downline IB - Level 2", status: "Active", generatedVolume: "$96,500", commission: "+$2,895.00" },
-      { id: "UID-21804", name: "Mia S.", email: "mias@gmail.com", userType: "Direct User", status: "Active", generatedVolume: "$42,700", commission: "+$854.00" },
-    ],
-  },
-];
+function nodeStatus(node: NetworkNode): NetworkStatus {
+  if (node.is_ib) return node.ib_status === "ACTIVE" ? "Active" : node.ib_status === "BANNED" ? "PermanentlySuspended" : "Inactive";
+  return node.member_status === "ACTIVE" ? "Active" : "Inactive";
+}
 
-const COMMISSION_UIDS = [
-  "UID-10487", "UID-20591", "UID-31842", "UID-20714", "UID-41208", "UID-38511",
-  "UID-10487", "UID-42924", "UID-20591", "UID-46777", "UID-33108", "UID-44041",
-  "UID-27829", "UID-45118", "UID-31342", "UID-47006", "UID-41621", "UID-48990",
-];
+function toTreeNode(node: NetworkNode): TreeNode {
+  const status = nodeStatus(node);
+  return {
+    id: uidLabel(node.uid),
+    name: displayName(node),
+    level: node.level,
+    status: status === "Active" ? "Active" : status === "PermanentlySuspended" ? "Blacklist" : "Suspended",
+    volume: usd(node.commission_total),
+    children: node.children.map(toTreeNode),
+  };
+}
 
-const COMMISSION_DETAIL_ROWS = [
-  { date: "2026-11-18 16:42 GMT+9", member: "Alex M.", email: "alex@gmail.com", userType: "Downline IB - Level 3", accountType: "Prime", amount: "$192.00", rate: "5%", earned: "+$9.60", status: "Completed" },
-  { date: "2026-11-17 14:32 GMT+9", member: "Minji K.", email: "minjik@naver.com", userType: "Downline IB - Level 2", accountType: "Elite", amount: "$113.00", rate: "7%", earned: "+$7.91", status: "Completed" },
-  { date: "2026-11-16 11:08 GMT+9", member: "TRADER92", email: "trader92@outlook.com", userType: "Direct Client", accountType: "Professional", amount: "$79.00", rate: "10%", earned: "+$7.90", status: "Pending" },
-  { date: "2026-11-15 09:55 GMT+9", member: "Soojin P.", email: "soojinp@gmail.com", userType: "Downline IB - Level 2", accountType: "Prime", amount: "$192.00", rate: "7%", earned: "+$13.44", status: "Completed" },
-  { date: "2026-11-14 18:20 GMT+9", member: "ZENITH08", email: "zenith08@proton.me", userType: "Direct Client", accountType: "Starter", amount: "$48.00", rate: "10%", earned: "+$4.80", status: "Completed" },
-  { date: "2026-11-13 13:47 GMT+9", member: "FXPRO11", email: "fxpro11@gmail.com", userType: "Direct Client", accountType: "Elite", amount: "$113.00", rate: "10%", earned: "+$11.30", status: "Refunded" },
-  { date: "2026-11-12 10:16 GMT+9", member: "Alex M.", email: "alex@gmail.com", userType: "Downline IB - Level 3", accountType: "Professional", amount: "$79.00", rate: "5%", earned: "+$3.95", status: "Completed" },
-  { date: "2026-11-11 21:04 GMT+9", member: "PROTRADER24", email: "protrader24@gmail.com", userType: "Direct Client", accountType: "Prime", amount: "$192.00", rate: "10%", earned: "+$19.20", status: "Completed" },
-  { date: "2026-11-10 17:39 GMT+9", member: "Minji K.", email: "minjik@naver.com", userType: "Downline IB - Level 2", accountType: "Professional", amount: "$79.00", rate: "7%", earned: "+$5.53", status: "Pending" },
-  { date: "2026-11-09 08:25 GMT+9", member: "ALPHA77", email: "alpha77@outlook.com", userType: "Direct Client", accountType: "Starter", amount: "$48.00", rate: "10%", earned: "+$4.80", status: "Completed" },
-  { date: "2026-11-08 19:14 GMT+9", member: "Jinho L.", email: "jinhol@gmail.com", userType: "Downline IB - Level 4", accountType: "Elite", amount: "$113.00", rate: "4%", earned: "+$4.52", status: "Completed" },
-  { date: "2026-11-07 15:03 GMT+9", member: "CAPITAL41", email: "capital41@icloud.com", userType: "Direct Client", accountType: "Prime", amount: "$192.00", rate: "10%", earned: "+$19.20", status: "Completed" },
-  { date: "2026-11-06 12:28 GMT+9", member: "Emma W.", email: "emma@altos.io", userType: "Downline IB - Level 2", accountType: "Professional", amount: "$79.00", rate: "7%", earned: "+$5.53", status: "Refunded" },
-  { date: "2026-11-05 09:41 GMT+9", member: "NEXUS18", email: "nexus18@gmail.com", userType: "Direct Client", accountType: "Starter", amount: "$48.00", rate: "10%", earned: "+$4.80", status: "Completed" },
-  { date: "2026-11-04 17:52 GMT+9", member: "Noah L.", email: "noah@gmail.com", userType: "Downline IB - Level 3", accountType: "Elite", amount: "$113.00", rate: "5%", earned: "+$5.65", status: "Pending" },
-  { date: "2026-11-03 14:18 GMT+9", member: "VIPTRADER06", email: "viptrader06@proton.me", userType: "Direct Client", accountType: "Prime", amount: "$192.00", rate: "10%", earned: "+$19.20", status: "Completed" },
-  { date: "2026-11-02 11:33 GMT+9", member: "Leo M.", email: "leom@mail.com", userType: "Downline IB - Level 4", accountType: "Professional", amount: "$79.00", rate: "4%", earned: "+$3.16", status: "Completed" },
-  { date: "2026-11-01 08:06 GMT+9", member: "STRATEGY90", email: "strategy90@gmail.com", userType: "Direct Client", accountType: "Starter", amount: "$48.00", rate: "10%", earned: "+$4.80", status: "Completed" },
-].map((row, index) => ({ ...row, ibNumber: COMMISSION_UIDS[index] }));
+function toNetworkTreeNode(node: NetworkNode, rootDepth = node.depth): NetworkTreeNode {
+  return {
+    id: uidLabel(node.uid),
+    userId: node.user_id,
+    isIb: node.is_ib,
+    name: displayName(node),
+    email: node.email,
+    userType: node.is_ib
+      ? `${node.depth === rootDepth ? "IB" : "Downline IB"} - Level ${node.level}`
+      : "Direct User",
+    status: nodeStatus(node),
+    generatedVolume: "",
+    commission: node.is_ib ? `+${usd(node.commission_total)}` : "-",
+    children: node.children.map(child => toNetworkTreeNode(child, rootDepth)),
+  };
+}
 
 function tokens(dark: boolean) {
   return {
@@ -281,9 +234,9 @@ function TreeView({ node, t, depth = 0, compact = false }: { node: TreeNode; t: 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
             <span style={{ color: t.text, fontSize: 12, fontWeight: 650 }}>{node.name}</span>
-            <span style={{ color: t.accent, fontSize: 10, fontWeight: 700 }}>LV.{node.level}</span>
+            <span style={{ color: node.level != null ? t.accent : t.textHint, fontSize: 10, fontWeight: 700 }}>{node.level != null ? `LV.${node.level}` : "일반 회원"}</span>
           </div>
-          <div style={{ color: t.textHint, fontSize: 10, marginTop: 2, fontFamily: "'DM Mono',monospace" }}>{node.id} · 볼륨 {node.volume}</div>
+          <div style={{ color: t.textHint, fontSize: 10, marginTop: 2, fontFamily: "'DM Mono',monospace" }}>{node.id} · 커미션 {node.volume}</div>
         </div>
         <StatusBadge status={node.status} />
         {hasChildren && <ChevronDown size={14} color={t.textHint} style={{ transform: open ? "none" : "rotate(-90deg)", transition: "transform .15s" }} />}
@@ -291,25 +244,6 @@ function TreeView({ node, t, depth = 0, compact = false }: { node: TreeNode; t: 
       {open && node.children?.map(child => <TreeView key={child.id} node={child} t={t} depth={depth + 1} compact={compact} />)}
     </div>
   );
-}
-
-function findNetworkNode(node: NetworkTreeNode, query: string): NetworkTreeNode | null {
-  const normalizedQuery = query.toLowerCase().replace(/\s/g, "");
-  const searchable = `${node.name}${node.id}${node.id.replace("IB-", "")}${node.email}`.toLowerCase().replace(/\s/g, "");
-  if (searchable.includes(normalizedQuery)) return node;
-  for (const child of node.children ?? []) {
-    const match = findNetworkNode(child, query);
-    if (match) return match;
-  }
-  return null;
-}
-
-function countNetworkNodes(node: NetworkTreeNode): number {
-  return 1 + (node.children ?? []).reduce((total, child) => total + countNetworkNodes(child), 0);
-}
-
-function countActiveNetworkNodes(node: NetworkTreeNode): number {
-  return (node.status === "Active" ? 1 : 0) + (node.children ?? []).reduce((total, child) => total + countActiveNetworkNodes(child), 0);
 }
 
 function NetworkTreeRows({ node, depth = 0 }: { node: NetworkTreeNode; depth?: number }) {
@@ -373,6 +307,15 @@ function NetworkTreeTable({ root }: { root: NetworkTreeNode }) {
 }
 
 function PartnerDrawer({ partner, t, onClose }: { partner: Partner; t: T; onClose: () => void }) {
+  const [tree, setTree] = useState<TreeNode | null>(null);
+  const [treeError, setTreeError] = useState("");
+  useEffect(() => {
+    let alive = true;
+    getNetwork({ user_id: partner.userId })
+      .then(res => { if (alive) setTree(toTreeNode(res.root)); })
+      .catch(error => { if (alive) setTreeError(apiErrorMessage(error, "조직도를 불러오지 못했습니다.")); });
+    return () => { alive = false; };
+  }, [partner.userId]);
   return (
     <>
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.38)", zIndex: 900 }} />
@@ -398,6 +341,7 @@ function PartnerDrawer({ partner, t, onClose }: { partner: Partner; t: T; onClos
               ["연락처", partner.phone],
               ["이메일", partner.email],
               ["커미션레벨", `Level ${partner.level}`],
+              ["누적 커미션", usd(partner.commission)],
             ].map(([label, value]) => (
               <div key={label} style={{ padding: "12px 13px", borderRadius: 9, background: t.surface2, border: `1px solid ${t.border}` }}>
                 <div style={{ color: t.textHint, fontSize: 10, marginBottom: 5 }}>{label}</div>
@@ -412,27 +356,30 @@ function PartnerDrawer({ partner, t, onClose }: { partner: Partner; t: T; onClos
             </div>
             <span style={{ padding: "4px 8px", borderRadius: 6, background: t.surface2, color: t.textSec, fontSize: 10 }}>전체 {partner.downline}명</span>
           </div>
-          <TreeView node={{ ...TREE, id: partner.id, name: partner.name, level: partner.level, status: partner.status }} t={t} compact />
+          {tree
+            ? <TreeView node={tree} t={t} compact />
+            : <div style={{ padding: "22px 12px", borderRadius: 9, background: t.surface2, color: t.textHint, textAlign: "center", fontSize: 11 }}>{treeError || "조직도를 불러오는 중입니다."}</div>}
         </div>
       </aside>
     </>
   );
 }
 
-function AddPartnerModal({ t, onClose, onSave }: { t: T; onClose: () => void; onSave: () => void }) {
+function AddPartnerModal({ t, onClose, onSave, onToast }: { t: T; onClose: () => void; onSave: () => void; onToast: ToastHandler }) {
   const [memberQuery, setMemberQuery] = useState("");
-  const [results, setResults] = useState(MEMBER_SEARCH_RESULTS);
+  const [results, setResults] = useState<IbCandidate[]>([]);
+  const [searched, setSearched] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [partnerName, setPartnerName] = useState("");
-  const [uplineQuery, setUplineQuery] = useState("");
-  const [selectedUplineId, setSelectedUplineId] = useState<string | null>(null);
-  const [uplineComboboxOpen, setUplineComboboxOpen] = useState(false);
+  const [level, setLevel] = useState(1);
+  const [status, setStatus] = useState<IbStatus>("ACTIVE");
+  const [saving, setSaving] = useState(false);
+  // Upline은 회원의 기존 placement(수당 조직 상위)를 보여주기만 한다. 바꾸려면 '네트워크 및 조직도 관리 > 재배치'에서 한다.
+  // const [uplineQuery, setUplineQuery] = useState("");
+  // const [selectedUplineId, setSelectedUplineId] = useState<string | null>(null);
+  // const [uplineComboboxOpen, setUplineComboboxOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const filteredUplines = PARTNERS.filter(partner => {
-    const query = uplineQuery.trim().toLowerCase().replace(/\s/g, "");
-    const searchable = `${partner.name}${partner.email}${partner.id}${partner.id.replace("IB-", "")}`.toLowerCase().replace(/\s/g, "");
-    return selectedUplineId === "root" || !query || searchable.includes(query);
-  });
+  const selectedMember = results.find(member => member.user_id === selectedMemberId) ?? null;
 
   const inputStyle: React.CSSProperties = {
     width: "100%",
@@ -447,17 +394,33 @@ function AddPartnerModal({ t, onClose, onSave }: { t: T; onClose: () => void; on
   };
 
   function handleSearch() {
-    const query = memberQuery.trim().toLowerCase();
-    setResults(
-      query
-        ? MEMBER_SEARCH_RESULTS.filter(member => `${member.name} ${member.email} ${member.ibNumber}`.toLowerCase().includes(query))
-        : MEMBER_SEARCH_RESULTS,
-    );
+    const query = memberQuery.trim();
+    if (!query) return;
+    searchCandidates(query)
+      .then(items => { setResults(items); setSearched(true); })
+      .catch(error => onToast(apiErrorMessage(error, "회원 검색에 실패했습니다."), "warning"));
   }
 
-  function handleSelectMember(member: typeof MEMBER_SEARCH_RESULTS[number]) {
-    setSelectedMemberId(member.id);
-    setPartnerName(member.name);
+  function handleSelectMember(member: IbCandidate) {
+    if (member.is_ib) {
+      onToast("이미 IB 파트너로 등록된 회원입니다.", "warning");
+      return;
+    }
+    setSelectedMemberId(member.user_id);
+    setPartnerName(displayName(member));
+  }
+
+  function handleRegister() {
+    if (saving) return;
+    if (!selectedMemberId) {
+      onToast("IB로 등록할 회원을 먼저 선택해주세요.", "warning");
+      return;
+    }
+    setSaving(true);
+    addPartner({ user_id: selectedMemberId, level, status })
+      .then(() => onSave())
+      .catch(error => onToast(apiErrorMessage(error, "IB 파트너 등록에 실패했습니다."), "warning"))
+      .finally(() => { setSaving(false); setConfirmOpen(false); });
   }
 
   return (
@@ -478,7 +441,7 @@ function AddPartnerModal({ t, onClose, onSave }: { t: T; onClose: () => void; on
                   value={memberQuery}
                   onChange={event => setMemberQuery(event.target.value)}
                   onKeyDown={event => event.key === "Enter" && handleSearch()}
-                  placeholder="회원 이름, 이메일 또는 IB 번호 입력"
+                  placeholder="회원 이름, 이메일 또는 UID 입력"
                   style={{ ...inputStyle, width: "100%", paddingLeft: 34 }}
                 />
               </div>
@@ -486,17 +449,17 @@ function AddPartnerModal({ t, onClose, onSave }: { t: T; onClose: () => void; on
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
               {results.map(member => {
-                const selected = selectedMemberId === member.id;
+                const selected = selectedMemberId === member.user_id;
                 return (
-                  <div key={member.id} style={{ padding: "10px 11px", borderRadius: 9, border: `1px solid ${selected ? t.accentBd : t.border}`, background: selected ? t.accentBg : t.surface2, display: "grid", gridTemplateColumns: "minmax(100px,.8fr) minmax(180px,1.5fr) minmax(88px,.7fr) auto", alignItems: "center", gap: 10 }}>
-                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 650, color: t.text }}>{member.name}</span>
+                  <div key={member.user_id} style={{ padding: "10px 11px", borderRadius: 9, border: `1px solid ${selected ? t.accentBd : t.border}`, background: selected ? t.accentBg : t.surface2, display: "grid", gridTemplateColumns: "minmax(100px,.8fr) minmax(180px,1.5fr) minmax(88px,.7fr) auto", alignItems: "center", gap: 10 }}>
+                    <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 12, fontWeight: 650, color: t.text }}>{displayName(member)}</span>
                     <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 10, color: t.textHint }}>{member.email}</span>
-                    <span style={{ whiteSpace: "nowrap", fontSize: 10, color: t.textSec, fontFamily: "'DM Mono',monospace" }}>{member.ibNumber}</span>
-                    <button onClick={() => handleSelectMember(member)} style={{ height: 28, padding: "0 11px", borderRadius: 7, border: `1px solid ${selected ? t.accent : t.border2}`, background: selected ? t.accent : t.surface, color: selected ? "#fff" : t.textSec, fontSize: 10, fontWeight: 650, cursor: "pointer" }}>{selected ? "선택됨" : "선택"}</button>
+                    <span style={{ whiteSpace: "nowrap", fontSize: 10, color: t.textSec, fontFamily: "'DM Mono',monospace" }}>{uidLabel(member.uid)}</span>
+                    <button onClick={() => handleSelectMember(member)} disabled={member.is_ib} style={{ height: 28, padding: "0 11px", borderRadius: 7, border: `1px solid ${selected ? t.accent : t.border2}`, background: selected ? t.accent : t.surface, color: selected ? "#fff" : t.textSec, fontSize: 10, fontWeight: 650, cursor: member.is_ib ? "not-allowed" : "pointer", opacity: member.is_ib ? 0.5 : 1 }}>{member.is_ib ? "IB 등록됨" : selected ? "선택됨" : "선택"}</button>
                   </div>
                 );
               })}
-              {results.length === 0 && <div style={{ padding: "22px 12px", borderRadius: 9, background: t.surface2, color: t.textHint, textAlign: "center", fontSize: 11 }}>검색 결과가 없습니다.</div>}
+              {results.length === 0 && <div style={{ padding: "22px 12px", borderRadius: 9, background: t.surface2, color: t.textHint, textAlign: "center", fontSize: 11 }}>{searched ? "검색 결과가 없습니다." : "회원 이름, 이메일 또는 UID로 검색하세요."}</div>}
             </div>
           </section>
 
@@ -504,24 +467,32 @@ function AddPartnerModal({ t, onClose, onSave }: { t: T; onClose: () => void; on
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <label style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 6, color: t.textSec, fontSize: 11 }}>
               파트너명
-              <input value={partnerName} onChange={event => setPartnerName(event.target.value)} placeholder="회원을 선택해주세요" style={inputStyle} />
+              <input value={partnerName} readOnly placeholder="회원을 선택해주세요" style={inputStyle} />
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: 6, color: t.textSec, fontSize: 11 }}>
               초기 IB 레벨
-              <select defaultValue="1" style={{ ...inputStyle, padding: "0 10px" }}>
+              <select value={level} onChange={event => setLevel(Number(event.target.value))} style={{ ...inputStyle, padding: "0 10px" }}>
                 {Array.from({ length: 40 }, (_, i) => <option key={i + 1} value={i + 1}>Level {i + 1}</option>)}
               </select>
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: 6, color: t.textSec, fontSize: 11 }}>
               상태
-              <select defaultValue="Active" style={{ ...inputStyle, padding: "0 10px" }}>
-                <option value="Active">활성</option>
-                <option value="Inactive">비활성</option>
-                <option value="PermanentlySuspended">영구정지</option>
+              <select value={status} onChange={event => setStatus(event.target.value as IbStatus)} style={{ ...inputStyle, padding: "0 10px" }}>
+                <option value="ACTIVE">활성</option>
+                <option value="INACTIVE">비활성</option>
+                <option value="BANNED">영구정지</option>
               </select>
             </label>
             <label style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 6, color: t.textSec, fontSize: 11 }}>
               Upline
+              <input
+                value={selectedMember ? (selectedMember.upline ? `${displayName(selectedMember.upline)} · ${uidLabel(selectedMember.upline.uid)}` : "Upline 없음 (Root)") : ""}
+                readOnly
+                placeholder="회원을 선택하면 기존 Upline(수당 조직 상위)이 표시됩니다"
+                style={{ ...inputStyle, background: t.surface3, color: t.textSec, cursor: "not-allowed" }}
+              />
+              <span style={{ fontSize: 10, color: t.textHint }}>Upline 변경은 &apos;네트워크 및 조직도 관리 &gt; Downline 재배치&apos;에서 합니다.</span>
+              {/* 기존 Make 디자인의 Upline 검색 콤보박스 (사용자 결정 2026-11-24: 기존 placement 표시만, 변경은 재배치에서)
               <div style={{ position: "relative" }}>
                 <Search size={14} color={t.textHint} style={{ position: "absolute", left: 11, top: 12, zIndex: 1, pointerEvents: "none" }} />
                 <input
@@ -587,12 +558,13 @@ function AddPartnerModal({ t, onClose, onSave }: { t: T; onClose: () => void; on
                   </div>
                 )}
               </div>
+              */}
             </label>
           </div>
         </div>
         <div style={{ padding: "14px 22px", borderTop: `1px solid ${t.border}`, display: "flex", justifyContent: "flex-end", gap: 8 }}>
           <button onClick={onClose} style={{ height: 38, padding: "0 18px", borderRadius: 8, border: `1px solid ${t.border2}`, background: "transparent", color: t.textSec, cursor: "pointer" }}>취소</button>
-          <PrimaryButton onClick={() => setConfirmOpen(true)}><Check size={15} /> 파트너 등록</PrimaryButton>
+          <PrimaryButton onClick={() => (selectedMemberId ? setConfirmOpen(true) : onToast("IB로 등록할 회원을 먼저 선택해주세요.", "warning"))}><Check size={15} /> 파트너 등록</PrimaryButton>
         </div>
       </div>
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
@@ -604,7 +576,7 @@ function AddPartnerModal({ t, onClose, onSave }: { t: T; onClose: () => void; on
           </AlertDialogHeader>
           <AlertDialogFooter className="border-t border-border bg-muted/30 px-6 py-4">
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={onSave}><Check /> 확인</AlertDialogAction>
+            <AlertDialogAction onClick={handleRegister}><Check /> 확인</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -648,7 +620,7 @@ function EditPartnerModal({ partner, t, onClose, onSave }: { partner: Partner; t
         </div>
         <div style={{ padding: 22 }}>
           <div style={{ padding: "11px 13px", borderRadius: 9, background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.textSec, fontSize: 11, lineHeight: 1.55, marginBottom: 18 }}>
-            레벨 또는 상태 변경 시 이후 발생하는 커미션부터 새로운 설정이 적용됩니다.
+            레벨 또는 상태 변경 시 이후 발생하는 커미션부터 새로운 설정이 적용됩니다.{partner.status === "Blacklist" ? " 영구정지된 IB는 다시 활성화할 수 없습니다." : ""}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             <label style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 6, color: t.textSec, fontSize: 11 }}>
@@ -663,7 +635,7 @@ function EditPartnerModal({ partner, t, onClose, onSave }: { partner: Partner; t
             </label>
             <label style={{ display: "flex", flexDirection: "column", gap: 6, color: t.textSec, fontSize: 11 }}>
               상태
-              <select value={status} onChange={event => setStatus(event.target.value as PartnerStatus)} style={{ ...inputStyle, padding: "0 10px", cursor: "pointer" }}>
+              <select value={status} disabled={partner.status === "Blacklist"} onChange={event => setStatus(event.target.value as PartnerStatus)} style={{ ...(partner.status === "Blacklist" ? readOnlyInputStyle : inputStyle), padding: "0 10px", cursor: partner.status === "Blacklist" ? "not-allowed" : "pointer" }}>
                 <option value="Active">활성</option>
                 <option value="Suspended">비활성</option>
                 <option value="Blacklist">영구정지</option>
@@ -730,27 +702,36 @@ function RelocationConfirmModal({
 }
 
 export function IbPartnerManagementPage({ dark, onToast }: { dark: boolean; onToast: ToastHandler }) {
-  const PAGE_SIZE = 5;
+  const PAGE_SIZE = 10;
   const t = tokens(dark);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<PartnerStatusFilter>("All");
   const [currentPage, setCurrentPage] = useState(1);
-  const [partners, setPartners] = useState(PARTNERS);
+  const [partners, setPartners] = useState<Partner[]>([]);
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState({ total: 0, active: 0 });
+  const [reloadKey, setReloadKey] = useState(0);
   const [drawer, setDrawer] = useState<Partner | null>(null);
   const [adding, setAdding] = useState(false);
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
-  const filtered = partners.filter(p => {
-    const q = query.toLowerCase();
-    const matchesStatus =
-      status === "All" ||
-      (status === "Active" && p.status === "Active") ||
-      (status === "Inactive" && (p.status === "Suspended" || p.status === "Withdrawn")) ||
-      (status === "PermanentlySuspended" && p.status === "Blacklist");
-    return (!q || `${p.name} ${p.id} ${p.email} ${p.uplineId ?? ""} ${p.downlineIbId ?? ""}`.toLowerCase().includes(q)) && matchesStatus;
-  });
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  useEffect(() => {
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      listPartners({ keyword: query.trim() || undefined, status: FILTER_TO_API[status], page: currentPage, size: PAGE_SIZE })
+        .then(res => {
+          if (!alive) return;
+          setPartners(res.items.map(toPartner));
+          setTotal(res.total);
+          setSummary({ total: res.summary.total, active: res.summary.active });
+        })
+        .catch(error => { if (alive) onToast(apiErrorMessage(error, "IB 파트너 목록을 불러오지 못했습니다."), "warning"); });
+    }, query ? 250 : 0);
+    return () => { alive = false; window.clearTimeout(timer); };
+  }, [query, status, currentPage, reloadKey, onToast]);
+  const filtered = partners;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
-  const pagedPartners = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+  const pagedPartners = partners;
   const visiblePages = Array.from({ length: totalPages }, (_, index) => index + 1);
   const th: React.CSSProperties = { padding: "11px 13px", textAlign: "left", fontSize: 11, fontWeight: 700, color: t.textSec, whiteSpace: "nowrap", background: dark ? t.surface2 : "#F8FAFC", borderBottom: `1px solid ${dark ? t.border2 : "#E2E8F0"}` };
   const td: React.CSSProperties = { padding: "13px", color: t.text, fontSize: 12, borderBottom: `1px solid ${dark ? t.border : "#E2E8F0"}`, verticalAlign: "middle" };
@@ -759,8 +740,8 @@ export function IbPartnerManagementPage({ dark, onToast }: { dark: boolean; onTo
       <PageHeader title="IB 파트너 관리" description="IB 파트너 정보, 레벨, 상태 및 전체 Downline 조직을 관리합니다." action={<PrimaryButton onClick={() => setAdding(true)}><Plus size={15} /> 신규 IB 추가</PrimaryButton>} />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginBottom: 18 }}>
         {[
-          ["전체 파트너", partners.length, Users, t.text],
-          ["활성 파트너", partners.filter(p => p.status === "Active").length, ShieldCheck, "#16A34A"],
+          ["전체 파트너", summary.total, Users, t.text],
+          ["활성 파트너", summary.active, ShieldCheck, "#16A34A"],
         ].map(([label, value, Icon, color]) => {
           const IconComponent = Icon as typeof Users;
           return <div key={String(label)} style={{ padding: "15px 17px", borderRadius: 11, border: `1px solid ${t.border}`, background: t.surface, display: "flex", alignItems: "center", gap: 12 }}>
@@ -808,7 +789,7 @@ export function IbPartnerManagementPage({ dark, onToast }: { dark: boolean; onTo
                     </button>
                   </td>
                   <td style={{ ...td, color: p.uplineId ? t.textSec : t.textHint, fontFamily: "'DM Mono',monospace", fontSize: 11, whiteSpace: "nowrap" }}>{p.uplineId ? formatUid(p.uplineId) : "-"}</td>
-                  <td style={{ ...td, color: p.downlineIbId ? t.textSec : t.textHint, fontFamily: "'DM Mono',monospace", fontSize: 11, whiteSpace: "nowrap" }}>{p.downlineIbId ? formatUid(p.downlineIbId) : "-"}</td>
+                  <td style={{ ...td, color: p.downlineIbId ? t.textSec : t.textHint, fontFamily: "'DM Mono',monospace", fontSize: 11, whiteSpace: "nowrap" }}>{p.downlineIbId ? formatUid(p.downlineIbId) : "-"}{p.downlineIbCount > 1 && <span style={{ color: t.textHint, marginLeft: 4, fontFamily: "'Noto Sans KR',sans-serif" }}>외 {p.downlineIbCount - 1}</span>}</td>
                   <td style={td}><span style={{ display: "inline-flex", alignItems: "center", height: 26, padding: "0 9px", borderRadius: 7, border: `1px solid ${t.accentBd}`, background: t.accentBg, color: t.accent, fontSize: 11, fontWeight: 700 }}>Level {p.level}</span></td>
                   <td style={td}><span style={{ fontWeight: 650 }}>{p.downline}</span><span style={{ color: t.textHint, marginLeft: 3 }}>명</span></td>
                   <td style={{ ...td, whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>{p.registeredAt}</td>
@@ -821,7 +802,7 @@ export function IbPartnerManagementPage({ dark, onToast }: { dark: boolean; onTo
           </table>
         </div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: `1px solid ${t.border}` }}>
-          <span style={{ fontSize: 11, color: t.textHint, fontFamily: "'Noto Sans KR',sans-serif" }}>총 {filtered.length}명 · {safePage} / {totalPages} 페이지</span>
+          <span style={{ fontSize: 11, color: t.textHint, fontFamily: "'Noto Sans KR',sans-serif" }}>총 {total}명 · {safePage} / {totalPages} 페이지</span>
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
             <button
               onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
@@ -862,16 +843,21 @@ export function IbPartnerManagementPage({ dark, onToast }: { dark: boolean; onTo
         </div>
       </div>
       {drawer && <PartnerDrawer partner={drawer} t={t} onClose={() => setDrawer(null)} />}
-      {adding && <AddPartnerModal t={t} onClose={() => setAdding(false)} onSave={() => { setAdding(false); onToast("신규 IB 파트너가 등록되었습니다.", "success"); }} />}
+      {adding && <AddPartnerModal t={t} onToast={onToast} onClose={() => setAdding(false)} onSave={() => { setAdding(false); setReloadKey(key => key + 1); onToast("신규 IB 파트너가 등록되었습니다.", "success"); }} />}
       {editingPartner && (
         <EditPartnerModal
           partner={editingPartner}
           t={t}
           onClose={() => setEditingPartner(null)}
           onSave={updatedPartner => {
-            setPartners(current => current.map(partner => partner.id === updatedPartner.id ? updatedPartner : partner));
-            setEditingPartner(null);
-            onToast("IB 파트너 정보가 저장되었습니다.", "success");
+            updatePartner(updatedPartner.userId, { level: updatedPartner.level, status: STATUS_TO_API[updatedPartner.status] })
+              .then(res => {
+                setPartners(current => current.map(partner => partner.userId === res.user_id ? toPartner(res) : partner));
+                setEditingPartner(null);
+                setReloadKey(key => key + 1);
+                onToast("IB 파트너 정보가 저장되었습니다.", "success");
+              })
+              .catch(error => onToast(apiErrorMessage(error, "IB 파트너 정보 저장에 실패했습니다."), "warning"));
           }}
         />
       )}
@@ -881,12 +867,14 @@ export function IbPartnerManagementPage({ dark, onToast }: { dark: boolean; onTo
 
 export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast: ToastHandler }) {
   const t = tokens(dark);
-  const relocationMembers = useMemo(() => {
-    const collect = (node: NetworkTreeNode): NetworkTreeNode[] => [node, ...(node.children ?? []).flatMap(collect)];
-    return NETWORK_TREES.flatMap(collect).filter(node => node.id.startsWith("IB-"));
-  }, []);
+  // 재배치는 IB만 (이동 대상·새 Upline 모두 IB 파트너 목록에서 고른다)
+  const [relocationMembers, setRelocationMembers] = useState<NetworkTreeNode[]>([]);
   const [networkQuery, setNetworkQuery] = useState("");
-  const [treeRoot, setTreeRoot] = useState<NetworkTreeNode>(NETWORK_TREES[0]);
+  const [treeRoot, setTreeRoot] = useState<NetworkTreeNode | null>(null);
+  const [rootUserId, setRootUserId] = useState<string | null>(null);
+  const [reason, setReason] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [networkStats, setNetworkStats] = useState({ total: 0, active: 0 });
   const [source, setSource] = useState("");
   const [sourceQuery, setSourceQuery] = useState("");
   const [sourceComboboxOpen, setSourceComboboxOpen] = useState(false);
@@ -897,29 +885,65 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
   const control: React.CSSProperties = { width: "100%", height: 38, borderRadius: 8, border: `1px solid ${t.border2}`, background: t.surface2, color: t.text, padding: "0 10px", fontSize: 12 };
   const filteredRelocationMembers = relocationMembers.filter(member => {
     const query = sourceQuery.toLowerCase().replace(/\s/g, "");
-    return !query || `${member.name}${member.id}${member.id.replace("IB-", "")}`.toLowerCase().replace(/\s/g, "").includes(query);
+    return !query || `${member.name}${member.email}${member.id}${member.id.replace("UID-", "")}`.toLowerCase().replace(/\s/g, "").includes(query);
   });
   const filteredUplineMembers = relocationMembers.filter(member => {
     const query = targetQuery.toLowerCase().replace(/\s/g, "");
-    const matchesQuery = !query || `${member.name}${member.id}${member.id.replace("IB-", "")}`.toLowerCase().replace(/\s/g, "").includes(query);
+    const matchesQuery = !query || `${member.name}${member.email}${member.id}${member.id.replace("UID-", "")}`.toLowerCase().replace(/\s/g, "").includes(query);
     return member.id !== source && matchesQuery;
   });
   const selectedSource = relocationMembers.find(member => member.id === source);
   const selectedTarget = relocationMembers.find(member => member.id === target);
 
+  const loadPartners = useCallback(() => listPartners({ size: 200 })
+    .then(res => {
+      const members = res.items.map(p => ({
+        id: uidLabel(p.uid), userId: p.user_id, isIb: true, name: displayName(p), email: p.email,
+        userType: `IB - Level ${p.level}`, status: (p.status === "ACTIVE" ? "Active" : p.status === "BANNED" ? "PermanentlySuspended" : "Inactive") as NetworkStatus,
+        generatedVolume: "", commission: "",
+      }));
+      setRelocationMembers(members);
+      return res.items;
+    }), []);
+
+  const loadTree = useCallback((params: { user_id?: string; keyword?: string }) => getNetwork(params).then(res => {
+    setTreeRoot(toNetworkTreeNode(res.root));
+    setRootUserId(res.root.user_id);
+    setNetworkStats({ total: res.total, active: res.active });
+    return res;
+  }), []);
+
+  useEffect(() => {
+    // 처음에는 Upline이 없는(최상위) IB 중 첫 번째의 조직도를 보여준다.
+    loadPartners()
+      .then(items => {
+        const first = items.find(item => !item.upline) ?? items[0];
+        if (first) return loadTree({ user_id: first.user_id });
+        return undefined;
+      })
+      .catch(error => onToast(apiErrorMessage(error, "조직도를 불러오지 못했습니다."), "warning"));
+  }, [loadPartners, loadTree, onToast]);
+
   function handleNetworkSearch() {
     const query = networkQuery.trim();
-    if (!query) {
-      setTreeRoot(NETWORK_TREES[0]);
-      return;
-    }
-    const match = NETWORK_TREES.map(root => findNetworkNode(root, query)).find((node): node is NetworkTreeNode => Boolean(node));
-    if (match) {
-      setTreeRoot(match);
-      onToast(`${match.name}의 Downline 조직도를 불러왔습니다.`, "success");
-    } else {
-      onToast("일치하는 이름 또는 IB 번호를 찾을 수 없습니다.", "warning");
-    }
+    if (!query) return;
+    loadTree({ keyword: query })
+      .then(res => onToast(`${displayName(res.root)}의 Downline 조직도를 불러왔습니다.`, "success"))
+      .catch(error => onToast(apiErrorMessage(error, "일치하는 이름 또는 UID를 찾을 수 없습니다."), "warning"));
+  }
+
+  function handleRelocate() {
+    if (!selectedSource || !selectedTarget || saving) return;
+    setSaving(true);
+    relocate({ member_id: selectedSource.userId, new_parent_id: selectedTarget.userId, reason: reason.trim() })
+      .then(() => {
+        onToast(`${selectedSource.id} 조직이 ${selectedTarget.id} 하위로 재배치되었습니다.`, "success");
+        setSource(""); setSourceQuery(""); setTarget(""); setTargetQuery(""); setReason("");
+        loadPartners().catch(() => undefined);
+        if (rootUserId) loadTree({ user_id: rootUserId }).catch(() => undefined);
+      })
+      .catch(error => onToast(apiErrorMessage(error, "재배치에 실패했습니다."), "warning"))
+      .finally(() => { setSaving(false); setShowRelocationConfirm(false); });
   }
 
   return (
@@ -928,23 +952,23 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
       <div style={{ background: t.surface, border: `1px solid ${t.border2}`, borderRadius: 13, padding: "14px 16px", marginBottom: 16, display: "flex", alignItems: "center", gap: 10 }}>
         <div style={{ color: t.accent, width: 34, height: 34, borderRadius: 9, background: t.accentBg, display: "flex", alignItems: "center", justifyContent: "center" }}><Search size={16} /></div>
         <div style={{ flex: 1, minWidth: 260 }}>
-          <div style={{ fontSize: 11, color: t.textHint, marginBottom: 5 }}>이름 또는 IB 번호 입력</div>
+          <div style={{ fontSize: 11, color: t.textHint, marginBottom: 5 }}>이름, 이메일 또는 UID 입력</div>
           <div style={{ display: "flex", gap: 8, maxWidth: 560 }}>
             <input
               value={networkQuery}
               onChange={event => setNetworkQuery(event.target.value)}
               onKeyDown={event => event.key === "Enter" && handleNetworkSearch()}
-              placeholder="이름 또는 IB 번호 입력"
+              placeholder="이름, 이메일 또는 UID 입력"
               style={{ ...control, flex: 1, minWidth: 0, outline: "none" }}
             />
             <button onClick={handleNetworkSearch} style={{ height: 38, padding: "0 18px", borderRadius: 8, border: "none", background: t.accent, color: "#fff", fontSize: 12, fontWeight: 650, cursor: "pointer" }}>검색</button>
           </div>
-          <div style={{ fontSize: 9, color: t.textHint, marginTop: 5 }}>예: Daniel, 10482, IB-11342</div>
+          <div style={{ fontSize: 9, color: t.textHint, marginTop: 5 }}>예: 홍길동, hong@example.com, 1234567890</div>
         </div>
         <div style={{ display: "flex", gap: 22, padding: "0 10px" }}>
           {[
-            ["표시 조직", `${countNetworkNodes(treeRoot)}명`],
-            ["활성", `${countActiveNetworkNodes(treeRoot)}명`],
+            ["표시 조직", `${networkStats.total}명`],
+            ["활성", `${networkStats.active}명`],
           ].map(([label, value], index) => <div key={label} style={{ paddingLeft: index > 0 ? 22 : 0, borderLeft: index > 0 ? `1px solid ${t.border}` : "none" }}><div style={{ fontSize: 10, color: t.textHint }}>{label}</div><div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginTop: 3, whiteSpace: "nowrap" }}>{value}</div></div>)}
         </div>
       </div>
@@ -953,7 +977,9 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
           <div style={{ padding: "15px 18px", borderBottom: "1px solid rgba(0,0,0,.09)", background: "#FFFFFF" }}>
             <div><div style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A" }}>Downline IB &amp; Client Network</div><div style={{ fontSize: 10, color: "#A0A0AA", marginTop: 3 }}>폴더 노드를 선택해 Sub-IB와 Direct User 계층을 확장하거나 축소하세요.</div></div>
           </div>
-          <NetworkTreeTable root={treeRoot} />
+          {treeRoot
+            ? <NetworkTreeTable root={treeRoot} />
+            : <div style={{ padding: "48px 16px", textAlign: "center", color: "#A0A0AA", fontSize: 12 }}>표시할 조직이 없습니다. IB 파트너를 등록하거나 회원을 검색하세요.</div>}
         </div>
         <div style={{ background: t.surface, border: `1px solid ${t.border2}`, borderRadius: 13 }}>
           <div style={{ padding: "15px 17px", borderBottom: `1px solid ${t.border}`, display: "flex", gap: 9, alignItems: "center" }}><ArrowRightLeft size={16} color={t.accent} /><div><div style={{ fontSize: 13, fontWeight: 700 }}>Downline 재배치</div><div style={{ fontSize: 10, color: t.textHint, marginTop: 2 }}>선택한 조직과 전체 하위 노드를 이동합니다.</div></div></div>
@@ -971,7 +997,7 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
                     setSource("");
                     setSourceComboboxOpen(true);
                   }}
-                  placeholder="이름 또는 IB 번호 입력"
+                  placeholder="이름, 이메일 또는 UID 입력"
                   role="combobox"
                   aria-expanded={sourceComboboxOpen}
                   aria-controls="relocation-member-options"
@@ -1027,7 +1053,7 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
                     setTarget("");
                     setTargetComboboxOpen(true);
                   }}
-                  placeholder="이름 또는 IB 번호 입력"
+                  placeholder="이름, 이메일 또는 UID 입력"
                   role="combobox"
                   aria-expanded={targetComboboxOpen}
                   aria-controls="relocation-upline-options"
@@ -1065,8 +1091,18 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
                 )}
               </div>
             </label>
-            <div style={{ padding: "9px 10px", borderRadius: 8, background: "rgba(217,119,6,.08)", color: "#D97706", fontSize: 10, lineHeight: 1.5 }}>재배치 시 이미 확정된 커미션에는 영향을 주지 않습니다.</div>
-            <PrimaryButton onClick={() => selectedSource && selectedTarget ? setShowRelocationConfirm(true) : onToast("이동 대상과 새 Upline을 모두 선택해주세요.", "warning")}><ArrowRightLeft size={14} /> 재배치 실행</PrimaryButton>
+            <div style={{ padding: "9px 10px", borderRadius: 8, background: "rgba(217,119,6,.08)", color: "#D97706", fontSize: 10, lineHeight: 1.5 }}>재배치 시 이미 확정된 커미션에는 영향을 주지 않습니다. 추천인(Sponsor)은 바뀌지 않습니다.</div>
+            <label style={{ fontSize: 11, color: t.textSec }}>
+              재배치 사유 <span style={{ color: "#DC2626" }}>*</span>
+              <textarea
+                value={reason}
+                onChange={event => setReason(event.target.value)}
+                placeholder="재배치 사유를 입력하세요"
+                rows={3}
+                style={{ ...control, height: "auto", marginTop: 6, padding: "8px 10px", resize: "vertical", outline: "none", fontFamily: "inherit" }}
+              />
+            </label>
+            <PrimaryButton onClick={() => (!selectedSource || !selectedTarget ? onToast("이동 대상과 새 Upline을 모두 선택해주세요.", "warning") : !reason.trim() ? onToast("재배치 사유를 입력해주세요.", "warning") : setShowRelocationConfirm(true))}><ArrowRightLeft size={14} /> 재배치 실행</PrimaryButton>
           </div>
         </div>
       </div>
@@ -1076,10 +1112,7 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
           target={selectedTarget}
           t={t}
           onClose={() => setShowRelocationConfirm(false)}
-          onConfirm={() => {
-            setShowRelocationConfirm(false);
-            onToast(`${selectedSource.id} 조직이 ${selectedTarget.id} 하위로 재배치되었습니다.`, "success");
-          }}
+          onConfirm={handleRelocate}
         />
       )}
     </div>
@@ -1088,11 +1121,36 @@ export function AffiliateNetworkPage({ dark, onToast }: { dark: boolean; onToast
 
 export function AffiliateCommissionRatePage({ dark, onToast }: { dark: boolean; onToast: ToastHandler }) {
   const t = tokens(dark);
-  const [rates, setRates] = useState(() => Array.from({ length: 40 }, (_, index) => ({
-    level: index + 1,
-    value: index < 5 ? 6 - index * .5 : index < 10 ? 2 : Math.max(1, 12 - Math.floor(index / 3)),
-  })));
+  const [rates, setRates] = useState(() => Array.from({ length: 40 }, (_, index) => ({ level: index + 1, value: 0 })));
+  const [marketingRate, setMarketingRate] = useState<number | null>(null);
+  const [version, setVersion] = useState<{ version: number; effective_from: string } | null>(null);
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
+
+  const applyOverview = useCallback((overview: Awaited<ReturnType<typeof getLevelRates>>) => {
+    setMarketingRate(overview.marketing_rate);
+    if (overview.current?.rates) {
+      setRates(overview.current.rates.map(item => ({ level: item.level, value: item.rate })));
+      setVersion({ version: overview.current.version, effective_from: overview.current.effective_from });
+    }
+  }, []);
+
+  useEffect(() => {
+    getLevelRates().then(applyOverview).catch(error => onToast(apiErrorMessage(error, "커미션 비율을 불러오지 못했습니다."), "warning"));
+  }, [applyOverview, onToast]);
+
+  function handleSave() {
+    const invalid = rates.find(rate => !Number.isFinite(rate.value) || rate.value < 0);
+    if (invalid) {
+      onToast(`Level ${invalid.level} 비율을 0 이상으로 입력해주세요.`, "warning");
+      return;
+    }
+    saveLevelRates({ rates: rates.map(rate => ({ level: rate.level, rate: rate.value })) })
+      .then(overview => {
+        applyOverview(overview);
+        onToast("커미션 비율 설정이 저장되었습니다.", "success");
+      })
+      .catch(error => onToast(apiErrorMessage(error, "커미션 비율 저장에 실패했습니다."), "warning"));
+  }
 
   return (
     <div style={{ padding: "24px 28px 48px", minHeight: "100vh", color: t.text, background: t.pageBg }}>
@@ -1105,7 +1163,11 @@ export function AffiliateCommissionRatePage({ dark, onToast }: { dark: boolean; 
         <div style={{ padding: "15px 18px", borderBottom: "1px solid rgba(0,0,0,.09)", background: "#F8FAFC" }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A" }}>Commission Matrix</div>
-            <div style={{ fontSize: 10, color: "#A0A0AA", marginTop: 3 }}>Level 1–40의 기본 커미션 비율(%)을 설정합니다.</div>
+            <div style={{ fontSize: 10, color: "#A0A0AA", marginTop: 3 }}>
+              Level 1–40의 기본 커미션 비율(%)을 설정합니다.
+              {marketingRate != null && ` 현재 마케팅 비율 ${pct(marketingRate)}를 넘을 수 없습니다.`}
+              {version && ` · 적용 중 v${version.version} (${formatKst(version.effective_from)} GMT+9부터)`}
+            </div>
           </div>
         </div>
         <div style={{ padding: 16, background: "#F8FAFC", display: "grid", gridTemplateColumns: "repeat(5, minmax(150px, 1fr))", gap: 10, overflowX: "auto" }}>
@@ -1115,7 +1177,7 @@ export function AffiliateCommissionRatePage({ dark, onToast }: { dark: boolean; 
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#1A1A1A" }}>Level {rate.level}</span>
               </div>
               <div style={{ padding: 10, position: "relative" }}>
-                <input type="number" min="0" step=".5" value={rate.value} aria-label={`Level ${rate.level} 커미션 비율 (%)`} onChange={event => setRates(current => current.map(item => item.level === rate.level ? { ...item, value: Number(event.target.value) } : item))} style={{ width: "100%", minWidth: 0, height: 34, borderRadius: 7, border: "1px solid rgba(0,0,0,.12)", background: "#FFFFFF", color: "#1A1A1A", fontSize: 11, padding: "0 28px 0 9px", outline: "none", fontFamily: "'DM Mono',monospace" }} />
+                <input type="number" min="0" step="0.01" value={rate.value} aria-label={`Level ${rate.level} 커미션 비율 (%)`} onChange={event => setRates(current => current.map(item => item.level === rate.level ? { ...item, value: Number(event.target.value) } : item))} style={{ width: "100%", minWidth: 0, height: 34, borderRadius: 7, border: "1px solid rgba(0,0,0,.12)", background: "#FFFFFF", color: "#1A1A1A", fontSize: 11, padding: "0 28px 0 9px", outline: "none", fontFamily: "'DM Mono',monospace" }} />
                 <span style={{ position: "absolute", right: 20, top: "50%", transform: "translateY(-50%)", fontSize: 11, fontWeight: 600, color: "#64748B", pointerEvents: "none" }}>%</span>
               </div>
             </div>
@@ -1133,7 +1195,7 @@ export function AffiliateCommissionRatePage({ dark, onToast }: { dark: boolean; 
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               setSaveConfirmOpen(false);
-              onToast("커미션 비율 설정이 저장되었습니다.", "success");
+              handleSave();
             }}><Check /> 확인</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1142,23 +1204,50 @@ export function AffiliateCommissionRatePage({ dark, onToast }: { dark: boolean; 
   );
 }
 
-const COMMISSION_FLOW_UPLINES = [
-  { step: "3차 상위 IB", name: "Sophia Chen", uid: "UID-10396", level: "Level 9", rate: "2%", amount: "$60.00", accent: "#0F766E", accentBg: "rgba(15,118,110,.08)", accentBorder: "rgba(15,118,110,.2)", width: 470 },
-  { step: "2차 상위 IB", name: "Emma Wilson", uid: "UID-10829", level: "Level 7", rate: "4%", amount: "$120.00", accent: "#2563EB", accentBg: "rgba(37,99,235,.07)", accentBorder: "rgba(37,99,235,.18)", width: 500 },
-  { step: "1차 상위 IB · Direct", name: "Daniel Kim", uid: "UID-10482", level: "Level 12", rate: "5%", amount: "$150.00", accent: "#7C6AF7", accentBg: "rgba(124,106,247,.08)", accentBorder: "rgba(124,106,247,.2)", width: 560 },
+const FLOW_ACCENTS = [
+  { accent: "#7C6AF7", accentBg: "rgba(124,106,247,.08)", accentBorder: "rgba(124,106,247,.2)" },
+  { accent: "#2563EB", accentBg: "rgba(37,99,235,.07)", accentBorder: "rgba(37,99,235,.18)" },
+  { accent: "#0F766E", accentBg: "rgba(15,118,110,.08)", accentBorder: "rgba(15,118,110,.2)" },
 ] as const;
+const FLOW_SKIPPED = { accent: "#94A3B8", accentBg: "rgba(148,163,184,.12)", accentBorder: "rgba(148,163,184,.3)" };
+const FLOW_RESULT_LABEL: Record<string, string> = {
+  PAID: "지급",
+  ZERO: "$0 (아래 IB 비율 이상)",
+  SKIPPED_NOT_IB: "건너뜀 · 일반 회원",
+  SKIPPED_INACTIVE: "건너뜀 · 비활성 IB",
+};
 
-export function AffiliateCommissionFlowPage({ dark }: { dark: boolean }) {
+export function AffiliateCommissionFlowPage({ dark, onToast }: { dark: boolean; onToast: ToastHandler }) {
   const t = tokens(dark);
-  const sampleOrder = "ORD-2026-88412";
-  const [orderQuery, setOrderQuery] = useState(sampleOrder);
-  const [searchedOrder, setSearchedOrder] = useState(sampleOrder);
+  const [orderQuery, setOrderQuery] = useState("");
+  const [searchedOrder, setSearchedOrder] = useState("");
+  const [flow, setFlow] = useState<CommissionFlow | null>(null);
+
+  const loadFlow = useCallback((orderNumber: string) => getCommissionFlow(orderNumber).then(res => {
+    setFlow(res);
+    setSearchedOrder(res.order_id);
+    setOrderQuery(res.order_id);
+  }), []);
+
+  useEffect(() => {
+    // 처음에는 가장 최근 결제 주문의 커미션 경로를 보여준다.
+    listCommissionFlows({ size: 1 })
+      .then(res => (res.items[0] ? loadFlow(res.items[0].order_id) : undefined))
+      .catch(error => onToast(apiErrorMessage(error, "커미션 플로우를 불러오지 못했습니다."), "warning"));
+  }, [loadFlow, onToast]);
 
   function handleSearch() {
     const orderNumber = orderQuery.trim().toUpperCase();
     setOrderQuery(orderNumber);
-    setSearchedOrder(orderNumber);
+    loadFlow(orderNumber).catch(error => {
+      setFlow(null);
+      setSearchedOrder("");
+      onToast(apiErrorMessage(error, "주문의 커미션 기록을 찾을 수 없습니다."), "warning");
+    });
   }
+
+  const flowLines = [...(flow?.lines ?? [])].reverse(); // 위(최상위)부터 아래(구매자 바로 위)로
+  const paidCount = (flow?.lines ?? []).filter(line => line.amount > 0).length;
 
   return (
     <div style={{ padding: "24px 28px 56px", minHeight: "100vh", color: t.text, background: t.pageBg }}>
@@ -1186,7 +1275,7 @@ export function AffiliateCommissionFlowPage({ dark }: { dark: boolean }) {
             <input
               value={orderQuery}
               onChange={event => setOrderQuery(event.target.value)}
-              placeholder="주문 번호 입력 (예: ORD-2026-88412)"
+              placeholder="주문 번호 입력 (예: ORD-20261124-AB12CD34)"
               aria-label="챌린지 티켓 주문 번호"
               style={{ width: "100%", height: 40, padding: "0 13px 0 36px", borderRadius: 8, border: `1px solid ${dark ? t.border2 : "#E2E8F0"}`, background: dark ? t.surface2 : "#F8FAFC", color: t.text, fontSize: 12, fontFamily: "'DM Mono',monospace", outline: "none" }}
             />
@@ -1197,6 +1286,7 @@ export function AffiliateCommissionFlowPage({ dark }: { dark: boolean }) {
             onClick={() => {
               setOrderQuery("");
               setSearchedOrder("");
+              setFlow(null);
             }}
             style={{ width: 40, height: 40, borderRadius: 8, border: `1px solid ${dark ? t.border2 : "#E2E8F0"}`, background: dark ? t.surface : "#FFFFFF", color: t.textSec, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
             aria-label="검색 초기화"
@@ -1206,7 +1296,7 @@ export function AffiliateCommissionFlowPage({ dark }: { dark: boolean }) {
         </form>
       </div>
 
-      {searchedOrder ? (
+      {searchedOrder && flow ? (
         <div style={{ borderRadius: 13, border: `1px solid ${dark ? t.border2 : "#E2E8F0"}`, background: dark ? t.surface : "#FFFFFF", overflow: "hidden" }}>
           <div style={{ padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, borderBottom: `1px solid ${dark ? t.border : "#E2E8F0"}`, background: dark ? t.surface : "#FFFFFF" }}>
             <div>
@@ -1216,20 +1306,55 @@ export function AffiliateCommissionFlowPage({ dark }: { dark: boolean }) {
             <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 9, color: t.textHint }}>분배 인원</div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginTop: 2 }}>3명</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: t.text, marginTop: 2 }}>{paidCount}명</div>
+              </div>
+              <div style={{ width: 1, height: 28, background: dark ? t.border : "#E2E8F0" }} />
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 9, color: t.textHint }}>예산 (마케팅 {pct(flow.marketing_rate)})</div>
+                <div style={{ fontSize: 14, fontWeight: 750, color: t.text, marginTop: 2, fontFamily: "'DM Mono',monospace" }}>{usd(flow.budget)}</div>
               </div>
               <div style={{ width: 1, height: 28, background: dark ? t.border : "#E2E8F0" }} />
               <div style={{ textAlign: "right" }}>
                 <div style={{ fontSize: 9, color: t.textHint }}>총 지급 커미션</div>
-                <div style={{ fontSize: 14, fontWeight: 750, color: "#16A34A", marginTop: 2, fontFamily: "'DM Mono',monospace" }}>$330.00</div>
+                <div style={{ fontSize: 14, fontWeight: 750, color: "#16A34A", marginTop: 2, fontFamily: "'DM Mono',monospace" }}>{usd(flow.paid_amount)}</div>
               </div>
+              <div style={{ width: 1, height: 28, background: dark ? t.border : "#E2E8F0" }} />
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 9, color: t.textHint }}>회사 귀속</div>
+                <div style={{ fontSize: 14, fontWeight: 750, color: "#0F766E", marginTop: 2, fontFamily: "'DM Mono',monospace" }}>{usd(flow.retained_amount)}</div>
+              </div>
+              {flow.clawed_back_amount > 0 && <>
+                <div style={{ width: 1, height: 28, background: dark ? t.border : "#E2E8F0" }} />
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 9, color: t.textHint }}>환불 환수</div>
+                  <div style={{ fontSize: 14, fontWeight: 750, color: "#DC2626", marginTop: 2, fontFamily: "'DM Mono',monospace" }}>-{usd(flow.clawed_back_amount)}</div>
+                </div>
+              </>}
             </div>
           </div>
 
           <div style={{ padding: "30px 24px 34px", background: dark ? t.pageBg : "#F8FAFC", overflowX: "auto" }}>
             <div style={{ minWidth: 720, display: "flex", flexDirection: "column", alignItems: "center" }}>
-              {COMMISSION_FLOW_UPLINES.map((node, index) => (
-                <div key={node.uid} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+              {flowLines.length === 0 && (
+                <div style={{ marginBottom: 14, padding: "14px 18px", borderRadius: 10, border: `1px dashed ${dark ? t.border2 : "#CBD5E1"}`, color: t.textHint, fontSize: 11 }}>
+                  구매자 위에 수당 조직(Upline)이 없어 예산 전액이 회사에 귀속되었습니다.
+                </div>
+              )}
+              {flowLines.map((line, index) => {
+                const skipped = line.result === "SKIPPED_NOT_IB" || line.result === "SKIPPED_INACTIVE";
+                const colors = skipped ? FLOW_SKIPPED : FLOW_ACCENTS[(line.depth - 1) % FLOW_ACCENTS.length];
+                const node = {
+                  ...colors,
+                  uid: uidLabel(line.member?.uid),
+                  name: displayName(line.member),
+                  step: `${line.depth}차 상위${line.is_ib ? " IB" : " 회원"}${line.depth === 1 ? " · Direct" : ""}`,
+                  level: line.level != null ? `Level ${line.level}` : "일반 회원",
+                  rate: skipped ? "-" : `${pct(line.applied_rate)} (${pct(line.level_rate)} − ${pct(line.prev_max_rate)})`,
+                  amount: skipped ? "-" : usd(line.amount),
+                  width: Math.max(540, 620 - (flowLines.length - 1 - index) * 20),
+                };
+                return (
+                <div key={line.depth} style={{ display: "flex", flexDirection: "column", alignItems: "center", opacity: skipped ? 0.75 : 1 }}>
                   {index > 0 && (
                     <div style={{ width: 32, height: 52, display: "flex", flexDirection: "column", alignItems: "center", color: "#94A3B8" }}>
                       <ArrowUp size={17} strokeWidth={2.2} />
@@ -1238,9 +1363,9 @@ export function AffiliateCommissionFlowPage({ dark }: { dark: boolean }) {
                   )}
                   <div style={{ width: node.width, borderRadius: 12, border: `1px solid ${node.accentBorder}`, background: dark ? t.surface : "#FFFFFF", boxShadow: "0 4px 14px rgba(15,23,42,.04)", overflow: "hidden" }}>
                     <div style={{ height: 3, background: node.accent }} />
-                    <div style={{ padding: "14px 16px", display: "grid", gridTemplateColumns: "minmax(170px,1.5fr) minmax(120px,1fr) minmax(110px,.8fr)", gap: 16, alignItems: "center" }}>
+                    <div style={{ padding: "14px 16px", display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1.2fr) minmax(90px,.7fr)", gap: 14, alignItems: "center" }}>
                       <div style={{ minWidth: 0 }}>
-                        <div style={{ display: "inline-flex", padding: "3px 7px", borderRadius: 6, background: node.accentBg, color: node.accent, fontSize: 9, fontWeight: 700, marginBottom: 7 }}>{node.step}</div>
+                        <div style={{ display: "inline-flex", padding: "3px 7px", borderRadius: 6, background: node.accentBg, color: node.accent, fontSize: 9, fontWeight: 700, marginBottom: 7 }}>{node.step} · {FLOW_RESULT_LABEL[line.result]}</div>
                         <div style={{ display: "flex", alignItems: "baseline", gap: 6, whiteSpace: "nowrap" }}>
                           <span style={{ fontSize: 13, fontWeight: 700, color: t.text }}>{node.name}</span>
                           <span style={{ fontSize: 10, color: t.textHint, fontFamily: "'DM Mono',monospace" }}>{node.uid}</span>
@@ -1248,16 +1373,19 @@ export function AffiliateCommissionFlowPage({ dark }: { dark: boolean }) {
                       </div>
                       <div>
                         <div style={{ fontSize: 9, color: t.textHint }}>커미션레벨 · 지급률</div>
-                        <div style={{ fontSize: 11, color: t.textSec, fontWeight: 650, marginTop: 4 }}>{node.level} <span style={{ color: "#CBD5E1", margin: "0 4px" }}>·</span> {node.rate}</div>
+                        <div style={{ fontSize: 11, color: t.textSec, fontWeight: 650, marginTop: 4 }}>{node.level}</div>
+                        <div style={{ fontSize: 10, color: t.textHint, marginTop: 2, whiteSpace: "nowrap" }}>{node.rate}</div>
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontSize: 9, color: t.textHint }}>지급 커미션</div>
-                        <div style={{ fontSize: 15, color: "#16A34A", fontWeight: 750, marginTop: 3, fontFamily: "'DM Mono',monospace" }}>{node.amount}</div>
+                        <div style={{ fontSize: 15, color: line.amount > 0 ? "#16A34A" : t.textHint, fontWeight: 750, marginTop: 3, fontFamily: "'DM Mono',monospace" }}>{node.amount}</div>
+                        {line.clawed_back_amount > 0 && <div style={{ fontSize: 9, color: "#DC2626", marginTop: 3 }}>환수 -{usd(line.clawed_back_amount)}</div>}
                       </div>
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
 
               <div style={{ width: 32, height: 56, display: "flex", flexDirection: "column", alignItems: "center", color: t.accent }}>
                 <ArrowUp size={18} strokeWidth={2.3} />
@@ -1270,21 +1398,24 @@ export function AffiliateCommissionFlowPage({ dark }: { dark: boolean }) {
                     <div style={{ width: 38, height: 38, borderRadius: 10, background: t.accentBg, color: t.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}><CircleDollarSign size={19} /></div>
                     <div>
                       <div style={{ fontSize: 9, color: t.accent, fontWeight: 700, marginBottom: 4 }}>BASE · 구매자 / 주문</div>
-                      <div style={{ fontSize: 13, color: t.text, fontWeight: 700 }}>Grace Yoon <span style={{ color: t.textHint, fontSize: 10, fontFamily: "'DM Mono',monospace", fontWeight: 500 }}>UID-20841</span></div>
+                      <div style={{ fontSize: 13, color: t.text, fontWeight: 700 }}>{displayName(flow.buyer)} <span style={{ color: t.textHint, fontSize: 10, fontFamily: "'DM Mono',monospace", fontWeight: 500 }}>{uidLabel(flow.buyer?.uid)}</span></div>
                     </div>
                   </div>
                   <div>
                     <div style={{ fontSize: 9, color: t.textHint }}>챌린지 티켓 주문 번호</div>
                     <div style={{ fontSize: 12, color: t.text, fontWeight: 650, fontFamily: "'DM Mono',monospace", marginTop: 4 }}>{searchedOrder}</div>
+                    {flow.product_name && <div style={{ fontSize: 10, color: t.textHint, marginTop: 3 }}>{flow.product_name}</div>}
                   </div>
                   <div style={{ textAlign: "right" }}>
                     <div style={{ fontSize: 9, color: t.textHint }}>결제 금액</div>
-                    <div style={{ fontSize: 16, color: t.text, fontWeight: 750, fontFamily: "'DM Mono',monospace", marginTop: 2 }}>$3,000.00</div>
-                    <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, padding: "3px 7px", borderRadius: 6, border: "1px solid rgba(22,163,74,.2)", background: "rgba(22,163,74,.08)", color: "#16A34A", fontSize: 9, fontWeight: 650 }}><CheckCircle2 size={10} /> 결제완료</div>
+                    <div style={{ fontSize: 16, color: t.text, fontWeight: 750, fontFamily: "'DM Mono',monospace", marginTop: 2 }}>{usd(flow.base_amount)}</div>
+                    {flow.refunded_base > 0
+                      ? <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, padding: "3px 7px", borderRadius: 6, border: "1px solid rgba(220,38,38,.2)", background: "rgba(220,38,38,.08)", color: "#DC2626", fontSize: 9, fontWeight: 650 }}>{flow.refunded_base >= flow.base_amount ? "전액 환불" : `부분 환불 ${usd(flow.refunded_base)}`}</div>
+                      : <div style={{ display: "inline-flex", alignItems: "center", gap: 4, marginTop: 5, padding: "3px 7px", borderRadius: 6, border: "1px solid rgba(22,163,74,.2)", background: "rgba(22,163,74,.08)", color: "#16A34A", fontSize: 9, fontWeight: 650 }}><CheckCircle2 size={10} /> 결제완료</div>}
                   </div>
                 </div>
               </div>
-              <div style={{ marginTop: 13, color: t.textHint, fontSize: 9 }}>커미션 생성 기준 · 결제 완료 2026-11-18 16:42 (GMT+9)</div>
+              <div style={{ marginTop: 13, color: t.textHint, fontSize: 9 }}>커미션 생성 기준 · 결제 완료 {formatKst(flow.created_at)} (GMT+9) · 결제 시점의 조직·레벨·비율 기준</div>
             </div>
           </div>
         </div>
@@ -1299,7 +1430,28 @@ export function AffiliateCommissionFlowPage({ dark }: { dark: boolean }) {
   );
 }
 
-export function AffiliateCommissionDetailPage({ dark }: { dark: boolean }) {
+const COMMISSION_STATUS: Record<CommissionItem["status"], string> = { CREDITED: "Completed", PARTIAL_CLAWBACK: "Partial Refund", CLAWED_BACK: "Refunded" };
+
+function toCommissionRow(item: CommissionItem) {
+  return {
+    date: `${formatKst(item.created_at)} GMT+9`,
+    member: displayName(item.ib),
+    email: item.ib?.email ?? "",
+    ibNumber: uidLabel(item.ib?.uid),
+    userType: `${item.depth}차 상위 IB - Level ${item.level ?? "-"}`,
+    accountType: item.product_name ?? "-",
+    orderId: item.order_id,
+    buyer: `${displayName(item.buyer)} · ${uidLabel(item.buyer?.uid)}`,
+    amount: usd(item.base_amount),
+    rate: pct(item.applied_rate),
+    earned: `+${usd(item.amount)}`,
+    clawedBack: item.clawed_back_amount,
+    net: item.net_amount,
+    status: COMMISSION_STATUS[item.status],
+  };
+}
+
+export function AffiliateCommissionDetailPage({ dark, onToast }: { dark: boolean; onToast: ToastHandler }) {
   const t = tokens(dark);
   const PAGE_SIZE = 10;
   const [query, setQuery] = useState("");
@@ -1307,19 +1459,33 @@ export function AffiliateCommissionDetailPage({ dark }: { dark: boolean }) {
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const filteredRows = COMMISSION_DETAIL_ROWS.filter(row => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const matchesMember = !normalizedQuery || `${row.member} ${row.email} ${row.ibNumber}`.toLowerCase().includes(normalizedQuery);
-    const rowDate = row.date.slice(0, 10);
-    const matchesStart = !startDate || rowDate >= startDate.slice(0, 10);
-    const matchesEnd = !endDate || rowDate <= endDate.slice(0, 10);
-    return matchesMember && matchesStart && matchesEnd;
-  });
-  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE));
+  const [pagedRows, setPagedRows] = useState<ReturnType<typeof toCommissionRow>[]>([]);
+  const [total, setTotal] = useState(0);
+  const [summary, setSummary] = useState({ paid: 0, clawed_back: 0, net: 0 });
+  // 날짜 필터는 KST 날짜 단위로 서버에 보낸다 (시각은 화면 입력 형식 유지용).
+  const filterParams = useCallback(() => ({
+    keyword: query.trim() || undefined,
+    start_date: startDate ? startDate.slice(0, 10) : undefined,
+    end_date: endDate ? endDate.slice(0, 10) : undefined,
+  }), [query, startDate, endDate]);
+  useEffect(() => {
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      listCommissions({ ...filterParams(), page: currentPage, size: PAGE_SIZE })
+        .then(res => {
+          if (!alive) return;
+          setPagedRows(res.items.map(toCommissionRow));
+          setTotal(res.total);
+          setSummary(res.summary);
+        })
+        .catch(error => { if (alive) onToast(apiErrorMessage(error, "커미션 내역을 불러오지 못했습니다."), "warning"); });
+    }, query ? 250 : 0);
+    return () => { alive = false; window.clearTimeout(timer); };
+  }, [filterParams, currentPage, query, onToast]);
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
-  const pagedRows = filteredRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-  const firstRecord = filteredRows.length ? (safePage - 1) * PAGE_SIZE + 1 : 0;
-  const lastRecord = Math.min(safePage * PAGE_SIZE, filteredRows.length);
+  const firstRecord = total ? (safePage - 1) * PAGE_SIZE + 1 : 0;
+  const lastRecord = Math.min(safePage * PAGE_SIZE, total);
 
   function resetFilters() {
     setQuery("");
@@ -1328,9 +1494,20 @@ export function AffiliateCommissionDetailPage({ dark }: { dark: boolean }) {
     setCurrentPage(1);
   }
 
-  function exportExcelRecords() {
-    const headers = ["DATE", "MEMBER", "UID", "USER TYPE", "ACCOUNT TYPE", "AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION", "STATUS"];
-    const values = filteredRows.map(row => [row.date, `${row.member} (${row.email})`, row.ibNumber, row.userType, row.accountType, row.amount, row.rate, row.earned, row.status]);
+  async function exportExcelRecords() {
+    const filteredRows: ReturnType<typeof toCommissionRow>[] = [];
+    try {
+      for (let page = 1; ; page += 1) {
+        const res = await listCommissions({ ...filterParams(), page, size: 200 });
+        filteredRows.push(...res.items.map(toCommissionRow));
+        if (filteredRows.length >= res.total || res.items.length === 0) break;
+      }
+    } catch (error) {
+      onToast(apiErrorMessage(error, "엑셀 내보내기에 실패했습니다."), "warning");
+      return;
+    }
+    const headers = ["DATE", "IB", "UID", "POSITION", "PRODUCT", "ORDER", "BUYER", "AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION", "CLAWED BACK", "NET", "STATUS"];
+    const values = filteredRows.map(row => [row.date, `${row.member} (${row.email})`, row.ibNumber, row.userType, row.accountType, row.orderId, row.buyer, row.amount, row.rate, row.earned, usd(row.clawedBack), usd(row.net), row.status]);
     const body = [headers, ...values].map(row => row.join("\t")).join("\n");
     const blob = new Blob([body], { type: "application/vnd.ms-excel;charset=utf-8" });
     const link = document.createElement("a");
@@ -1364,10 +1541,10 @@ export function AffiliateCommissionDetailPage({ dark }: { dark: boolean }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) minmax(220px, .8fr) minmax(220px, .8fr) auto", gap: 14, alignItems: "end" }}>
           <label style={{ display: "flex", flexDirection: "column", gap: 6, color: "#4A4A58", fontSize: 10 }}>
-            Member / Email / UID
+            IB / 구매자 / Email / UID / 주문번호
             <div style={{ position: "relative" }}>
               <Search size={14} color="#94A3B8" style={{ position: "absolute", left: 12, top: 13, pointerEvents: "none" }} />
-              <input value={query} onChange={event => { setQuery(event.target.value); setCurrentPage(1); }} placeholder="Search by Member, Email, or UID..." style={{ ...inputStyle, paddingLeft: 34 }} />
+              <input value={query} onChange={event => { setQuery(event.target.value); setCurrentPage(1); }} placeholder="Search by IB, Buyer, Email, UID or Order..." style={{ ...inputStyle, paddingLeft: 34 }} />
             </div>
           </label>
           <label style={{ display: "flex", flexDirection: "column", gap: 6, color: "#4A4A58", fontSize: 10 }}>
@@ -1386,7 +1563,12 @@ export function AffiliateCommissionDetailPage({ dark }: { dark: boolean }) {
         <div style={{ padding: "18px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, borderBottom: "1px solid #E2E8F0" }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 700, color: "#1A1A1A" }}>Detailed Performance Workspace</div>
-            <div style={{ fontSize: 11, color: "#64748B", marginTop: 5 }}>Search, filter, and export transaction-level affiliate commission records.</div>
+            <div style={{ fontSize: 11, color: "#64748B", marginTop: 5 }}>
+              Search, filter, and export transaction-level affiliate commission records.
+              <span style={{ marginLeft: 8, color: "#16A34A", fontWeight: 650 }}>지급 {usd(summary.paid)}</span>
+              <span style={{ marginLeft: 8, color: "#DC2626", fontWeight: 650 }}>환수 -{usd(summary.clawed_back)}</span>
+              <span style={{ marginLeft: 8, color: "#1A1A1A", fontWeight: 700 }}>순액 {usd(summary.net)}</span>
+            </div>
           </div>
           <button onClick={exportExcelRecords} style={{ height: 34, padding: "0 12px", borderRadius: 8, border: "1px solid #E2E8F0", background: "#FFFFFF", color: "#334155", display: "flex", alignItems: "center", gap: 6, fontSize: 11, fontWeight: 600, cursor: "pointer" }}><FileSpreadsheet size={13} /> Excel</button>
         </div>
@@ -1404,25 +1586,32 @@ export function AffiliateCommissionDetailPage({ dark }: { dark: boolean }) {
               <col style={{ width: 140 }} />
               <col style={{ width: 110 }} />
             </colgroup>
-            <thead><tr>{["DATE", "MEMBER", "UID", "USER TYPE", "ACCOUNT TYPE", "AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION", "STATUS"].map(header => <th key={header} style={{ ...thStyle, textAlign: ["AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION"].includes(header) ? "right" : "left" }}>{header}</th>)}</tr></thead>
+            <thead><tr>{["DATE", "IB", "UID", "POSITION", "ORDER / BUYER", "AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION", "STATUS"].map(header => <th key={header} style={{ ...thStyle, textAlign: ["AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION"].includes(header) ? "right" : "left" }}>{header}</th>)}</tr></thead>
             <tbody>
               {pagedRows.map((row, index) => {
                 const statusStyle = row.status === "Completed"
                   ? { color: "#16A34A", background: "rgba(22,163,74,.08)", border: "rgba(22,163,74,.2)" }
-                  : row.status === "Pending"
+                  : row.status === "Partial Refund"
                     ? { color: "#D97706", background: "rgba(217,119,6,.08)", border: "rgba(217,119,6,.2)" }
                     : { color: "#DC2626", background: "rgba(220,38,38,.08)", border: "rgba(220,38,38,.2)" };
-                const isIb = row.userType.startsWith("Downline");
+                const isIb = true;
                 return (
                   <tr key={`${row.date}-${index}`} onMouseEnter={event => { event.currentTarget.style.background = "#F8FAFC"; }} onMouseLeave={event => { event.currentTarget.style.background = "#FFFFFF"; }}>
                     <td style={{ ...tdStyle, fontFamily: "'DM Mono',monospace", color: "#475569", whiteSpace: "nowrap" }}>{row.date}</td>
                     <td style={tdStyle}><div style={{ display: "flex", alignItems: "baseline", gap: 6, whiteSpace: "nowrap" }}><span style={{ color: "#1A1A1A", fontWeight: 650 }}>{row.member}</span><span style={{ color: "#94A3B8", fontSize: 10 }}>({row.email})</span></div></td>
                     <td style={{ ...tdStyle, color: "#475569", fontFamily: "'DM Mono',monospace", fontWeight: 650, whiteSpace: "nowrap" }}>{row.ibNumber}</td>
                     <td style={tdStyle}><span style={{ display: "inline-flex", padding: "4px 8px", borderRadius: 7, border: `1px solid ${isIb ? "rgba(37,99,235,.18)" : "#E2E8F0"}`, background: isIb ? "rgba(37,99,235,.07)" : "#F8FAFC", color: isIb ? "#2563EB" : "#475569", fontSize: 10, whiteSpace: "nowrap" }}>{row.userType}</span></td>
-                    <td style={{ ...tdStyle, color: "#1A1A1A", fontWeight: 550 }}>{row.accountType}</td>
+                    <td style={{ ...tdStyle, color: "#1A1A1A", fontWeight: 550 }}>
+                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.accountType}</div>
+                      <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 3, fontFamily: "'DM Mono',monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.orderId}</div>
+                      <div style={{ fontSize: 9, color: "#64748B", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.buyer}</div>
+                    </td>
                     <td style={{ ...tdStyle, color: "#1A1A1A", fontWeight: 650, fontFamily: "'DM Mono',monospace", textAlign: "right" }}>{row.amount}</td>
                     <td style={{ ...tdStyle, color: "#334155", fontWeight: 650, textAlign: "right" }}>{row.rate}</td>
-                    <td style={{ ...tdStyle, color: "#16A34A", fontWeight: 750, fontFamily: "'DM Mono',monospace", textAlign: "right" }}>{row.earned}</td>
+                    <td style={{ ...tdStyle, color: "#16A34A", fontWeight: 750, fontFamily: "'DM Mono',monospace", textAlign: "right" }}>
+                      {row.earned}
+                      {row.clawedBack > 0 && <div style={{ fontSize: 9, color: "#DC2626", marginTop: 3 }}>환수 -{usd(row.clawedBack)}</div>}
+                    </td>
                     <td style={tdStyle}><span style={{ display: "inline-flex", padding: "4px 8px", borderRadius: 7, border: `1px solid ${statusStyle.border}`, background: statusStyle.background, color: statusStyle.color, fontSize: 10, fontWeight: 650 }}>{row.status}</span></td>
                   </tr>
                 );
@@ -1433,7 +1622,7 @@ export function AffiliateCommissionDetailPage({ dark }: { dark: boolean }) {
         </div>
 
         <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #E2E8F0", background: "#FFFFFF" }}>
-          <span style={{ fontSize: 11, color: "#64748B" }}>Showing {firstRecord} - {lastRecord} of {filteredRows.length} records</span>
+          <span style={{ fontSize: 11, color: "#64748B" }}>Showing {firstRecord} - {lastRecord} of {total} records</span>
           <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
             <button onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safePage === 1} style={{ height: 32, padding: "0 12px", borderRadius: 7, border: "1px solid #E2E8F0", background: "#FFFFFF", color: "#475569", fontSize: 11, cursor: safePage === 1 ? "not-allowed" : "pointer", opacity: safePage === 1 ? .4 : 1 }}>Previous</button>
             {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => {

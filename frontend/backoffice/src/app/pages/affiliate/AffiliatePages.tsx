@@ -1,5 +1,5 @@
-// 재무/정산 > 제휴 프로그램 화면들 (Figma Make 백오피스 1124 디자인 그대로, 아직 API 미연결 예시 데이터).
-import { useState } from "react";
+// 재무/정산 > 제휴 프로그램 화면들 (Figma Make 백오피스 1124 디자인, Core /admin/affiliate API 연결).
+import { useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AffiliateCommissionDetailPage as CommissionDetail,
@@ -17,9 +17,11 @@ type ToastHandler = (message: string, type?: "success" | "warning") => void;
 function WithToast({ render }: { render: (dark: boolean, onToast: ToastHandler) => ReactNode }) {
   const { dark } = useAppShell();
   const [toast, setToast] = useState<ToastState>(null);
+  // 화면이 onToast를 effect 의존성으로 써도 다시 불리지 않도록 고정한다.
+  const onToast = useCallback<ToastHandler>((message, type = "success") => setToast({ message, type }), []);
   return (
     <>
-      {render(dark, (message, type = "success") => setToast({ message, type }))}
+      {render(dark, onToast)}
       {toast && <Toast message={toast.message} type={toast.type} dark={dark} onDone={() => setToast(null)} />}
     </>
   );
@@ -34,13 +36,11 @@ export function AffiliateNetworkPage() {
 }
 
 export function AffiliateCommissionDetailPage() {
-  const { dark } = useAppShell();
-  return <CommissionDetail dark={dark} />;
+  return <WithToast render={(dark, onToast) => <CommissionDetail dark={dark} onToast={onToast} />} />;
 }
 
 export function AffiliateCommissionFlowPage() {
-  const { dark } = useAppShell();
-  return <CommissionFlow dark={dark} />;
+  return <WithToast render={(dark, onToast) => <CommissionFlow dark={dark} onToast={onToast} />} />;
 }
 
 export function AffiliateCommissionRatePage() {
