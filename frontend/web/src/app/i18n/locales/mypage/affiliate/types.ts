@@ -50,6 +50,10 @@ export interface AffiliateTranslations {
   statusCompleted: string;
   statusPending: string;
   statusRefunded: string;
+  statusPartialRefund: string;
+  loading: string;
+  notIbPartner: string;
+  loadFailed: string;
   showingRecords: string;
   previous: string;
   next: string;

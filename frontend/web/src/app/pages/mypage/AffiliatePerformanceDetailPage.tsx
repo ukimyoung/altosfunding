@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   Calendar,
@@ -20,41 +20,58 @@ import {
   TableHeader,
   TableRow,
 } from '@/app/components/ui/table';
+import type { AffiliateCommission } from '@/api/affiliate';
+import { useAffiliateCommissionsQuery } from '@/app/queries/affiliate';
 
-type CommissionStatus = 'completed' | 'pending' | 'refunded';
-type SourceType = 'direct' | 'level2' | 'level3';
+type CommissionStatus = 'completed' | 'partial' | 'refunded';
 
 interface CommissionRecord {
   id: string;
   timestamp: string;
   memberName: string;
-  sourceType: SourceType;
+  memberUid: string;
+  /** 구매자에서 나까지 단계 (1 = 직속 고객) */
+  depth: number;
   transactionAmount: number;
   commissionRate: number;
   earnedCommission: number;
   status: CommissionStatus;
 }
 
-const commissionRecords: CommissionRecord[] = [
-  { id: 'COM-260118', timestamp: '2026-11-18 16:42:05', memberName: 'Alex M.', sourceType: 'level3', transactionAmount: 192, commissionRate: 5, earnedCommission: 9.6, status: 'completed' },
-  { id: 'COM-260117', timestamp: '2026-11-17 14:32:10', memberName: 'Min*** K.', sourceType: 'level2', transactionAmount: 113, commissionRate: 7, earnedCommission: 7.91, status: 'completed' },
-  { id: 'COM-260116', timestamp: '2026-11-16 11:08:44', memberName: 'TRA***92', sourceType: 'direct', transactionAmount: 79, commissionRate: 10, earnedCommission: 7.9, status: 'pending' },
-  { id: 'COM-260115', timestamp: '2026-11-15 09:55:21', memberName: 'Soo*** P.', sourceType: 'level2', transactionAmount: 192, commissionRate: 7, earnedCommission: 13.44, status: 'completed' },
-  { id: 'COM-260114', timestamp: '2026-11-14 18:20:37', memberName: 'ZEN***08', sourceType: 'direct', transactionAmount: 48, commissionRate: 10, earnedCommission: 4.8, status: 'completed' },
-  { id: 'COM-260113', timestamp: '2026-11-13 13:47:52', memberName: 'FXP***11', sourceType: 'direct', transactionAmount: 113, commissionRate: 10, earnedCommission: 11.3, status: 'refunded' },
-  { id: 'COM-260112', timestamp: '2026-11-12 10:16:08', memberName: 'Alex M.', sourceType: 'level3', transactionAmount: 79, commissionRate: 5, earnedCommission: 3.95, status: 'completed' },
-  { id: 'COM-260111', timestamp: '2026-11-11 21:04:29', memberName: 'PRO***24', sourceType: 'direct', transactionAmount: 192, commissionRate: 10, earnedCommission: 19.2, status: 'completed' },
-  { id: 'COM-260110', timestamp: '2026-11-10 17:39:14', memberName: 'Min*** K.', sourceType: 'level2', transactionAmount: 79, commissionRate: 7, earnedCommission: 5.53, status: 'pending' },
-  { id: 'COM-260109', timestamp: '2026-11-09 08:25:46', memberName: 'ALP***77', sourceType: 'direct', transactionAmount: 48, commissionRate: 10, earnedCommission: 4.8, status: 'completed' },
-  { id: 'COM-260108', timestamp: '2026-11-08 14:32:10', memberName: 'Alex M.', sourceType: 'level3', transactionAmount: 113, commissionRate: 5, earnedCommission: 5.65, status: 'completed' },
-  { id: 'COM-260107', timestamp: '2026-11-07 12:11:33', memberName: 'Soo*** P.', sourceType: 'level2', transactionAmount: 48, commissionRate: 7, earnedCommission: 3.36, status: 'completed' },
-  { id: 'COM-260106', timestamp: '2026-11-06 16:58:02', memberName: 'TRA***92', sourceType: 'direct', transactionAmount: 192, commissionRate: 10, earnedCommission: 19.2, status: 'pending' },
-  { id: 'COM-260105', timestamp: '2026-11-05 10:43:19', memberName: 'Min*** K.', sourceType: 'level2', transactionAmount: 192, commissionRate: 7, earnedCommission: 13.44, status: 'completed' },
-  { id: 'COM-260104', timestamp: '2026-10-29 15:27:40', memberName: 'ZEN***08', sourceType: 'direct', transactionAmount: 79, commissionRate: 10, earnedCommission: 7.9, status: 'completed' },
-  { id: 'COM-260103', timestamp: '2026-10-24 09:14:55', memberName: 'Alex M.', sourceType: 'level3', transactionAmount: 48, commissionRate: 5, earnedCommission: 2.4, status: 'refunded' },
-  { id: 'COM-260102', timestamp: '2026-10-20 19:36:11', memberName: 'PRO***24', sourceType: 'direct', transactionAmount: 113, commissionRate: 10, earnedCommission: 11.3, status: 'completed' },
-  { id: 'COM-260101', timestamp: '2026-10-19 07:52:28', memberName: 'Soo*** P.', sourceType: 'level2', transactionAmount: 79, commissionRate: 7, earnedCommission: 5.53, status: 'completed' },
-];
+const STATUS_FROM_API: Record<AffiliateCommission['status'], CommissionStatus> = {
+  COMPLETED: 'completed',
+  PARTIAL_REFUND: 'partial',
+  REFUNDED: 'refunded',
+};
+
+const toRecord = (item: AffiliateCommission): CommissionRecord => ({
+  id: String(item.id),
+  timestamp: item.created_at,
+  memberName: item.buyer?.name ?? '-',
+  memberUid: item.buyer ? `UID-${item.buyer.uid}` : '-',
+  depth: item.depth,
+  transactionAmount: item.base_amount,
+  commissionRate: item.applied_rate,
+  earnedCommission: item.net_amount,
+  status: STATUS_FROM_API[item.status],
+});
+
+/** ISO 시각 → 'YYYY-MM-DD HH:mm' (KST) */
+const toKst = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get('minute')}`;
+};
 
 export function AffiliatePerformanceDetailPage() {
   const { locale, T } = useLocale();
@@ -75,55 +92,47 @@ export function AffiliatePerformanceDetailPage() {
     [locale],
   );
 
-  const getSourceTypeLabel = (type: SourceType) => {
-    if (type === 'direct') return A.directClient;
-    if (type === 'level2') return `${A.downlineIb} - ${A.level} 2`;
-    return `${A.downlineIb} - ${A.level} 3`;
+  const getSourceTypeLabel = (record: CommissionRecord) => {
+    if (record.depth <= 1) return A.directClient;
+    return A.downlineIb;
   };
 
-  const getIbNumber = (record: CommissionRecord) => {
-    if (record.sourceType === 'direct') return '-';
-    const ibNumbers: Record<string, string> = {
-      'Min*** K.': 'IB-240002',
-      'Alex M.': 'IB-240003',
-      'Soo*** P.': 'IB-240004',
-    };
-    return ibNumbers[record.memberName] ?? '-';
-  };
+  const getIbNumber = (record: CommissionRecord) => record.memberUid;
 
   const getStatusLabel = (status: CommissionStatus) => {
     if (status === 'completed') return A.statusCompleted;
-    if (status === 'pending') return A.statusPending;
+    if (status === 'partial') return A.statusPartialRefund;
     return A.statusRefunded;
   };
 
-  const formatTimestamp = (timestamp: string) => `${timestamp.slice(0, 16)} GMT+9`;
+  const formatTimestamp = (timestamp: string) => `${toKst(timestamp)} GMT+9`;
 
-  const filteredRecords = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
-    return commissionRecords.filter((record) => {
-      const recordDate = new Date(record.timestamp.replace(' ', 'T'));
-      const matchesDate =
-        (!customStartDate || recordDate >= new Date(`${customStartDate}T00:00:00`)) &&
-        (!customEndDate || recordDate <= new Date(`${customEndDate}T23:59:59`));
-      const matchesSearch =
-        !normalizedQuery ||
-        record.memberName.toLowerCase().includes(normalizedQuery) ||
-        getIbNumber(record).toLowerCase().includes(normalizedQuery);
+  // 검색어는 입력이 멈춘 뒤 서버에 보낸다.
+  const [keyword, setKeyword] = useState('');
+  useEffect(() => {
+    const timer = window.setTimeout(() => setKeyword(searchQuery.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
-      return matchesDate && matchesSearch;
-    });
-  }, [customEndDate, customStartDate, searchQuery]);
-
-  const pageCount = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
-  const safeCurrentPage = Math.min(currentPage, pageCount);
-  const paginatedRecords = filteredRecords.slice(
-    (safeCurrentPage - 1) * pageSize,
-    safeCurrentPage * pageSize,
+  const commissionsQuery = useAffiliateCommissionsQuery({
+    keyword: keyword || undefined,
+    start_date: customStartDate || undefined,
+    end_date: customEndDate || undefined,
+    page: currentPage,
+    size: pageSize,
+  });
+  const paginatedRecords = useMemo(
+    () => (commissionsQuery.data?.items ?? []).map(toRecord),
+    [commissionsQuery.data],
   );
-  const firstVisibleRecord =
-    filteredRecords.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1;
-  const lastVisibleRecord = Math.min(safeCurrentPage * pageSize, filteredRecords.length);
+  const totalRecords = commissionsQuery.data?.total ?? 0;
+
+  const pageCount = Math.max(1, Math.ceil(totalRecords / pageSize));
+  const safeCurrentPage = Math.min(currentPage, pageCount);
+  const firstVisibleRecord = totalRecords === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1;
+  const lastVisibleRecord = Math.min(safeCurrentPage * pageSize, totalRecords);
+  const notIb =
+    (commissionsQuery.error as { response?: { status?: number } } | null)?.response?.status === 403;
 
   const getPageNumbers = (): Array<number | 'ellipsis'> => {
     if (pageCount <= 5) {
@@ -160,7 +169,7 @@ export function AffiliatePerformanceDetailPage() {
     if (status === 'completed') {
       return 'border-[#00FF94]/20 bg-[#00FF94]/10 text-[#00FF94]';
     }
-    if (status === 'pending') {
+    if (status === 'partial') {
       return 'border-[#FFB800]/20 bg-[#FFB800]/10 text-[#FFB800]';
     }
     return 'border-red-400/20 bg-red-400/10 text-red-400';
@@ -292,17 +301,17 @@ export function AffiliatePerformanceDetailPage() {
         </div>
 
         <div className="hidden max-w-full overflow-hidden md:block">
-          <Table className="min-w-[1240px]">
+          <Table className="w-full">
             <TableHeader className="bg-[#14141e]">
             <TableRow className="border-white/[0.07] hover:bg-[#14141e]">
-              <TableHead className="px-5 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colDateTime}</TableHead>
-              <TableHead className="px-5 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colMemberSource}</TableHead>
-              <TableHead className="px-5 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.ibNumber}</TableHead>
-              <TableHead className="px-5 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colUserType}</TableHead>
-              <TableHead className="px-5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colTransactionAmount}</TableHead>
-              <TableHead className="px-5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colCommissionRate}</TableHead>
-              <TableHead className="px-5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colEarnedCommission}</TableHead>
-              <TableHead className="px-5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colStatus}</TableHead>
+              <TableHead className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colDateTime}</TableHead>
+              <TableHead className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colMemberSource}</TableHead>
+              <TableHead className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.ibNumber}</TableHead>
+              <TableHead className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colUserType}</TableHead>
+              <TableHead className="px-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colTransactionAmount}</TableHead>
+              <TableHead className="px-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colCommissionRate}</TableHead>
+              <TableHead className="px-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colEarnedCommission}</TableHead>
+              <TableHead className="px-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colStatus}</TableHead>
             </TableRow>
             </TableHeader>
             <TableBody>
@@ -314,37 +323,37 @@ export function AffiliatePerformanceDetailPage() {
                 transition={{ duration: 0.2, delay: index * 0.025 }}
                 className="border-b border-white/[0.06] transition-colors hover:bg-white/[0.025]"
               >
-                <TableCell className="px-5 py-4 font-mono text-xs text-gray-400">
+                <TableCell className="px-3 py-4 whitespace-nowrap font-mono text-xs text-gray-400">
                   {formatTimestamp(record.timestamp)}
                 </TableCell>
-                <TableCell className="px-5 py-4">
+                <TableCell className="px-3 py-4">
                   <span className="text-sm font-medium text-white">{record.memberName}</span>
                 </TableCell>
-                <TableCell className="px-5 py-4 font-mono text-xs font-medium text-gray-400">
+                <TableCell className="px-3 py-4 font-mono text-xs font-medium text-gray-400">
                   {getIbNumber(record)}
                 </TableCell>
-                <TableCell className="px-5 py-4">
+                <TableCell className="px-3 py-4">
                   <Badge
                     variant="outline"
                     className={
-                      record.sourceType === 'direct'
+                      record.depth <= 1
                         ? 'border-white/10 bg-white/5 text-gray-300'
                         : 'border-[#0052FF]/20 bg-[#0052FF]/10 text-[#8CB6FF]'
                     }
                   >
-                    {getSourceTypeLabel(record.sourceType)}
+                    {getSourceTypeLabel(record)}
                   </Badge>
                 </TableCell>
-                <TableCell className="px-5 py-4 text-right text-sm font-medium text-white">
+                <TableCell className="px-3 py-4 text-right text-sm font-medium text-white">
                   {currencyFormatter.format(record.transactionAmount)}
                 </TableCell>
-                <TableCell className="px-5 py-4 text-right text-sm text-gray-300">
+                <TableCell className="px-3 py-4 text-right text-sm text-gray-300">
                   {record.commissionRate}%
                 </TableCell>
-                <TableCell className="px-5 py-4 text-right text-sm font-semibold text-[#00FF94]">
+                <TableCell className="px-3 py-4 text-right text-sm font-semibold text-[#00FF94]">
                   +{currencyFormatter.format(record.earnedCommission)}
                 </TableCell>
-                <TableCell className="px-5 py-4 text-center">
+                <TableCell className="px-3 py-4 text-center">
                   <Badge variant="outline" className={statusClass(record.status)}>
                     {getStatusLabel(record.status)}
                   </Badge>
@@ -385,12 +394,12 @@ export function AffiliatePerformanceDetailPage() {
                 <Badge
                   variant="outline"
                   className={
-                    record.sourceType === 'direct'
+                    record.depth <= 1
                       ? 'max-w-full border-white/10 bg-white/5 text-gray-300'
                       : 'max-w-full border-[#0052FF]/20 bg-[#0052FF]/10 text-[#8CB6FF]'
                   }
                 >
-                  <span className="truncate">{getSourceTypeLabel(record.sourceType)}</span>
+                  <span className="truncate">{getSourceTypeLabel(record)}</span>
                 </Badge>
               </div>
 
@@ -425,8 +434,12 @@ export function AffiliatePerformanceDetailPage() {
         {paginatedRecords.length === 0 && (
           <div className="flex min-h-56 flex-col items-center justify-center px-6 py-12 text-center">
             <Search className="mb-4 size-8 text-gray-600" />
-            <div className="text-sm font-medium text-white">{A.noRecords}</div>
-            <div className="mt-1 text-xs text-gray-500">{A.noRecordsHint}</div>
+            <div className="text-sm font-medium text-white">
+              {commissionsQuery.isLoading ? A.loading : notIb ? A.notIbPartner : commissionsQuery.isError ? A.loadFailed : A.noRecords}
+            </div>
+            {!commissionsQuery.isLoading && !commissionsQuery.isError && (
+              <div className="mt-1 text-xs text-gray-500">{A.noRecordsHint}</div>
+            )}
           </div>
         )}
 
@@ -435,7 +448,7 @@ export function AffiliatePerformanceDetailPage() {
             {A.showingRecords
               .replace('{from}', String(firstVisibleRecord))
               .replace('{to}', String(lastVisibleRecord))
-              .replace('{total}', String(filteredRecords.length))}
+              .replace('{total}', String(totalRecords))}
           </div>
           <div className="flex w-full min-w-0 flex-wrap items-center gap-2 md:w-auto md:justify-end">
             <Button

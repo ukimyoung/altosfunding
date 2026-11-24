@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import {
   ChevronDown,
@@ -16,6 +16,8 @@ import { Badge } from '@/app/components/ui/badge';
 import { Button } from '@/app/components/ui/button';
 import { Card, CardContent } from '@/app/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/app/components/ui/collapsible';
+import type { AffiliateNetworkNode } from '@/api/affiliate';
+import { useAffiliateMeQuery, useAffiliateNetworkQuery } from '@/app/queries/affiliate';
 
 type AffiliateStatus = 'active' | 'pending' | 'inactive';
 type AffiliateType = 'self' | 'ib' | 'client';
@@ -32,114 +34,58 @@ interface AffiliateNode {
   children?: AffiliateNode[];
 }
 
-const affiliateNetwork: AffiliateNode = {
-  id: 'ib-root',
-  name: 'John D.',
-  email: 'joh**n@gmail.com',
-  ibNumber: 'IB-240001',
-  type: 'self',
-  level: 1,
-  status: 'active',
-  commission: 18420.5,
-  children: [
-    {
-      id: 'ib-1',
-      name: 'Min*** K.',
-      email: 'min***k@naver.com',
-      ibNumber: 'IB-240002',
-      type: 'ib',
-      level: 2,
-      status: 'active',
-      commission: 4284,
-      children: [
-        {
-          id: 'ib-2',
-          name: 'Alex***',
-          email: 'ale***x@gmail.com',
-          ibNumber: 'IB-240003',
-          type: 'ib',
-          level: 3,
-          status: 'active',
-          commission: 1710,
-          children: [
-            {
-              id: 'client-3',
-              name: 'TRA***92',
-              email: 'tra***92@outlook.com',
-              ibNumber: '-',
-              type: 'client',
-              level: 3,
-              status: 'active',
-              commission: 572,
-            },
-            {
-              id: 'client-4',
-              name: 'FXP***11',
-              email: 'fxp***11@gmail.com',
-              ibNumber: '-',
-              type: 'client',
-              level: 3,
-              status: 'pending',
-              commission: 186,
-            },
-          ],
-        },
-        {
-          id: 'client-1',
-          name: 'ZEN***08',
-          email: 'zen***08@proton.me',
-          ibNumber: '-',
-          type: 'client',
-          level: 2,
-          status: 'active',
-          commission: 836,
-        },
-      ],
-    },
-    {
-      id: 'ib-3',
-      name: 'Soo*** P.',
-      email: 'soo***p@gmail.com',
-      ibNumber: 'IB-240004',
-      type: 'ib',
-      level: 2,
-      status: 'active',
-      commission: 3014,
-      children: [
-        {
-          id: 'client-2',
-          name: 'ALP***77',
-          email: 'alp***77@outlook.com',
-          ibNumber: '-',
-          type: 'client',
-          level: 2,
-          status: 'inactive',
-          commission: 291,
-        },
-      ],
-    },
-    {
-      id: 'client-5',
-      name: 'PRO***24',
-      email: 'pro***24@gmail.com',
-      ibNumber: '-',
-      type: 'client',
-      level: 1,
-      status: 'active',
-      commission: 2156,
-    },
-  ],
-};
+const uidLabel = (uid: string) => `UID-${uid}`;
 
-const expandableNodeIds = ['ib-root', 'ib-1', 'ib-2', 'ib-3'];
+const toAffiliateNode = (node: AffiliateNetworkNode, isRoot = false): AffiliateNode => ({
+  id: node.uid,
+  name: node.name,
+  email: node.email,
+  ibNumber: uidLabel(node.uid),
+  type: isRoot ? 'self' : node.is_ib ? 'ib' : 'client',
+  level: node.level ?? 0,
+  status:
+    node.member_status === 'ACTIVE' && (node.ib_status === null || node.ib_status === 'ACTIVE')
+      ? 'active'
+      : 'inactive',
+  commission: node.commission,
+  children: node.children.map((child) => toAffiliateNode(child)),
+});
+
+const collectExpandableIds = (node: AffiliateNode): string[] =>
+  node.children?.length
+    ? [node.id, ...node.children.flatMap((child) => collectExpandableIds(child))]
+    : [];
+
 const depthPadding = ['pl-4', 'pl-10', 'pl-16', 'pl-24', 'pl-28'];
 
 export function AffiliatePerformancePage() {
   const { locale, T } = useLocale();
   const A = T.affiliate;
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(
-    new Set(['ib-root', 'ib-1']),
+  const meQuery = useAffiliateMeQuery();
+  const me = meQuery.data?.is_ib ? meQuery.data : null;
+  const networkQuery = useAffiliateNetworkQuery(Boolean(me));
+  const affiliateNetwork = useMemo(
+    () => (networkQuery.data ? toAffiliateNode(networkQuery.data.root, true) : null),
+    [networkQuery.data],
   );
+  const expandableNodeIds = useMemo(
+    () => (affiliateNetwork ? collectExpandableIds(affiliateNetwork) : []),
+    [affiliateNetwork],
+  );
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+
+  // 처음 불러오면 내 계정과 바로 아래 단계까지 펼친다.
+  useEffect(() => {
+    if (!affiliateNetwork) return;
+    setExpandedNodes(
+      new Set([
+        affiliateNetwork.id,
+        ...(affiliateNetwork.children ?? [])
+          .filter((child) => child.children?.length)
+          .map((child) => child.id),
+      ]),
+    );
+  }, [affiliateNetwork]);
 
   const currencyFormatter = useMemo(
     () =>
@@ -162,9 +108,9 @@ export function AffiliatePerformancePage() {
   const getStatusLabel = (status: AffiliateStatus) => A[status];
 
   const getTypeLabel = (node: AffiliateNode) => {
-    if (node.type === 'self') return `${A.myAccount} - ${A.level} ${node.level}`;
+    if (node.type === 'self') return `${A.myAccount} - ${A.level} ${me?.level ?? node.level}`;
     if (node.type === 'client') return A.directClient;
-    return `${A.downlineIb} - ${A.level} ${node.level}`;
+    return A.downlineIb;
   };
 
   const statusClass = (status: AffiliateStatus) => {
@@ -189,7 +135,7 @@ export function AffiliatePerformancePage() {
         onOpenChange={(open) => setNodeOpen(node.id, open)}
       >
         <div
-          className={`group grid min-w-[820px] grid-cols-[minmax(240px,1.5fr)_130px_minmax(180px,1fr)_150px_120px] items-center border-b border-white/[0.06] py-3 pr-4 transition-colors hover:bg-white/[0.025] ${
+          className={`group grid min-w-[820px] grid-cols-[minmax(240px,1.5fr)_minmax(180px,1fr)_150px_120px] items-center border-b border-white/[0.06] py-3 pr-4 transition-colors hover:bg-white/[0.025] ${
             depthPadding[Math.min(depth, depthPadding.length - 1)]
           }`}
         >
@@ -224,9 +170,11 @@ export function AffiliatePerformancePage() {
             </div>
           </div>
 
+          {/* UID 열 숨김 (2026-11-24 요청)
           <div className="font-mono text-xs font-medium text-gray-400">
             {node.ibNumber}
           </div>
+          */}
 
           <div>
             <Badge
@@ -322,6 +270,7 @@ export function AffiliatePerformancePage() {
             </div>
 
             <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+              {/* UID 숨김 (2026-11-24 요청)
               <div className="flex items-center gap-2 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1">
                 <span className="text-[10px] uppercase tracking-wide text-gray-500">
                   {A.ibNumber}
@@ -330,6 +279,7 @@ export function AffiliatePerformancePage() {
                   {node.ibNumber}
                 </span>
               </div>
+              */}
               <Badge
                 variant="outline"
                 className={
@@ -376,26 +326,34 @@ export function AffiliatePerformancePage() {
     );
   };
 
+  const emptyMessage =
+    meQuery.isLoading || networkQuery.isLoading
+      ? A.loading
+      : meQuery.data && !meQuery.data.is_ib
+        ? A.notIbPartner
+        : A.loadFailed;
+
   const summaryCards = [
-    {
-      label: A.currentLevel,
-      value: 'Level 12',
-      meta: A.levelRange,
-      icon: Layers3,
-      accent: 'text-[#68A0FF]',
-      iconSurface: 'border-[#0052FF]/20 bg-[#0052FF]/10',
-    },
+    // '현재 IB 레벨' 카드 숨김 (2026-11-24 요청)
+    // {
+    //   label: A.currentLevel,
+    //   value: me ? `${A.level} ${me.level}` : '-',
+    //   meta: A.levelRange,
+    //   icon: Layers3,
+    //   accent: 'text-[#68A0FF]',
+    //   iconSurface: 'border-[#0052FF]/20 bg-[#0052FF]/10',
+    // },
     {
       label: A.commissionRate,
-      value: '8.5%',
-      meta: `${A.level} 12`,
+      value: me ? `${Number(me.commission_rate.toFixed(4))}%` : '-',
+      meta: me ? `${A.level} ${me.level}` : '',
       icon: TrendingUp,
       accent: 'text-[#00FF94]',
       iconSurface: 'border-[#00FF94]/20 bg-[#00FF94]/10',
     },
     {
       label: A.totalCommission,
-      value: '$18,420.50',
+      value: me ? `$${currencyFormatter.format(me.total_commission)}` : '-',
       meta: A.paidInUsdt,
       icon: CircleDollarSign,
       accent: 'text-[#00FF94]',
@@ -403,8 +361,8 @@ export function AffiliatePerformancePage() {
     },
     {
       label: A.activeNetwork,
-      value: '18',
-      meta: `${A.activeMembers} · 24 ${A.partnersAndClients}`,
+      value: me ? String(me.network_active) : '-',
+      meta: `${A.activeMembers} · ${me?.network_total ?? 0} ${A.partnersAndClients}`,
       icon: UsersRound,
       accent: 'text-[#C59BFF]',
       iconSurface: 'border-purple-400/20 bg-purple-400/10',
@@ -428,7 +386,7 @@ export function AffiliatePerformancePage() {
         </div>
       </motion.div>
 
-      <div className="mb-6 grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
+      <div className="mb-6 grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
         {summaryCards.map((card, index) => {
           const Icon = card.icon;
           return (
@@ -496,18 +454,25 @@ export function AffiliatePerformancePage() {
         </div>
 
         <div className="hidden max-w-full overflow-x-auto overscroll-x-contain md:block">
-          <div className="grid min-w-[820px] grid-cols-[minmax(240px,1.5fr)_130px_minmax(180px,1fr)_150px_120px] border-b border-white/[0.07] bg-[#14141e] px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          <div className="grid min-w-[820px] grid-cols-[minmax(240px,1.5fr)_minmax(180px,1fr)_150px_120px] border-b border-white/[0.07] bg-[#14141e] px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
             <div>{A.member}</div>
-            <div>{A.ibNumber}</div>
+            {/* <div>{A.ibNumber}</div> */}
             <div>{A.type}</div>
             <div className="text-right">{A.commissionContribution}</div>
             <div className="text-right">{A.status}</div>
           </div>
-          <div>{renderNode(affiliateNetwork)}</div>
+          <div>{affiliateNetwork && renderNode(affiliateNetwork)}</div>
+          {!affiliateNetwork && (
+            <div className="px-6 py-12 text-center text-sm text-gray-500">{emptyMessage}</div>
+          )}
         </div>
 
         <div className="min-w-0 space-y-2 p-3 md:hidden">
-          {renderMobileNode(affiliateNetwork)}
+          {affiliateNetwork ? (
+            renderMobileNode(affiliateNetwork)
+          ) : (
+            <div className="py-10 text-center text-sm text-gray-500">{emptyMessage}</div>
+          )}
         </div>
       </motion.div>
     </div>
