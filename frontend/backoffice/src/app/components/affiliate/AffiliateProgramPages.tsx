@@ -119,7 +119,7 @@ function toPartner(p: IbPartner): Partner {
     level: p.level,
     status: PARTNER_STATUS[p.status],
     downline: p.downline_count,
-    registeredAt: `${formatKst(p.registered_at)} (GMT+9)`,
+    registeredAt: `${formatKst(p.registered_at, true)} (GMT+9)`,
     commission: p.commission_total,
   };
 }
@@ -1434,7 +1434,7 @@ const COMMISSION_STATUS: Record<CommissionItem["status"], string> = { CREDITED: 
 
 function toCommissionRow(item: CommissionItem) {
   return {
-    date: `${formatKst(item.created_at)} GMT+9`,
+    date: `${formatKst(item.created_at, true)} GMT+9`,
     member: displayName(item.ib),
     email: item.ib?.email ?? "",
     ibNumber: uidLabel(item.ib?.uid),
@@ -1574,16 +1574,16 @@ export function AffiliateCommissionDetailPage({ dark, onToast }: { dark: boolean
         </div>
 
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", minWidth: 1350, borderCollapse: "collapse", tableLayout: "fixed" }}>
+          <table style={{ width: "100%", minWidth: 1310, borderCollapse: "collapse", tableLayout: "fixed" }}>
             <colgroup>
-              <col style={{ width: 175 }} />
-              <col style={{ width: 250 }} />
+              <col style={{ width: 195 }} />
+              <col style={{ width: 190 }} />
               <col style={{ width: 110 }} />
-              <col style={{ width: 180 }} />
+              <col style={{ width: 150 }} />
+              <col style={{ width: 200 }} />
               <col style={{ width: 110 }} />
-              <col style={{ width: 110 }} />
-              <col style={{ width: 125 }} />
-              <col style={{ width: 140 }} />
+              <col style={{ width: 115 }} />
+              <col style={{ width: 130 }} />
               <col style={{ width: 110 }} />
             </colgroup>
             <thead><tr>{["DATE", "IB", "UID", "POSITION", "ORDER / BUYER", "AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION", "STATUS"].map(header => <th key={header} style={{ ...thStyle, textAlign: ["AMOUNT PAID", "COMMISSION RATE", "EARNED COMMISSION"].includes(header) ? "right" : "left" }}>{header}</th>)}</tr></thead>
@@ -1602,9 +1602,9 @@ export function AffiliateCommissionDetailPage({ dark, onToast }: { dark: boolean
                     <td style={{ ...tdStyle, color: "#475569", fontFamily: "'DM Mono',monospace", fontWeight: 650, whiteSpace: "nowrap" }}>{row.ibNumber}</td>
                     <td style={tdStyle}><span style={{ display: "inline-flex", padding: "4px 8px", borderRadius: 7, border: `1px solid ${isIb ? "rgba(37,99,235,.18)" : "#E2E8F0"}`, background: isIb ? "rgba(37,99,235,.07)" : "#F8FAFC", color: isIb ? "#2563EB" : "#475569", fontSize: 10, whiteSpace: "nowrap" }}>{row.userType}</span></td>
                     <td style={{ ...tdStyle, color: "#1A1A1A", fontWeight: 550 }}>
-                      <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.accountType}</div>
-                      <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 3, fontFamily: "'DM Mono',monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.orderId}</div>
-                      <div style={{ fontSize: 9, color: "#64748B", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{row.buyer}</div>
+                      <div style={{ wordBreak: "break-word" }}>{row.accountType}</div>
+                      <div style={{ fontSize: 9, color: "#94A3B8", marginTop: 3, fontFamily: "'DM Mono',monospace", wordBreak: "break-all" }}>{row.orderId}</div>
+                      <div style={{ fontSize: 9, color: "#64748B", marginTop: 2, wordBreak: "break-word" }}>{row.buyer}</div>
                     </td>
                     <td style={{ ...tdStyle, color: "#1A1A1A", fontWeight: 650, fontFamily: "'DM Mono',monospace", textAlign: "right" }}>{row.amount}</td>
                     <td style={{ ...tdStyle, color: "#334155", fontWeight: 650, textAlign: "right" }}>{row.rate}</td>
