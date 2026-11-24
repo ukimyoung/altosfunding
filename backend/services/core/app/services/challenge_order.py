@@ -24,7 +24,7 @@ from app.config import settings
 from app.errors import AppError
 from app.models import Challenge, ChallengeOrder, Mt4AccountIssuedHistory, Product, TradingAccount, User
 from app.security import generate_human_code
-from app.services import jobs, mt4, reward_admin
+from app.services import ib_commission, jobs, mt4, reward_admin
 from app.services.wallet import USER_WALLET, Line, _change_balance, _post_journal, get_wallet
 
 logger = logging.getLogger(__name__)
@@ -100,6 +100,9 @@ async def purchase(
     unit = unit_price_of(product)
     total = unit * quantity
     original_total = product.price_usdt * quantity
+    # IB 커미션: 결제 시각 기준 경로·비율로 미리 계산하고, 구매자·IB 지갑을 정해진 순서로 잠근다.
+    commission = await ib_commission.plan(session, user.id, total, now)
+    await ib_commission.lock_wallets(session, [user.id, *(commission.payee_ids if commission else [])])
     wallet = await get_wallet(session, user.id, lock=True)
     if wallet.balance_usdt < total:
         raise AppError(400, "insufficient_balance", f"Total Asset 잔고가 부족합니다 (필요 금액: {total} USDT).")
@@ -138,6 +141,8 @@ async def purchase(
             reference_type="challenge_order", reference_id=order.id,
         )
         order.wallet_tx_id, order.journal_entry_id = tx.id, journal.id
+    if commission is not None:
+        await ib_commission.apply(session, commission, order)
 
     challenge.current_participants += quantity
     server = mt4.SERVER_OF_TIER[product.tier_type]
@@ -290,6 +295,7 @@ async def refund_account(session: AsyncSession, account: TradingAccount, reason:
                 reference_type="challenge_order", reference_id=order.id,
             )
             account.refund_wallet_tx_id = tx.id
+            await ib_commission.refund(session, order, account.unit_price, f"trading_account:{account.id}")
         order.refunded_quantity += 1
         order.refunded_amount += account.unit_price
         _finish_if_done(order, now)

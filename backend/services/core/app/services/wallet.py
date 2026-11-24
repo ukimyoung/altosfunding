@@ -198,13 +198,17 @@ async def _change_balance(
     reference_type: str,
     reference_id: int | str,
     tx_hash: str | None = None,
+    allow_negative: bool = False,
 ) -> WalletTransaction:
-    """잔고를 바꾸고 이력을 남긴다. wallet은 with_for_update로 잠근 상태여야 한다."""
+    """잔고를 바꾸고 이력을 남긴다. wallet은 with_for_update로 잠근 상태여야 한다.
+
+    allow_negative는 IB 커미션 환수처럼 회원 요청이 아닌 회수에만 쓴다 (잔고가 마이너스가 될 수 있음).
+    """
     before = wallet.balance_usdt
     if direction == "IN":
         after = before + amount
     else:
-        if before < amount:
+        if before < amount and not allow_negative:
             raise AppError(400, "insufficient_balance", "잔고가 부족합니다.")
         after = before - amount
     wallet.balance_usdt = after
@@ -369,6 +373,9 @@ async def request_withdrawal(
         await signup.consume_withdraw_code(session, user, verification_code.strip())
 
     wallet = await get_wallet(session, user.id, lock=True)
+    if wallet.balance_usdt < 0:
+        # IB 커미션 환수로 마이너스가 된 지갑은 입금·적립으로 0 이상이 될 때까지 출금을 막는다.
+        raise AppError(400, "negative_balance", "잔고가 마이너스라 출금할 수 없습니다.")
     if wallet.balance_usdt < value:
         raise AppError(400, "insufficient_balance", "잔고가 부족합니다.")
 
