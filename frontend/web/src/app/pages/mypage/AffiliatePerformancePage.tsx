@@ -110,7 +110,7 @@ export function AffiliatePerformancePage() {
   const getTypeLabel = (node: AffiliateNode) => {
     if (node.type === 'self') return `${A.myAccount} - ${A.level} ${me?.level ?? node.level}`;
     if (node.type === 'client') return A.directClient;
-    return `${A.downlineIb} - ${A.level} ${node.level}`;
+    return A.downlineIb;
   };
 
   const statusClass = (status: AffiliateStatus) => {

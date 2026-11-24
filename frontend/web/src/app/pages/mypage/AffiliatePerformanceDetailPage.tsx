@@ -94,7 +94,7 @@ export function AffiliatePerformanceDetailPage() {
 
   const getSourceTypeLabel = (record: CommissionRecord) => {
     if (record.depth <= 1) return A.directClient;
-    return `${A.downlineIb} - ${A.level} ${record.depth}`;
+    return A.downlineIb;
   };
 
   const getIbNumber = (record: CommissionRecord) => record.memberUid;
@@ -301,17 +301,17 @@ export function AffiliatePerformanceDetailPage() {
         </div>
 
         <div className="hidden max-w-full overflow-hidden md:block">
-          <Table className="min-w-[1240px]">
+          <Table className="w-full">
             <TableHeader className="bg-[#14141e]">
             <TableRow className="border-white/[0.07] hover:bg-[#14141e]">
-              <TableHead className="px-5 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colDateTime}</TableHead>
-              <TableHead className="px-5 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colMemberSource}</TableHead>
-              <TableHead className="px-5 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.ibNumber}</TableHead>
-              <TableHead className="px-5 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colUserType}</TableHead>
-              <TableHead className="px-5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colTransactionAmount}</TableHead>
-              <TableHead className="px-5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colCommissionRate}</TableHead>
-              <TableHead className="px-5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colEarnedCommission}</TableHead>
-              <TableHead className="px-5 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colStatus}</TableHead>
+              <TableHead className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colDateTime}</TableHead>
+              <TableHead className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colMemberSource}</TableHead>
+              <TableHead className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.ibNumber}</TableHead>
+              <TableHead className="px-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colUserType}</TableHead>
+              <TableHead className="px-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colTransactionAmount}</TableHead>
+              <TableHead className="px-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colCommissionRate}</TableHead>
+              <TableHead className="px-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colEarnedCommission}</TableHead>
+              <TableHead className="px-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">{A.colStatus}</TableHead>
             </TableRow>
             </TableHeader>
             <TableBody>
@@ -323,16 +323,16 @@ export function AffiliatePerformanceDetailPage() {
                 transition={{ duration: 0.2, delay: index * 0.025 }}
                 className="border-b border-white/[0.06] transition-colors hover:bg-white/[0.025]"
               >
-                <TableCell className="px-5 py-4 font-mono text-xs text-gray-400">
+                <TableCell className="px-3 py-4 whitespace-nowrap font-mono text-xs text-gray-400">
                   {formatTimestamp(record.timestamp)}
                 </TableCell>
-                <TableCell className="px-5 py-4">
+                <TableCell className="px-3 py-4">
                   <span className="text-sm font-medium text-white">{record.memberName}</span>
                 </TableCell>
-                <TableCell className="px-5 py-4 font-mono text-xs font-medium text-gray-400">
+                <TableCell className="px-3 py-4 font-mono text-xs font-medium text-gray-400">
                   {getIbNumber(record)}
                 </TableCell>
-                <TableCell className="px-5 py-4">
+                <TableCell className="px-3 py-4">
                   <Badge
                     variant="outline"
                     className={
@@ -344,16 +344,16 @@ export function AffiliatePerformanceDetailPage() {
                     {getSourceTypeLabel(record)}
                   </Badge>
                 </TableCell>
-                <TableCell className="px-5 py-4 text-right text-sm font-medium text-white">
+                <TableCell className="px-3 py-4 text-right text-sm font-medium text-white">
                   {currencyFormatter.format(record.transactionAmount)}
                 </TableCell>
-                <TableCell className="px-5 py-4 text-right text-sm text-gray-300">
+                <TableCell className="px-3 py-4 text-right text-sm text-gray-300">
                   {record.commissionRate}%
                 </TableCell>
-                <TableCell className="px-5 py-4 text-right text-sm font-semibold text-[#00FF94]">
+                <TableCell className="px-3 py-4 text-right text-sm font-semibold text-[#00FF94]">
                   +{currencyFormatter.format(record.earnedCommission)}
                 </TableCell>
-                <TableCell className="px-5 py-4 text-center">
+                <TableCell className="px-3 py-4 text-center">
                   <Badge variant="outline" className={statusClass(record.status)}>
                     {getStatusLabel(record.status)}
                   </Badge>
