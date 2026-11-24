@@ -135,7 +135,7 @@ export function AffiliatePerformancePage() {
         onOpenChange={(open) => setNodeOpen(node.id, open)}
       >
         <div
-          className={`group grid min-w-[820px] grid-cols-[minmax(240px,1.5fr)_130px_minmax(180px,1fr)_150px_120px] items-center border-b border-white/[0.06] py-3 pr-4 transition-colors hover:bg-white/[0.025] ${
+          className={`group grid min-w-[820px] grid-cols-[minmax(240px,1.5fr)_minmax(180px,1fr)_150px_120px] items-center border-b border-white/[0.06] py-3 pr-4 transition-colors hover:bg-white/[0.025] ${
             depthPadding[Math.min(depth, depthPadding.length - 1)]
           }`}
         >
@@ -170,9 +170,11 @@ export function AffiliatePerformancePage() {
             </div>
           </div>
 
+          {/* UID 열 숨김 (2026-11-24 요청)
           <div className="font-mono text-xs font-medium text-gray-400">
             {node.ibNumber}
           </div>
+          */}
 
           <div>
             <Badge
@@ -268,6 +270,7 @@ export function AffiliatePerformancePage() {
             </div>
 
             <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+              {/* UID 숨김 (2026-11-24 요청)
               <div className="flex items-center gap-2 rounded-md border border-white/[0.07] bg-white/[0.03] px-2 py-1">
                 <span className="text-[10px] uppercase tracking-wide text-gray-500">
                   {A.ibNumber}
@@ -276,6 +279,7 @@ export function AffiliatePerformancePage() {
                   {node.ibNumber}
                 </span>
               </div>
+              */}
               <Badge
                 variant="outline"
                 className={
@@ -330,14 +334,15 @@ export function AffiliatePerformancePage() {
         : A.loadFailed;
 
   const summaryCards = [
-    {
-      label: A.currentLevel,
-      value: me ? `${A.level} ${me.level}` : '-',
-      meta: A.levelRange,
-      icon: Layers3,
-      accent: 'text-[#68A0FF]',
-      iconSurface: 'border-[#0052FF]/20 bg-[#0052FF]/10',
-    },
+    // '현재 IB 레벨' 카드 숨김 (2026-11-24 요청)
+    // {
+    //   label: A.currentLevel,
+    //   value: me ? `${A.level} ${me.level}` : '-',
+    //   meta: A.levelRange,
+    //   icon: Layers3,
+    //   accent: 'text-[#68A0FF]',
+    //   iconSurface: 'border-[#0052FF]/20 bg-[#0052FF]/10',
+    // },
     {
       label: A.commissionRate,
       value: me ? `${Number(me.commission_rate.toFixed(4))}%` : '-',
@@ -381,7 +386,7 @@ export function AffiliatePerformancePage() {
         </div>
       </motion.div>
 
-      <div className="mb-6 grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
+      <div className="mb-6 grid w-full min-w-0 grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3">
         {summaryCards.map((card, index) => {
           const Icon = card.icon;
           return (
@@ -449,9 +454,9 @@ export function AffiliatePerformancePage() {
         </div>
 
         <div className="hidden max-w-full overflow-x-auto overscroll-x-contain md:block">
-          <div className="grid min-w-[820px] grid-cols-[minmax(240px,1.5fr)_130px_minmax(180px,1fr)_150px_120px] border-b border-white/[0.07] bg-[#14141e] px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+          <div className="grid min-w-[820px] grid-cols-[minmax(240px,1.5fr)_minmax(180px,1fr)_150px_120px] border-b border-white/[0.07] bg-[#14141e] px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-500">
             <div>{A.member}</div>
-            <div>{A.ibNumber}</div>
+            {/* <div>{A.ibNumber}</div> */}
             <div>{A.type}</div>
             <div className="text-right">{A.commissionContribution}</div>
             <div className="text-right">{A.status}</div>
