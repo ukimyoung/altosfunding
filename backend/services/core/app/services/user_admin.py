@@ -9,10 +9,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
-from app.models import User, UserStatusHistory, Wallet
+from app.models import MemberRelation, User, UserStatusHistory, Wallet
 from app.schemas.auth import UserOut
 from app.security import hash_password
-from app.services import tokens
+from app.services import member_relations, tokens
 from app.services.signup import (
     _clean,
     _generate_unique,
@@ -85,11 +85,10 @@ async def _total_assets(session: AsyncSession, user_id: uuid.UUID) -> float:
 
 async def user_out(session: AsyncSession, user: User, *, for_admin: bool) -> UserOut:
     referrer_code = None
-    if user.referrer_id:
-        referrer_code = await session.scalar(select(User.referral_code).where(User.id == user.referrer_id))
-    total_referrals = await session.scalar(
-        select(func.count()).select_from(User).where(User.referrer_id == user.id)
-    )
+    sponsor_id = await member_relations.sponsor_id_of(session, user.id)
+    if sponsor_id:
+        referrer_code = await session.scalar(select(User.referral_code).where(User.id == sponsor_id))
+    total_referrals = await member_relations.count_sponsored(session, user.id)
     out = to_user_out(
         user,
         referrer_code=referrer_code,
@@ -138,12 +137,15 @@ async def list_users(
     total = await session.scalar(select(func.count()).select_from(User).where(*conditions)) or 0
     referrer = User.__table__.alias("referrer")
     referral_counts = (
-        select(User.referrer_id, func.count().label("n")).where(User.referrer_id.is_not(None)).group_by(User.referrer_id)
+        select(MemberRelation.sponsor_id, func.count().label("n"))
+        .where(MemberRelation.sponsor_id.is_not(None))
+        .group_by(MemberRelation.sponsor_id)
     ).subquery()
     rows = await session.execute(
         select(User, referrer.c.referral_code, func.coalesce(referral_counts.c.n, 0), _wallet_balance)
-        .outerjoin(referrer, referrer.c.id == User.referrer_id)
-        .outerjoin(referral_counts, referral_counts.c.referrer_id == User.id)
+        .outerjoin(MemberRelation, MemberRelation.member_id == User.id)
+        .outerjoin(referrer, referrer.c.id == MemberRelation.sponsor_id)
+        .outerjoin(referral_counts, referral_counts.c.sponsor_id == User.id)
         .outerjoin(Wallet, (Wallet.user_id == User.id) & (Wallet.wallet_type == "INTEGRATED"))
         .where(*conditions)
         .order_by(User.created_at.desc(), User.id)
@@ -284,7 +286,15 @@ async def update_user(session: AsyncSession, user: User, data: dict, admin: User
             raise AppError(400, "invalid_referrer_code", "존재하지 않는 초대 코드입니다.")
         if referrer.id == user.id:
             raise AppError(400, "cannot_refer_yourself", "본인의 초대 코드는 등록할 수 없습니다.")
-        user.referrer_id = referrer.id
+        # 관리자가 회원 정보에서 추천인을 바꾸면 추천인만 바뀌고 수당 조직(placement)은 그대로다 (비어 있을 때만 채움).
+        await member_relations.set_sponsor(
+            session,
+            user.id,
+            referrer.id,
+            change_type=member_relations.SPONSOR_CHANGE,
+            actor_id=admin.id,
+            reason="관리자 회원 정보 수정",
+        )
 
 
 async def set_password(session: AsyncSession, user: User, new_password: str) -> None:

@@ -28,6 +28,8 @@ from app.models.trading import (
 from app.models.user import (
     EmailVerification,
     LoginHistory,
+    MemberRelation,
+    MemberRelationHistory,
     PasswordResetToken,
     RefreshToken,
     User,
@@ -87,6 +89,8 @@ __all__ = [
     "TradingBonusRecord",
     "TradingAccountStatusHistory",
     "UploadedFile",
+    "MemberRelation",
+    "MemberRelationHistory",
     "User",
     "UserBackupCode",
     "UserStatusHistory",

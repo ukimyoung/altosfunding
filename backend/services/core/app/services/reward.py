@@ -11,9 +11,9 @@ from sqlalchemy import and_, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import ChallengeOrder, RewardRecord, User
+from app.models import ChallengeOrder, MemberRelation, RewardRecord, User
 from app.schemas.reward import ReferralCodeOut, ReferralItemOut, ReferralPage, ReferralStatsOut
-from app.services import reward_policy
+from app.services import member_relations, reward_policy
 
 
 def referral_link(code: str) -> str:
@@ -25,8 +25,7 @@ def referral_code_out(user: User) -> ReferralCodeOut:
 
 
 async def _count_invited(session: AsyncSession, user: User) -> int:
-    n = await session.scalar(select(func.count()).select_from(User).where(User.referrer_id == user.id))
-    return n or 0
+    return await member_relations.count_sponsored(session, user.id)
 
 
 async def referral_stats(session: AsyncSession, user: User) -> ReferralStatsOut:
@@ -40,7 +39,7 @@ async def referral_stats(session: AsyncSession, user: User) -> ReferralStatsOut:
         )
     )
     pending = await session.scalar(
-        select(func.count()).select_from(User).where(User.referrer_id == user.id, ~approved_reward)
+        select(func.count()).select_from(User).where(User.id.in_(select(MemberRelation.member_id).where(MemberRelation.sponsor_id == user.id)), ~approved_reward)
     )
     earned = await session.scalar(
         select(func.coalesce(func.sum(RewardRecord.amount), 0)).where(
@@ -66,7 +65,7 @@ async def list_referrals(session: AsyncSession, user: User, page: int, size: int
     rows = (
         await session.scalars(
             select(User)
-            .where(User.referrer_id == user.id)
+            .where(User.id.in_(select(MemberRelation.member_id).where(MemberRelation.sponsor_id == user.id)))
             .order_by(User.created_at.desc(), User.id)
             .offset((page - 1) * size)
             .limit(size)

@@ -157,9 +157,16 @@ def test_referral_code(client, sent_emails):
     assert res.json()["referrer_code"] == referrer["referral_code"]
 
     rows = run_sql(
-        "select referrer_id::text from core.users where email = 'friend@example.com'"
+        "select r.sponsor_id::text, r.placement_parent_id::text from core.member_relations r"
+        " join core.users u on u.id = r.member_id where u.email = 'friend@example.com'"
     )
-    assert rows[0]["referrer_id"] == referrer["id"]
+    assert rows[0]["sponsor_id"] == referrer["id"]
+    assert rows[0]["placement_parent_id"] == referrer["id"]
+    history = run_sql(
+        "select h.change_type, h.new_sponsor_id::text from core.member_relation_history h"
+        " join core.users u on u.id = h.member_id where u.email = 'friend@example.com'"
+    )
+    assert [(h["change_type"], h["new_sponsor_id"]) for h in history] == [("SIGNUP", referrer["id"])]
 
 
 def test_invalid_referral_code(client, sent_emails):
