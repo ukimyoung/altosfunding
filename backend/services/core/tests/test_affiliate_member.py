@@ -35,10 +35,11 @@ def test_member_affiliate_views(client, admin_headers, buyer, round_, fake_mt4, 
     assert root["email"] == "chul@example.com" and root["commission"] == 4.8
     kim = root["children"][0]
     assert kim["email"] == "k***@example.com" and kim["name"].startswith("k***")
-    assert (kim["is_ib"], kim["level"], kim["commission"]) == (True, 10, 4.8)  # 그 아래 구매로 내가 받은 몫
+    assert (kim["is_ib"], kim["level"], kim["commission"]) == (True, 10, 0)  # 본인 구매가 없으면 0
     assert "user_id" not in kim and "commission_total" not in kim
     plain = kim["children"][0]
-    assert (plain["is_ib"], plain["commission"]) == (False, 4.8)
+    assert (plain["is_ib"], plain["commission"]) == (False, 0)
+    assert plain["children"][0]["commission"] == 4.8  # 구매자 본인 줄에만
 
     rows = client.get(f"{API}/commissions", headers=ib_chain["chul"]).json()
     assert rows["total"] == 1 and rows["summary"]["net"] == 4.8

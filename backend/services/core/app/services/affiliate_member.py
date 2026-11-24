@@ -2,7 +2,7 @@
 
 - 메뉴는 IB 프로필이 있는 회원에게만 보인다(/affiliate/me의 is_ib).
 - 하위 회원의 이름·이메일은 가린다(본인만 그대로). 회원 식별은 UID로 한다(IB 번호 없음).
-- 조직도의 커미션은 '그 회원(과 그 아래)의 구매로 내가 받은 순 커미션'이다. 하위 IB 본인의 수입은 보여 주지 않는다.
+- 조직도의 커미션은 '그 회원이 직접 결제한 구매로 내가 받은 순 커미션'이다(본인 줄은 내 총 수령액). 하위 IB 본인의 수입은 보여 주지 않는다.
 """
 
 import uuid
@@ -131,13 +131,10 @@ async def network(session: AsyncSession, user: User) -> dict:
         )
     }
 
-    def build(node: dict) -> tuple[dict, Decimal]:
-        children = []
+    # 각 회원 줄 = 그 회원이 직접 결제한 구매로 내가 받은 순 커미션 (하위 조직 합산 안 함, 2026-11-24 결정)
+    def build(node: dict) -> dict:
+        children = [build(child) for child in node["children"]]
         total = Decimal(by_buyer.get(node["user_id"], 0))
-        for child in node["children"]:
-            built, sub = build(child)
-            children.append(built)
-            total += sub
         out = {
             **_member(users.get(uuid.UUID(node["user_id"])), self_id=user.id),
             "depth": node["depth"],
@@ -148,9 +145,9 @@ async def network(session: AsyncSession, user: User) -> dict:
             "commission": float(total),
             "children": children,
         }
-        return out, total
+        return out
 
-    root, _ = build(tree["root"])
+    root = build(tree["root"])
     # 조직 밖으로 옮겨 간 구매자 몫까지 포함한 내 전체 순 커미션
     totals = await ib_commission.totals_by_member(session, [user.id])
     root["commission"] = float(totals.get(user.id, 0))
