@@ -33,10 +33,12 @@ export function Sidebar({ activeId, onSelect, dark }: { activeId: string; onSele
   const productActive = activeId === "challenge-product" || activeId === "funded-product" || activeId === "live-product" || activeId === "demo-product" || activeId === "ruleset-management";
   const accountActive = activeId === "challenge-account" || activeId === "funded-account" || activeId === "live-account" || activeId === "demo-account";
   const systemSettingsActive = activeId === "supported-languages";
+  const affiliateActive = activeId === "ib-partner-management" || activeId === "affiliate-network" || activeId === "affiliate-commission-detail" || activeId === "affiliate-commission-flow" || activeId === "affiliate-commission-rates";
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     "product-template": productActive,
     "account-mgmt": accountActive,
     "system-settings": systemSettingsActive,
+    "affiliate-program": affiliateActive,
   });
   useEffect(() => {
     if (productActive) {
@@ -48,7 +50,10 @@ export function Sidebar({ activeId, onSelect, dark }: { activeId: string; onSele
     if (systemSettingsActive) {
       setExpanded((p) => ({ ...p, "system-settings": true }));
     }
-  }, [accountActive, productActive, systemSettingsActive]);
+    if (affiliateActive) {
+      setExpanded((p) => ({ ...p, "affiliate-program": true }));
+    }
+  }, [accountActive, affiliateActive, productActive, systemSettingsActive]);
   const toggle = (id: string) => setExpanded((p) => ({ ...p, [id]: !p[id] }));
   return (
     <aside style={{ width: 220, minHeight: "100vh", backgroundColor: t.sidebarBg, borderRight: `1px solid ${t.border}`, position: "fixed", top: 0, left: 0, bottom: 0, zIndex: 40, display: "flex", flexDirection: "column", overflowY: "auto", scrollbarWidth: "none", fontFamily: "'DM Sans','Noto Sans KR',sans-serif" }}>

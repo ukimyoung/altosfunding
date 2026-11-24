@@ -40,6 +40,13 @@ import { NoticeListPage } from './pages/notice/NoticeListPage';
 import { MarketingPopupPage } from './pages/marketing-popups/MarketingPopupPage';
 import { ProfitSplitPage } from './pages/system/ProfitSplitPage';
 import { SupportedLanguagesPage } from './pages/system/SupportedLanguagesPage';
+import {
+  AffiliateCommissionDetailPage,
+  AffiliateCommissionFlowPage,
+  AffiliateCommissionRatePage,
+  AffiliateNetworkPage,
+  IbPartnerManagementPage,
+} from './pages/affiliate/AffiliatePages';
 
 function RedirectToLogin() {
   return createElement(Navigate, { to: LOGIN_ROUTE, replace: true });
@@ -155,6 +162,26 @@ export const router = createBrowserRouter([
       {
         path: appPath(ROUTE_BY_PAGE_ID['transaction-approval']),
         Component: TransactionApprovalPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['ib-partner-management']),
+        Component: IbPartnerManagementPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['affiliate-network']),
+        Component: AffiliateNetworkPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['affiliate-commission-detail']),
+        Component: AffiliateCommissionDetailPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['affiliate-commission-flow']),
+        Component: AffiliateCommissionFlowPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['affiliate-commission-rates']),
+        Component: AffiliateCommissionRatePage,
       },
       {
         path: appPath(ROUTE_BY_PAGE_ID['notice-list']),
