@@ -51,9 +51,7 @@ class User(Base):
     locale: Mapped[str] = mapped_column(server_default="en")
 
     referral_code: Mapped[str] = mapped_column(String, unique=True)
-    referrer_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("core.users.id", ondelete="SET NULL")
-    )
+    # 추천인·수당 조직 상위는 core.member_relations (MemberRelation)에 있다.
 
     agreed_to_terms: Mapped[bool] = mapped_column(server_default="false")
     subscribed_newsletter: Mapped[bool] = mapped_column(server_default="false")
@@ -143,4 +141,37 @@ class UserStatusHistory(Base):
     to_status: Mapped[str]
     reason: Mapped[str | None]
     changed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class MemberRelation(Base):
+    """회원별 현재 조직 관계 1행. users에 행이 생기면 DB 트리거가 빈 행을 만든다."""
+
+    __tablename__ = "member_relations"
+
+    member_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.users.id", ondelete="CASCADE"), primary_key=True
+    )
+    sponsor_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.users.id", ondelete="SET NULL")
+    )
+    placement_parent_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("core.users.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
+class MemberRelationHistory(Base):
+    __tablename__ = "member_relation_history"
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    member_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("core.users.id", ondelete="CASCADE"))
+    change_type: Mapped[str]
+    old_sponsor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    new_sponsor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    old_placement_parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    new_placement_parent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    reason: Mapped[str | None]
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

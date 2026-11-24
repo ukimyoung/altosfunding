@@ -1090,7 +1090,6 @@ export function AffiliateCommissionRatePage({ dark, onToast }: { dark: boolean; 
   const t = tokens(dark);
   const [rates, setRates] = useState(() => Array.from({ length: 40 }, (_, index) => ({
     level: index + 1,
-    type: index < 10 ? "%" : "$",
     value: index < 5 ? 6 - index * .5 : index < 10 ? 2 : Math.max(1, 12 - Math.floor(index / 3)),
   })));
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false);
@@ -1099,25 +1098,25 @@ export function AffiliateCommissionRatePage({ dark, onToast }: { dark: boolean; 
     <div style={{ padding: "24px 28px 48px", minHeight: "100vh", color: t.text, background: t.pageBg }}>
       <PageHeader
         title="커미션 비율 관리"
-        description="Level 1–40의 기본 커미션 지급 방식과 금액을 설정합니다."
+        description="Level 1–40의 기본 커미션 비율(%)을 설정합니다."
         action={<PrimaryButton onClick={() => setSaveConfirmOpen(true)}><Save size={15} /> 변경사항 저장</PrimaryButton>}
       />
       <div style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,.09)", borderRadius: 12, overflow: "hidden" }}>
         <div style={{ padding: "15px 18px", borderBottom: "1px solid rgba(0,0,0,.09)", background: "#F8FAFC" }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#1A1A1A" }}>Commission Matrix</div>
-            <div style={{ fontSize: 10, color: "#A0A0AA", marginTop: 3 }}>Level 1–40의 기본 지급 방식을 비율(%) 또는 고정 금액($)으로 설정합니다.</div>
+            <div style={{ fontSize: 10, color: "#A0A0AA", marginTop: 3 }}>Level 1–40의 기본 커미션 비율(%)을 설정합니다.</div>
           </div>
         </div>
-        <div style={{ padding: 16, background: "#F8FAFC", display: "grid", gridTemplateColumns: "repeat(4, minmax(180px, 1fr))", gap: 10, overflowX: "auto" }}>
+        <div style={{ padding: 16, background: "#F8FAFC", display: "grid", gridTemplateColumns: "repeat(5, minmax(150px, 1fr))", gap: 10, overflowX: "auto" }}>
           {rates.map(rate => (
             <div key={rate.level} style={{ minHeight: 84, border: "1px solid rgba(0,0,0,.09)", borderRadius: 9, background: "#FFFFFF", overflow: "hidden", display: "flex", flexDirection: "column" }}>
               <div style={{ padding: "9px 10px", borderBottom: "1px solid rgba(0,0,0,.08)", display: "flex", alignItems: "center", background: "#FFFFFF" }}>
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#1A1A1A" }}>Level {rate.level}</span>
               </div>
-              <div style={{ padding: 10, display: "grid", gridTemplateColumns: "58px 1fr", gap: 6 }}>
-                <select value={rate.type} onChange={event => setRates(current => current.map(item => item.level === rate.level ? { ...item, type: event.target.value } : item))} style={{ height: 34, borderRadius: 7, border: "1px solid rgba(0,0,0,.12)", background: "#FFFFFF", color: "#1A1A1A", fontSize: 11, padding: "0 7px", cursor: "pointer" }}><option>%</option><option>$</option></select>
-                <input type="number" min="0" step=".5" value={rate.value} onChange={event => setRates(current => current.map(item => item.level === rate.level ? { ...item, value: Number(event.target.value) } : item))} style={{ width: "100%", minWidth: 0, height: 34, borderRadius: 7, border: "1px solid rgba(0,0,0,.12)", background: "#FFFFFF", color: "#1A1A1A", fontSize: 11, padding: "0 9px", outline: "none", fontFamily: "'DM Mono',monospace" }} />
+              <div style={{ padding: 10, position: "relative" }}>
+                <input type="number" min="0" step=".5" value={rate.value} aria-label={`Level ${rate.level} 커미션 비율 (%)`} onChange={event => setRates(current => current.map(item => item.level === rate.level ? { ...item, value: Number(event.target.value) } : item))} style={{ width: "100%", minWidth: 0, height: 34, borderRadius: 7, border: "1px solid rgba(0,0,0,.12)", background: "#FFFFFF", color: "#1A1A1A", fontSize: 11, padding: "0 28px 0 9px", outline: "none", fontFamily: "'DM Mono',monospace" }} />
+                <span style={{ position: "absolute", right: 20, top: "50%", transform: "translateY(-50%)", fontSize: 11, fontWeight: 600, color: "#64748B", pointerEvents: "none" }}>%</span>
               </div>
             </div>
           ))}

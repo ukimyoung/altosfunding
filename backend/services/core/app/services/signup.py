@@ -18,7 +18,7 @@ from app.security import (
     hash_code,
     hash_password,
 )
-from app.services import email_template, email_templates
+from app.services import email_template, email_templates, member_relations
 from app.services.email import EmailSender, EmailSendError
 
 
@@ -235,7 +235,6 @@ async def register(session: AsyncSession, body: RegisterRequest, locale: str = "
         phone=_clean(body.phone),
         email_verified_at=verification.verified_at,
         referral_code=await _generate_unique(session, User.referral_code, 8),
-        referrer_id=referrer.id if referrer else None,
         agreed_to_terms=True,
         subscribed_newsletter=body.subscribe_newsletter,
         locale=locale,
@@ -244,6 +243,11 @@ async def register(session: AsyncSession, body: RegisterRequest, locale: str = "
     verification.consumed_at = now
 
     try:
+        await session.flush()
+        if referrer is not None:
+            await member_relations.set_sponsor(
+                session, user.id, referrer.id, change_type=member_relations.SIGNUP, reason="가입 초대 코드"
+            )
         await session.commit()
     except IntegrityError as exc:
         # 같은 이메일로 동시에 가입 요청이 들어온 경우

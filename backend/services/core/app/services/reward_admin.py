@@ -19,8 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.errors import AppError
-from app.models import ChallengeOrder, RewardRecord, TradingBonusRecord, User
-from app.services import reward_policy
+from app.models import ChallengeOrder, MemberRelation, RewardRecord, TradingBonusRecord, User
+from app.services import member_relations, reward_policy
 from app.services.wallet import USER_WALLET, Line, _change_balance, _post_journal, as_float, get_wallet
 
 logger = logging.getLogger(__name__)
@@ -64,7 +64,8 @@ async def on_order_completed(session: AsyncSession, order: ChallengeOrder) -> Re
     if order.status != "COMPLETED" or order.issued_quantity <= 0:
         return None
     buyer = await session.get(User, order.user_id)
-    if buyer is None or buyer.referrer_id is None:
+    sponsor_id = await member_relations.sponsor_id_of(session, order.user_id) if buyer else None
+    if buyer is None or sponsor_id is None:
         return None
     policy = await reward_policy.get_policy(session)
     if policy.referral_reward_condition != "FIRST_PURCHASE":
@@ -75,7 +76,7 @@ async def on_order_completed(session: AsyncSession, order: ChallengeOrder) -> Re
     result = await session.execute(
         pg_insert(RewardRecord)
         .values(
-            user_id=buyer.referrer_id,
+            user_id=sponsor_id,
             source_user_id=buyer.id,
             type=REFERRAL_BONUS,
             amount=amount,
@@ -91,7 +92,7 @@ async def on_order_completed(session: AsyncSession, order: ChallengeOrder) -> Re
     reward_id = result.scalar_one_or_none()
     if reward_id is None:
         return None
-    logger.info("추천인 리워드 대기 생성: reward=%s referrer=%s referee=%s", reward_id, buyer.referrer_id, buyer.id)
+    logger.info("추천인 리워드 대기 생성: reward=%s referrer=%s referee=%s", reward_id, sponsor_id, buyer.id)
     return await session.get(RewardRecord, reward_id)
 
 
@@ -109,7 +110,10 @@ async def referral_stats(session: AsyncSession) -> dict:
 
     approved = await _sum(APPROVED)
     active = await session.scalar(
-        select(func.count()).select_from(User).where(User.referrer_id.is_not(None), User.status == "ACTIVE")
+        select(func.count())
+        .select_from(User)
+        .join(MemberRelation, MemberRelation.member_id == User.id)
+        .where(MemberRelation.sponsor_id.is_not(None), User.status == "ACTIVE")
     )
     return {
         "total_accumulated": approved,
@@ -125,7 +129,8 @@ def _referral_query(status: str | None, keyword: str | None):
     referrer = aliased(User, name="referrer")
     stmt = (
         select(referee, referrer, RewardRecord)
-        .join(referrer, referee.referrer_id == referrer.id)
+        .join(MemberRelation, MemberRelation.member_id == referee.id)
+        .join(referrer, MemberRelation.sponsor_id == referrer.id)
         .outerjoin(
             RewardRecord,
             and_(
@@ -506,7 +511,7 @@ async def my_summary(session: AsyncSession, user: User) -> dict:
     )
     if tb_count:
         by_type.append({"type": "TRADING_BONUS", "total": tb_total, "count": tb_count})
-    referral_count = await session.scalar(select(func.count()).select_from(User).where(User.referrer_id == user.id))
+    referral_count = await member_relations.count_sponsored(session, user.id)
     return {
         "total_credited": await _sum(RewardRecord, RewardRecord.amount, APPROVED) + tb_total,
         "total_pending": await _sum(RewardRecord, RewardRecord.amount, PENDING)

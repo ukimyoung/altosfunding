@@ -33,7 +33,7 @@ from app.schemas.auth import (
     WithdrawEmailRequest,
     WithdrawEmailResponse,
 )
-from app.services import notify, password, signup, two_factor, user_admin
+from app.services import member_relations, notify, password, signup, two_factor, user_admin
 from app.services.email import EmailSender, get_email_sender
 from app.services.recaptcha import verify_recaptcha
 
@@ -68,9 +68,12 @@ async def update_profile(body: ProfileUpdateRequest, user: CurrentUser, session:
             raise AppError(400, "invalid_referrer_code", "존재하지 않는 초대 코드입니다.")
         if referrer.id == user.id:
             raise AppError(400, "cannot_refer_yourself", "본인의 초대 코드는 등록할 수 없습니다.")
-        if user.referrer_id is None:
-            user.referrer_id = referrer.id
-        elif user.referrer_id != referrer.id:
+        current = await member_relations.sponsor_id_of(session, user.id)
+        if current is None:
+            await member_relations.set_sponsor(
+                session, user.id, referrer.id, change_type=member_relations.SPONSOR_SET, reason="회원 본인 초대 코드 등록"
+            )
+        elif current != referrer.id:
             raise AppError(400, "referrer_already_set", "초대 코드는 한 번만 등록할 수 있습니다.")
 
     await session.commit()

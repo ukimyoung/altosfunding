@@ -16,7 +16,9 @@ def referrer(client, admin_headers, buyer):  # noqa: F811
     _create(client, admin_headers, email=REFERRER, first_name="추천", last_name="인")
     _create(client, admin_headers, email=WAITING, first_name="대기")
     run_sql(
-        "update core.users set referrer_id = (select id from core.users where email = $1) where email in ($2, $3)",
+        "update core.member_relations set sponsor_id = (select id from core.users where email = $1),"
+        " placement_parent_id = (select id from core.users where email = $1)"
+        " where member_id in (select id from core.users where email in ($2, $3))",
         REFERRER, BUYER, WAITING,
     )
     token = _login(client, email=REFERRER, password="Target123!").json()["access_token"]
