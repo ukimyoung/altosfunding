@@ -11,7 +11,7 @@ from app.models.manual_email import (
     ManualEmailRecipient,
     UploadedFile,
 )
-from app.models.partner import PartnerMember
+from app.models.partner import PartnerMember, PartnerMemberSyncRun
 from app.models.reward import RewardRecord, TradingBonusRecord
 from app.models.trading import (
     AccountDailyStat,
@@ -102,6 +102,7 @@ __all__ = [
     "UploadedFile",
     "MemberRelation",
     "PartnerMember",
+    "PartnerMemberSyncRun",
     "IbLevelRate",
     "IbLevelRateSet",
     "IbCommissionBatch",

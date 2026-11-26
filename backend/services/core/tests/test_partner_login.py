@@ -110,6 +110,7 @@ def test_activation_creates_separate_accounts_for_shared_email(client, sent_emai
     assert {r["email"] for r in rows} == {SHARED}
     assert all(r["auth_provider"] == "PARTNER" and r["verified"] for r in rows)
     assert rows[0]["first_name"] == "HONG GILDONG"
+    assert rows[0]["phone"] == "+821012345678"  # 제휴사 국내 번호는 +82로 저장
 
     # 이후에는 Member ID + 비밀번호로 로그인
     assert _login(client, email="ukim").status_code == 200

@@ -127,6 +127,7 @@ async def list_users(
                 User.last_name.ilike(like),
                 User.phone.ilike(like),
                 User.referral_code.ilike(like),
+                User.partner_member_id.ilike(like),
             )
         )
     if status:

@@ -6,6 +6,7 @@
 - 제휴사 status·구독 여부로 로그인을 막지 않는다. 단 deleted(제휴사에서 삭제)는 활성화하지 않는다.
 """
 
+import re
 from datetime import UTC, datetime
 
 from sqlalchemy import func, select, text
@@ -34,6 +35,21 @@ def mask_email(email: str) -> str:
     """k***@gmail.com 처럼 앞 한 글자만 보여 준다."""
     name, _, domain = email.partition("@")
     return f"{name[:1]}***@{domain}"
+
+
+def partner_phone(phone: str | None) -> str | None:
+    """제휴사(한국) 전화번호를 Altos 저장 형식(+821012345678)으로 바꾼다.
+
+    제휴사는 회원이 입력한 형식 그대로(01012345678, 010-1234-5678) 주므로, 0으로 시작하는 국내 번호만
+    +82로 바꾼다. 이미 +로 시작하거나 알 수 없는 형식은 그대로 둔다.
+    """
+    value = signup._clean(phone)
+    if not value:
+        return value
+    digits = re.sub(r"[\s\-()]", "", value)
+    if re.fullmatch(r"0\d{8,10}", digits):
+        return f"+82{digits[1:]}"
+    return value
 
 
 def partner_subject(member_id: str) -> str:
@@ -155,7 +171,7 @@ async def complete_activation(
         auth_provider="PARTNER",
         partner_member_id=partner.member_id,
         first_name=signup._clean(partner.name),
-        phone=signup._clean(partner.phone),
+        phone=partner_phone(partner.phone),
         email_verified_at=_now(),
         referral_code=await signup._generate_unique(session, User.referral_code, 8),
         agreed_to_terms=True,

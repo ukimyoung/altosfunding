@@ -24,6 +24,7 @@ import {
   Percent,
   CalendarClock,
   Ban,
+  Handshake,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -74,6 +75,7 @@ export const NAV: NavSection[] = [
     sectionLabel: '트레이더 관리',
     items: [
       { id: 'member-list', label: '회원 목록', icon: Users },
+      { id: 'partner-members', label: '제휴사 회원', icon: Handshake },
       {
         id: 'account-mgmt',
         label: '계좌 관리',
@@ -166,6 +168,7 @@ export const BC: Record<string, { parts: string[] }> = {
   leaderboard: { parts: ['대회', 'Leaderboard'] },
   'member-list': { parts: ['트레이더 관리', '회원 목록'] },
   'member-detail': { parts: ['트레이더 관리', '회원 목록', '회원 정보 상세'] },
+  'partner-members': { parts: ['트레이더 관리', '제휴사 회원'] },
   'account-mgmt': { parts: ['트레이더 관리', '계좌 관리'] },
   'challenge-account': { parts: ['트레이더 관리', '챌린지 계좌 관리'] },
   'funded-account': { parts: ['트레이더 관리', '펀디드 계좌 관리'] },
@@ -216,6 +219,7 @@ export const ROUTE_BY_PAGE_ID: Record<string, string> = {
   leaderboard: '/leaderboard',
   'member-list': '/member-list',
   'member-detail': '/member-list/:memberId',
+  'partner-members': '/partner-members',
   'challenge-account': '/challenge-account',
   'funded-account': '/funded-account',
   'live-account': '/live-account',

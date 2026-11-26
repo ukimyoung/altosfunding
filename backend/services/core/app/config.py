@@ -93,6 +93,17 @@ class Settings(BaseSettings):
     mt4_ingest_after_close_seconds: int = 1800
     # MT4 서버 시각의 시간대. 조회 기간(dateFrom/dateTo)을 이 시간대로 보내고, 시간대 없는 응답 시각도 이 시간대로 읽는다.
     mt4_server_timezone: str = "Europe/Athens"
+    # 제휴사(10Power·xnsoft) 회원 조회 API. 비어 있으면 가져오기를 하지 않는다.
+    # 'mock'이면 실제 호출 대신 개발용 가짜 회원(app.services.partner_mock)을 돌려준다 (live에서는 쓸 수 없음).
+    partner_members_api_url: str = ""
+    partner_members_api_key: str = ""
+    partner_members_http_timeout_seconds: float = 30
+    # 변경분 자동 가져오기 주기(분). 0이면 자동 실행 끔 (백오피스 버튼은 동작). 명세 권장 10분~1시간.
+    partner_sync_interval_minutes: int = 30
+    # 한 번에 받을 건수 (명세 최대 1000)
+    partner_sync_page_size: int = 1000
+    # 분당 60회 제한이라 페이지 요청 사이를 이만큼 띄운다
+    partner_sync_request_gap_seconds: float = 1.1
     # 트레이딩 룰 자동 검증 (Worker). 거래일 = 이 시간대의 날짜, 마감 = 그 날짜 다음 날 0시.
     risk_enabled: bool = True
     risk_seconds: float = 60

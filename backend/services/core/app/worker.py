@@ -10,6 +10,8 @@ Core API와 같은 코드·같은 DB를 쓰고, 사람이 누르지 않아도 �
   (app.services.trading_rules.watch_equity, RISK_EQUITY_WATCH_SECONDS).
 - MT4 거래·잔고 수집: 1분마다 거래 가능 계좌의 거래 내역·잔고를 브로커 API에서 받아 저장한다 (app.services.mt4_ingest).
 - MT4 연결 확인: 시작할 때와 10분마다 실제 브로커 API(서버 시각)를 불러 주소·API 키가 맞는지 로그로 남긴다.
+- 제휴사 회원 가져오기: PARTNER_SYNC_INTERVAL_MINUTES(기본 30분)마다 변경분 가져오기 회차를 작업 큐에 넣는다
+  (app.services.partner_sync, 제휴사 API 주소가 설정됐을 때만).
 - 생존 기록: core.worker_heartbeats에 마지막 실행 시각과 결과를 남긴다 (GET /api/v1/admin/system/worker).
 
 주기 작업은 각자 따로 돈다. 수동 메일을 오래 보내는 중에도 챌린지 회차는 제때 바뀐다.
@@ -34,7 +36,7 @@ from app import db
 from app.config import settings
 from app.models import Challenge, ChallengeSchedule, Job, WorkerHeartbeat
 from app.services import challenge as challenge_svc
-from app.services import jobs, mt4, mt4_ingest, trading_rules
+from app.services import jobs, mt4, mt4_ingest, partner_sync, trading_rules
 from app.services import manual_email as manual_email_svc
 from app.services.email import get_email_sender
 from app.services.files import public_base_url
@@ -50,7 +52,7 @@ MT4_CHECK_SECONDS = 600
 
 def import_job_handlers() -> None:
     """작업 처리기를 등록하는 모듈을 불러온다. 처리기를 새로 만들면 여기에 추가한다."""
-    from app.jobs import mt4  # noqa: F401
+    from app.jobs import mt4, partner  # noqa: F401
 
 
 # ── 주기 작업 ───────────────────────────────────────────────
@@ -220,6 +222,13 @@ class Worker:
             self._every("mt4", MT4_CHECK_SECONDS, check_mt4),
             self._every("mt4_ingest", settings.mt4_ingest_seconds, lambda: mt4_ingest.run(self.sessionmaker)),
         ]
+        if settings.partner_sync_interval_minutes > 0:
+            loops.append(
+                self._every(
+                    "partner_sync", settings.partner_sync_interval_minutes * 60,
+                    lambda: self._session_task(partner_sync.start_scheduled),
+                )
+            )
         if settings.risk_enabled:
             loops.append(
                 self._every("trading_rules", settings.risk_seconds, lambda: trading_rules.run(self.sessionmaker))
