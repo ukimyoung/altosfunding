@@ -110,7 +110,7 @@ export const challengeKo: ChallengeTranslations = {
 
     ruleResultsTitle: '챌린지 결과',
     ruleResultPassed: '통과',
-    ruleResultFailed: '불통과',
+    ruleResultFailed: '실패',
     rulePassed: '통과',
     ruleViolated: '위반',
     ruleProfitTarget: '수익 목표',
