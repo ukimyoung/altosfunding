@@ -26,7 +26,7 @@ const PASS_BADGE = {
     border: '1px solid rgba(22,163,74,0.2)',
   },
   FAILED: {
-    label: '✕ 불통과',
+    label: '✕ 실패',
     bg: 'rgba(220,38,38,0.1)',
     color: '#DC2626',
     border: '1px solid rgba(220,38,38,0.2)',

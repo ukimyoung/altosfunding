@@ -776,7 +776,7 @@ export function AccountDetailDrawer({
                     color: evaluation.result === 'PASSED' ? '#16A34A' : '#DC2626',
                   }}
                 >
-                  {evaluation.result === 'PASSED' ? '통과' : '불통과'}
+                  {evaluation.result === 'PASSED' ? '통과' : '실패'}
                 </span>
               </div>
               <div style={{ border: `1px solid ${t.border}`, borderRadius: 10, overflow: 'hidden' }}>

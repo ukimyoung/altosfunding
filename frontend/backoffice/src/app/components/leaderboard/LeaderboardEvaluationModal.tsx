@@ -75,7 +75,7 @@ export function LeaderboardEvaluationModal({
             marginBottom: 16,
           }}
         >
-          {passed ? '● 통과' : '✕ 불통과'}
+          {passed ? '● 통과' : '✕ 실패'}
         </div>
 
         <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
