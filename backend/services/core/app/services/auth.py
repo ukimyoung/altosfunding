@@ -3,14 +3,12 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
 from app.models import LoginHistory, User
 from app.security import verify_password
-from app.services import tokens
-from app.services.signup import normalize_email
+from app.services import partner_account, tokens
 
 
 @dataclass
@@ -40,12 +38,24 @@ async def login(
     user_agent: str | None,
     locale: str | None = None,
 ) -> LoginResult:
-    user = await session.scalar(
-        select(User).where(User.email == normalize_email(email), User.status != "WITHDRAWN")
-    )
+    """email에는 이메일 또는 제휴사 Member ID가 온다 (`@`가 없으면 Member ID)."""
+    identifier = email.strip()
     # 프론트는 404를 "가입되지 않은 이메일", 409를 "비밀번호 오류"로 보여 준다 (기존 서버와 동일).
-    if user is None:
-        raise AppError(404, "not_found", "user not found")
+    if partner_account.is_member_id(identifier):
+        partner = await partner_account.find_partner(session, identifier)
+        if partner is None:
+            raise AppError(404, "not_found", "user not found")
+        user = await partner_account.account_of(session, partner)
+        if user is None or user.status == "WITHDRAWN":
+            # 아직 Altos 계정이 없다: 비밀번호는 보지 않고 활성화 단계로 안내한다.
+            partner_account.ensure_activatable(partner)
+            raise partner_account.activation_required_error(partner)
+    else:
+        user = await partner_account.find_standard_user(session, identifier)
+        if user is None:
+            if await partner_account.has_partner_account_with_email(session, identifier):
+                raise AppError(404, "partner_use_member_id", "제휴사 회원은 Member ID로 로그인해 주세요.")
+            raise AppError(404, "not_found", "user not found")
 
     if not user.password_hash or not verify_password(password, user.password_hash):
         raise AppError(409, "invalid_credentials", "Invalid password")

@@ -148,6 +148,36 @@ DEFAULT_TEMPLATES: dict[str, dict[str, Any]] = {
             },
         },
     },
+    "partner_activation_code": {
+        "name": "제휴 회원 계정 활성화 인증코드",
+        "description": "제휴사 회원이 처음 로그인해 계정 활성화 코드를 요청할 때 즉시 발송",
+        "variables": ["verification_code", "expiry_minutes", "member_id"],
+        "locales": {
+            "en": {
+                "subject": "[Altos Funding] Account activation code",
+                "html": f"{_H2}Activate Your Account</h2>\n<p>Enter the code below to activate your Altos Funding account for Member ID <strong>{{{{ member_id }}}}</strong>.</p>\n{_CODE}\n<p>The verification code will expire after {{{{ expiry_minutes }}}} minutes. Do not share your code with anyone.</p>\n<p>If you did not request this, please ignore this email.</p>",
+            },
+            "ko": {
+                "subject": "[Altos Funding] 계정 활성화 인증코드",
+                "html": f"{_H2}계정 활성화</h2>\n<p>Member ID <strong>{{{{ member_id }}}}</strong>의 Altos Funding 계정을 활성화하려면 아래 인증코드를 입력해 주세요.</p>\n{_CODE}\n<p>인증코드는 {{{{ expiry_minutes }}}}분 동안 유효합니다. 다른 사람에게 코드를 알려 주지 마세요.</p>\n<p>직접 요청하지 않으셨다면 이 메일을 무시해 주세요.</p>",
+            },
+        },
+    },
+    "email_change_code": {
+        "name": "이메일 변경 인증코드",
+        "description": "Edit Profile에서 새 이메일로 변경할 때 새 이메일로 즉시 발송",
+        "variables": ["verification_code", "expiry_minutes"],
+        "locales": {
+            "en": {
+                "subject": "[Altos Funding] Email change verification code",
+                "html": f"{_H2}Email Verification</h2>\n<p>Enter the code below to use this address as your Altos Funding account email.</p>\n{_CODE}\n<p>The verification code will expire after {{{{ expiry_minutes }}}} minutes. Do not share your code with anyone.</p>\n<p>If you did not request this, please ignore this email.</p>",
+            },
+            "ko": {
+                "subject": "[Altos Funding] 이메일 변경 인증코드",
+                "html": f"{_H2}이메일 인증</h2>\n<p>이 주소를 Altos Funding 계정 이메일로 사용하려면 아래 인증코드를 입력해 주세요.</p>\n{_CODE}\n<p>인증코드는 {{{{ expiry_minutes }}}}분 동안 유효합니다. 다른 사람에게 코드를 알려 주지 마세요.</p>\n<p>직접 요청하지 않으셨다면 이 메일을 무시해 주세요.</p>",
+            },
+        },
+    },
     "password_reset": {
         "name": "비밀번호 재설정",
         "description": "비밀번호 찾기에서 재설정 링크 요청 시 즉시 발송",
@@ -202,10 +232,20 @@ DEFAULT_TEMPLATES.update(LEGACY_TEMPLATES)
 VERIFICATION_TEMPLATE_IDS = {
     "SIGNUP": "email_verification_requested",
     "WITHDRAW_REQUEST": "withdraw_verification_code",
+    "PARTNER_ACTIVATION": "partner_activation_code",
+    "EMAIL_CHANGE": "email_change_code",
 }
 
 # 코드가 꼭 보내야 하는 메일(인증·보안). 템플릿을 꺼 두어도 기본값으로 보낸다.
-REQUIRED_TEMPLATE_IDS = frozenset({"email_verification_requested", "withdraw_verification_code", "password_reset"})
+REQUIRED_TEMPLATE_IDS = frozenset(
+    {
+        "email_verification_requested",
+        "withdraw_verification_code",
+        "password_reset",
+        "partner_activation_code",
+        "email_change_code",
+    }
+)
 
 
 def render_default(template_id: str, locale: str, variables: dict[str, Any]) -> RenderedEmail:

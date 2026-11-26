@@ -116,7 +116,7 @@ def test_withdraw_code_send_failure_allows_retry(client, trader, monkeypatch):  
 
 def test_all_default_templates_render():
     """기존 서버에서 옮겨 온 템플릿까지 모두 en·ko로 렌더링되고, 한국어 본문에 영문 안내 문장이 남지 않는다."""
-    assert len(email_templates.DEFAULT_TEMPLATES) == 38
+    assert len(email_templates.DEFAULT_TEMPLATES) == 40
     for tid, t in email_templates.DEFAULT_TEMPLATES.items():
         sample = {v: f"<{v}>" for v in t["variables"]}
         for loc in ("en", "ko"):

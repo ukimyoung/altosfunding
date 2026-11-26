@@ -18,6 +18,8 @@ from app.errors import AppError
 from app.models import LoginHistory, User
 from app.schemas.auth import (
     BackupCodesResponse,
+    EmailChangeRequest,
+    EmailChangeSendRequest,
     LocaleUpdateRequest,
     LoginHistoryOut,
     LoginHistoryPage,
@@ -33,7 +35,7 @@ from app.schemas.auth import (
     WithdrawEmailRequest,
     WithdrawEmailResponse,
 )
-from app.services import member_relations, notify, password, signup, two_factor, user_admin
+from app.services import member_relations, notify, partner_account, password, signup, two_factor, user_admin
 from app.services.email import EmailSender, get_email_sender
 from app.services.recaptcha import verify_recaptcha
 
@@ -46,6 +48,28 @@ async def _user_out(session, user: User) -> UserOut:
 
 @router.get("/me", response_model=UserOut, summary="내 정보 조회")
 async def me(user: CurrentUser, session: Session) -> UserOut:
+    return await _user_out(session, user)
+
+
+# ── 이메일 변경 (제휴사 회원만) ─────────────────────────────────
+
+
+@router.post("/email/change/send-code", response_model=OkResponse, summary="이메일 변경 코드 발송 (제휴 회원)")
+async def email_change_send_code(
+    body: EmailChangeSendRequest,
+    user: CurrentUser,
+    session: Session,
+    sender: Annotated[EmailSender, Depends(get_email_sender)],
+) -> OkResponse:
+    """새 이메일로 6자리 코드를 보낸다. 일반 회원은 403 `email_change_not_allowed`."""
+    await partner_account.send_email_change_code(session, sender, user, str(body.new_email), user.locale or "en")
+    return OkResponse(message_key="auth.email.verification_sent")
+
+
+@router.post("/email/change", response_model=UserOut, summary="이메일 변경 (제휴 회원)")
+async def email_change(body: EmailChangeRequest, user: CurrentUser, session: Session) -> UserOut:
+    """새 이메일로 받은 코드를 확인하고 계정 이메일을 바꾼다. 다른 계정이 쓰는 이메일이어도 된다."""
+    await partner_account.change_email(session, user, str(body.new_email), body.code)
     return await _user_out(session, user)
 
 

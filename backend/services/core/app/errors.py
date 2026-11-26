@@ -17,22 +17,25 @@ from fastapi.responses import JSONResponse
 
 
 class AppError(Exception):
-    def __init__(self, status_code: int, error_code: str, message: str) -> None:
+    def __init__(self, status_code: int, error_code: str, message: str, data: dict | None = None) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.error_code = error_code
         self.message = message
+        # 화면이 다음 단계에 쓸 값 (예: 제휴 계정 활성화에 필요한 가린 이메일). 있으면 data로 함께 준다.
+        self.data = data
 
 
 def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def handle_app_error(_: Request, exc: AppError) -> JSONResponse:
-        return JSONResponse(
-            status_code=exc.status_code,
-            content={
-                "error_code": exc.error_code,
-                "message_key": f"error.{exc.error_code}",
-                "message": exc.message,
-                "detail": {"error_code": exc.error_code, "message": exc.message},
-            },
-        )
+        content = {
+            "error_code": exc.error_code,
+            "message_key": f"error.{exc.error_code}",
+            "message": exc.message,
+            "detail": {"error_code": exc.error_code, "message": exc.message},
+        }
+        if exc.data:
+            content["data"] = exc.data
+            content["detail"]["data"] = exc.data
+        return JSONResponse(status_code=exc.status_code, content=content)

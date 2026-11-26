@@ -13,6 +13,9 @@ from app.schemas.auth import (
     EmailVerifyRequest,
     LoginRequest,
     OkResponse,
+    PartnerActivationCompleteRequest,
+    PartnerActivationSendRequest,
+    PartnerActivationSendResponse,
     RefreshTokenRequest,
     RegisterRequest,
     TokenResponse,
@@ -21,7 +24,7 @@ from app.schemas.auth import (
     UserOut,
     VerificationPurpose,
 )
-from app.services import auth, notify, signup, tokens, two_factor
+from app.services import auth, notify, partner_account, signup, tokens, two_factor
 from app.services.email import EmailSender, get_email_sender
 from app.services.recaptcha import verify_recaptcha
 
@@ -145,14 +148,18 @@ async def register(
     "/login",
     response_model=TokenResponse | TwoFactorRequiredResponse,
     response_model_exclude_none=False,
-    summary="이메일 로그인",
+    summary="이메일 또는 제휴사 Member ID 로그인",
 )
 async def login(
     body: LoginRequest, request: Request, response: Response, session: Session
 ) -> TokenResponse | TwoFactorRequiredResponse:
     """로그인하고 access token을 돌려준다. refresh token은 HttpOnly 쿠키로 설정한다.
 
-    - 가입되지 않은 이메일: 404
+    - `email`에 `@`가 없으면 제휴사 Member ID로 본다.
+    - 가입되지 않은 이메일·Member ID: 404 `not_found`
+    - 제휴 계정만 쓰는 이메일로 로그인: 404 `partner_use_member_id`
+    - 아직 Altos 계정이 없는 Member ID: 409 `partner_activation_required` (data: member_id, masked_email),
+      제휴사 이메일 없음 409 `partner_email_required`, 제휴사 삭제 회원 409 `account_deactivated`
     - 비밀번호 오류, 이용 정지 계정: 409
     - 2FA를 켠 회원: `requires_2fa: true`와 임시 토큰 쿠키(`2fa_temp_token`)를 주고,
       `POST /auth/2fa/login`에서 코드를 확인한 뒤 토큰을 발급한다.
@@ -242,4 +249,55 @@ async def login_2fa(
         session, user, _client_ip(request), request.headers.get("user-agent"), _header_locale(request)
     )
     _delete_cookie(response, TWO_FACTOR_COOKIE)
+    return _token_response(response, result)
+
+
+# ── 제휴사 회원 계정 활성화 (처음 한 번) ─────────────────────────
+
+
+@router.post(
+    "/partner/activation/send-code",
+    response_model=PartnerActivationSendResponse,
+    summary="제휴 회원 계정 활성화 코드 발송",
+)
+async def partner_activation_send_code(
+    body: PartnerActivationSendRequest,
+    request: Request,
+    session: Session,
+    sender: Annotated[EmailSender, Depends(get_email_sender)],
+) -> PartnerActivationSendResponse:
+    """아직 Altos 계정이 없는 제휴 회원의 제휴사 등록 이메일로 6자리 코드를 보낸다 (reCAPTCHA 확인).
+
+    - 없는 Member ID 404 `not_found`, 이미 활성화 409 `partner_already_activated`,
+      이메일 없음 409 `partner_email_required`, 제휴사 삭제 회원 409 `account_deactivated`
+    """
+    await verify_recaptcha(body.recaptcha_token, _client_ip(request))
+    partner, expiry = await partner_account.send_activation_code(session, sender, body.member_id, _locale(request))
+    assert partner.email
+    return PartnerActivationSendResponse(
+        member_id=partner.member_id,
+        masked_email=partner_account.mask_email(partner.email),
+        expiry_minutes=expiry,
+    )
+
+
+@router.post(
+    "/partner/activation/complete",
+    response_model=TokenResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="제휴 회원 계정 활성화 (코드 확인·비밀번호 설정·로그인)",
+)
+async def partner_activation_complete(
+    body: PartnerActivationCompleteRequest,
+    request: Request,
+    response: Response,
+    session: Session,
+    sender: Annotated[EmailSender, Depends(get_email_sender)],
+) -> TokenResponse:
+    """코드가 맞으면 Altos 계정을 만들고 바로 로그인시킨다. 이후에는 Member ID + 이 비밀번호로 로그인한다."""
+    user = await partner_account.complete_activation(session, body, _locale(request))
+    await notify.welcome(session, sender, user.id)
+    result = await auth.complete_login(
+        session, user, _client_ip(request), request.headers.get("user-agent"), _header_locale(request)
+    )
     return _token_response(response, result)

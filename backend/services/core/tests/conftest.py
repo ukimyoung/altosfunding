@@ -66,8 +66,12 @@ def _wallet_config_seed() -> str:
 
 def _email_template_seed() -> str:
     """마이그레이션이 넣는 기본 메일 템플릿을 테스트마다 다시 넣는다 (users truncate cascade로 지워지므로)."""
-    sql = next(MIGRATIONS_DIR.glob("*_core_email_templates.sql")).read_text(encoding="utf-8")
-    return "truncate core.email_templates cascade;\n" + sql[sql.index("insert into core.email_templates") :]
+    parts = []
+    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        sql = path.read_text(encoding="utf-8")
+        if "insert into core.email_templates" in sql:
+            parts.append(sql[sql.index("insert into core.email_templates") :])
+    return "truncate core.email_templates cascade;\n" + "\n".join(parts)
 
 
 _CONTACT_CATEGORY_RESET = (
