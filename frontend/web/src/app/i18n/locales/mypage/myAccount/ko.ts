@@ -151,4 +151,25 @@ export const myAccountKo: MyAccountTranslations = {
     creating: '생성 중...',
     requestFailed: '요청 실패',
     profileNameRequired: '프로필에 이름과 성을 입력해 주세요.',
-  };
+
+    // Partner member: Member ID, email change
+    memberId: "Member ID",
+    emailChangeBtn: "변경",
+    emailChangeHint: "제휴사 회원은 이메일을 변경할 수 있습니다. 새 이메일로 인증코드를 보냅니다.",
+    emailChangeNewPlaceholder: "새 이메일 주소",
+    emailChangeSendCode: "인증코드 받기",
+    emailChangeResendCode: "다시 받기",
+    emailChangeSending: "보내는 중...",
+    emailChangeCodeSent: "{email}(으)로 6자리 인증코드를 보냈습니다. {minutes}분 동안 유효합니다.",
+    emailChangeCodePlaceholder: "6자리 숫자",
+    emailChangeConfirm: "인증 후 변경",
+    emailChangeConfirming: "변경 중...",
+    emailChangeCancel: "취소",
+    emailChangeDone: "이메일이 변경되었습니다.",
+    emailChangeErrInvalid: "올바른 이메일 주소를 입력해 주세요.",
+    emailChangeErrSame: "현재 이메일과 같습니다.",
+    emailChangeErrCode: "인증코드가 올바르지 않습니다.",
+    emailChangeErrExpired: "인증코드가 만료되었습니다. 코드를 다시 받아 주세요.",
+    emailChangeErrTooMany: "시도 횟수를 초과했습니다. 코드를 다시 받아 주세요.",
+    emailChangeFailed: "이메일을 변경하지 못했습니다. 다시 시도해 주세요.",
+};

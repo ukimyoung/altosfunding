@@ -9,6 +9,7 @@ import { accountsQueryKeys, useAccountsQuery } from '@/app/queries/accounts';
 import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { useQueryClient } from '@tanstack/react-query';
 import {
+  KeyRound,
   User,
   Mail,
   Phone,
@@ -436,6 +437,19 @@ export function MyAccountPage() {
                 </p>
               </div>
             </div>
+
+            {/* Member ID (제휴사 회원만) */}
+            {me?.is_partner_member && me.partner_member_id ? (
+              <div className="flex items-start gap-4">
+                <div className="w-10 h-10 rounded-lg bg-[#FFB800]/10 flex items-center justify-center flex-shrink-0">
+                  <KeyRound size={20} className="text-[#FFB800]" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-gray-400 text-xs mb-1">{text.memberId}</p>
+                  <p className="text-white text-sm font-medium font-mono">{me.partner_member_id}</p>
+                </div>
+              </div>
+            ) : null}
 
             {/* Referrer Code */}
             <div className="flex items-start gap-4">

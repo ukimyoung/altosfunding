@@ -151,4 +151,25 @@ export const myAccountEn: MyAccountTranslations = {
     creating: 'Creating...',
     requestFailed: 'Request Failed',
     profileNameRequired: 'Please enter your first and last name in your profile.',
-  };
+
+    // Partner member: Member ID, email change
+    memberId: "Member ID",
+    emailChangeBtn: "Change",
+    emailChangeHint: "Partner members can change their email. A code will be sent to the new email.",
+    emailChangeNewPlaceholder: "New email address",
+    emailChangeSendCode: "Send Code",
+    emailChangeResendCode: "Resend",
+    emailChangeSending: "Sending...",
+    emailChangeCodeSent: "We sent a 6-digit code to {email}. It expires in {minutes} minutes.",
+    emailChangeCodePlaceholder: "6-digit code",
+    emailChangeConfirm: "Verify & Change",
+    emailChangeConfirming: "Changing...",
+    emailChangeCancel: "Cancel",
+    emailChangeDone: "Your email has been changed.",
+    emailChangeErrInvalid: "Please enter a valid email address.",
+    emailChangeErrSame: "This is your current email.",
+    emailChangeErrCode: "The verification code is incorrect.",
+    emailChangeErrExpired: "The verification code has expired. Please request a new code.",
+    emailChangeErrTooMany: "Too many attempts. Please request a new code.",
+    emailChangeFailed: "Failed to change your email. Please try again.",
+};

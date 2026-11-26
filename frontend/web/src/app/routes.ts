@@ -18,6 +18,7 @@ import { HelpCenterPage } from './pages/help/HelpCenterPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { ForgotPasswordSuccessPage } from './pages/auth/ForgotPasswordSuccessPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
+import { PartnerActivationPage } from './pages/auth/PartnerActivationPage';
 import { AboutUsPage } from './pages/AboutUsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -158,6 +159,16 @@ export const router = createBrowserRouter([
           {
             index: true,
             Component: ForgotPasswordSuccessPage,
+          },
+        ],
+      },
+      {
+        path: '/partner-activation',
+        Component: SignUpLayout,
+        children: [
+          {
+            index: true,
+            Component: PartnerActivationPage,
           },
         ],
       },
