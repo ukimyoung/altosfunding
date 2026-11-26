@@ -38,6 +38,7 @@ type MemberRow = {
   name: string;
   email: string;
   uid: string;
+  partnerMemberId: string | null;
   userType: 'VIP' | 'Normal';
   nation: string;
   kyc: string;
@@ -127,6 +128,7 @@ const mapUserToRow = (user: User): MemberRow => {
     name,
     email: user.email,
     uid: user.uid || '-',
+    partnerMemberId: user.partner_member_id ?? null,
     userType: String(user.grade).toUpperCase() === 'VIP' ? 'VIP' : 'Normal',
     nation,
     kyc: mapKycStatus(user.kyc_status),
@@ -359,7 +361,7 @@ export function MemberListPage() {
         <SearchField
           value={searchDraft}
           onChange={setSearchDraft}
-          placeholder="이름, 이메일, UID로 검색"
+          placeholder="이름, 이메일, UID, Member ID로 검색"
           minWidth={180}
           background={t.surface2}
           borderColor={t.border2}
@@ -529,6 +531,25 @@ export function MemberListPage() {
                 >
                   UID : {m.uid}
                 </span>
+                {m.partnerMemberId ? (
+                  <span
+                    title="제휴사 회원 (Member ID로 로그인)"
+                    style={{
+                      alignSelf: 'flex-start',
+                      marginTop: 2,
+                      padding: '1px 6px',
+                      borderRadius: 999,
+                      fontSize: 10,
+                      fontWeight: 600,
+                      background: 'rgba(217,119,6,0.12)',
+                      color: '#D97706',
+                      fontFamily: "'DM Mono',monospace",
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    제휴 · {m.partnerMemberId}
+                  </span>
+                ) : null}
               </div>
             </td>
             <td style={{ padding: '0 16px', verticalAlign: 'middle' }}>

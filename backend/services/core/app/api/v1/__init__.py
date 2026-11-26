@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.account import router as account_router
 from app.api.v1.admin_accounts import router as admin_accounts_router
 from app.api.v1.admin_affiliate import router as admin_affiliate_router
+from app.api.v1.admin_partner_members import router as admin_partner_members_router
 from app.api.v1.admin_users import router as admin_users_router
 from app.api.v1.affiliate import router as affiliate_router
 from app.api.v1.announcements import admin_router as admin_announcements_router
@@ -63,5 +64,6 @@ router.include_router(admin_system_router)
 router.include_router(admin_dashboard_router)
 router.include_router(admin_mt4_account_issued_history_router)
 router.include_router(admin_affiliate_router)
+router.include_router(admin_partner_members_router)
 router.include_router(affiliate_router)
 router.include_router(admin_accounts_router)

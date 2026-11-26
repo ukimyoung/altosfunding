@@ -146,6 +146,10 @@ export interface User {
   admin_note?: string | null;
   /** 회원 언어 (알림 메일 언어) */
   locale?: UserLocale;
+  /** 제휴사(10Power·xnsoft) 회원 계정이면 true */
+  is_partner_member?: boolean;
+  /** 제휴사 Member ID (일반 계정은 null) */
+  partner_member_id?: string | null;
 }
 
 export interface ListUsersParams {

@@ -12,6 +12,7 @@ import Login from './pages/auth/Login';
 import { AccountManagementPage } from './pages/accounts/AccountManagementPage';
 import { MemberDetailPage } from './pages/members/MemberDetailPage';
 import { MemberListPage } from './pages/members/MemberListPage';
+import { PartnerMembersPage } from './pages/members/PartnerMembersPage';
 import { PlaceholderPage } from './pages/PlaceholderPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { ViolationHistoryPage } from './pages/violations/ViolationHistoryPage';
@@ -127,6 +128,10 @@ export const router = createBrowserRouter([
       {
         path: appPath(ROUTE_BY_PAGE_ID['member-detail']),
         Component: MemberDetailPage,
+      },
+      {
+        path: appPath(ROUTE_BY_PAGE_ID['partner-members']),
+        Component: PartnerMembersPage,
       },
       {
         path: appPath(ROUTE_BY_PAGE_ID['challenge-account']),

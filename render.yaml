@@ -151,6 +151,12 @@ services:
         sync: false
       - key: MT4_LIVE_API_KEY
         sync: false
+      # 제휴사(10Power·xnsoft) 회원 조회 API. 제휴사가 테스트 주소·전용 키를 발급하기 전까지는 'mock'(가짜 회원 25명)으로 둔다.
+      # 실제 값을 받으면 URL은 https://<10Power 도메인>/api/partner/v1/members 로 바꾸고 키는 대시보드에 입력한다.
+      - key: PARTNER_MEMBERS_API_URL
+        value: mock
+      - key: PARTNER_MEMBERS_API_KEY
+        sync: false
       # Google 로그인. 비어 있으면 /api/v1/auth/google/* 는 503을 돌려준다.
       - key: GOOGLE_CLIENT_ID
         sync: false
@@ -240,6 +246,17 @@ services:
           type: web
           name: altosfunding-core-sandbox
           envVarKey: MT4_LIVE_API_KEY
+      # 제휴사 회원 가져오기도 Worker가 한다 (값은 Core에서 가져온다).
+      - key: PARTNER_MEMBERS_API_URL
+        fromService:
+          type: web
+          name: altosfunding-core-sandbox
+          envVarKey: PARTNER_MEMBERS_API_URL
+      - key: PARTNER_MEMBERS_API_KEY
+        fromService:
+          type: web
+          name: altosfunding-core-sandbox
+          envVarKey: PARTNER_MEMBERS_API_KEY
       # 예약 메일 속 이미지·수신거부 링크의 주소. Worker에는 공개 주소가 없어서 Core 주소를 직접 적는다.
       - key: CORE_PUBLIC_URL
         value: https://altosfunding-core-sandbox.onrender.com

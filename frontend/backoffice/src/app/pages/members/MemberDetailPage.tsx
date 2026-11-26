@@ -572,7 +572,12 @@ export function MemberDetailPage() {
               <StatusBadge status={member.status} t={t} />
             </div>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-              {[`UID : ${member.uid}`, `Email : ${member.email}`, `가입일: ${member.regDate}`].map(
+              {[
+                `UID : ${member.uid}`,
+                `Email : ${member.email}`,
+                `가입일: ${member.regDate}`,
+                ...(user?.partner_member_id ? [`제휴사 Member ID : ${user.partner_member_id}`] : []),
+              ].map(
                 (info, i) => (
                   <span
                     key={i}
