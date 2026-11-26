@@ -228,108 +228,103 @@ export function PartnerActivationPage() {
               ) : null}
             </div>
 
-            {sentTo ? (
-              <>
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1.5">{text.paCodeLabel}</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    maxLength={6}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder={text.paCodePlaceholder}
-                    className={`${inputClass} tracking-[0.4em]`}
-                  />
-                </div>
+            {/* 처음부터 전체 입력란을 보여 준다. 인증코드를 받기 전에는 제출 버튼이 꺼져 있다. */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">{text.paCodeLabel}</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder={text.paCodePlaceholder}
+                className={`${inputClass} tracking-[0.4em]`}
+              />
+            </div>
 
-                <div className="space-y-3">
-                  <label className="block text-sm text-gray-400">{text.paPasswordLabel}</label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      name="new-password"
-                      autoComplete="new-password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder={text.paPasswordPlaceholder}
-                      className={inputClass}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="new-password"
-                    value={passwordConfirm}
-                    onChange={(e) => setPasswordConfirm(e.target.value)}
-                    placeholder={text.paPasswordConfirmPlaceholder}
-                    className={inputClass}
-                  />
-                  {isPasswordTooShort ? (
-                    <p className="text-sm text-red-400">{text.paErrPasswordLength}</p>
-                  ) : isPasswordMismatch ? (
-                    <p className="text-sm text-red-400">{text.paErrPasswordMismatch}</p>
-                  ) : null}
-                </div>
+            <div className="space-y-3">
+              <label className="block text-sm text-gray-400">{text.paPasswordLabel}</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="new-password"
+                  autoComplete="new-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder={text.paPasswordPlaceholder}
+                  className={inputClass}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="new-password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                placeholder={text.paPasswordConfirmPlaceholder}
+                className={inputClass}
+              />
+              {isPasswordTooShort ? (
+                <p className="text-sm text-red-400">{text.paErrPasswordLength}</p>
+              ) : isPasswordMismatch ? (
+                <p className="text-sm text-red-400">{text.paErrPasswordMismatch}</p>
+              ) : null}
+            </div>
 
-                <div className="space-y-3 pt-1">
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={agreeToTerms}
-                      onChange={(e) => setAgreeToTerms(e.target.checked)}
-                      className="mt-1 w-4 h-4 bg-[#1a1a24] border border-[#2a2a3a] rounded accent-[#0052FF]"
-                    />
-                    <span className="text-sm text-gray-400">
-                      {text.paAgreeTermsPrefix}
-                      <Link to="/terms" className="text-[#0052FF] hover:text-[#00FF94] transition-colors">
-                        {text.paTermsLink}
-                      </Link>
-                      {text.paAgreeTermsConnector}
-                      <Link
-                        to="/privacy-policy"
-                        className="text-[#0052FF] hover:text-[#00FF94] transition-colors"
-                      >
-                        {text.paPrivacyLink}
-                      </Link>
-                      {text.paAgreeTermsSuffix}
-                    </span>
-                  </label>
-                  <label className="flex items-start gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={subscribeNewsletter}
-                      onChange={(e) => setSubscribeNewsletter(e.target.checked)}
-                      className="mt-1 w-4 h-4 bg-[#1a1a24] border border-[#2a2a3a] rounded accent-[#0052FF]"
-                    />
-                    <span className="text-sm text-gray-400">{text.paNewsletter}</span>
-                  </label>
-                </div>
-              </>
-            ) : null}
+            <div className="space-y-3 pt-1">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreeToTerms}
+                  onChange={(e) => setAgreeToTerms(e.target.checked)}
+                  className="mt-1 w-4 h-4 bg-[#1a1a24] border border-[#2a2a3a] rounded accent-[#0052FF]"
+                />
+                <span className="text-sm text-gray-400">
+                  {text.paAgreeTermsPrefix}
+                  <Link to="/terms" className="text-[#0052FF] hover:text-[#00FF94] transition-colors">
+                    {text.paTermsLink}
+                  </Link>
+                  {text.paAgreeTermsConnector}
+                  <Link
+                    to="/privacy-policy"
+                    className="text-[#0052FF] hover:text-[#00FF94] transition-colors"
+                  >
+                    {text.paPrivacyLink}
+                  </Link>
+                  {text.paAgreeTermsSuffix}
+                </span>
+              </label>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={subscribeNewsletter}
+                  onChange={(e) => setSubscribeNewsletter(e.target.checked)}
+                  className="mt-1 w-4 h-4 bg-[#1a1a24] border border-[#2a2a3a] rounded accent-[#0052FF]"
+                />
+                <span className="text-sm text-gray-400">{text.paNewsletter}</span>
+              </label>
+            </div>
 
             {errorMessage ? <p className="text-sm text-red-400 text-center">{errorMessage}</p> : null}
 
-            {sentTo ? (
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className={`w-full px-6 py-3 text-white rounded-lg transition-all mt-4 ${
-                  canSubmit
-                    ? 'bg-gradient-to-r from-[#FFB800] via-[#0052FF] to-[#0052FF] hover:shadow-lg hover:shadow-[#0052FF]/50'
-                    : 'bg-[#2a2a3a] text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                {complete.isPending ? text.paSubmitting : text.paSubmit}
-              </button>
-            ) : null}
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              className={`w-full px-6 py-3 text-white rounded-lg transition-all mt-4 ${
+                canSubmit
+                  ? 'bg-gradient-to-r from-[#FFB800] via-[#0052FF] to-[#0052FF] hover:shadow-lg hover:shadow-[#0052FF]/50'
+                  : 'bg-[#2a2a3a] text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              {complete.isPending ? text.paSubmitting : text.paSubmit}
+            </button>
           </form>
 
           <div className="mt-8 flex items-center justify-center">
