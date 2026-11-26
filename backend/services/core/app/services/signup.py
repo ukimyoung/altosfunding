@@ -38,18 +38,25 @@ def _clean(value: str | None) -> str | None:
 
 
 async def _find_active_user_by_email(session: AsyncSession, email: str) -> User | None:
+    """같은 이메일을 쓰는 탈퇴 안 한 계정 (제휴 계정 포함 — 일반 가입은 제휴 계정 이메일도 거부한다)."""
     return await session.scalar(
-        select(User).where(User.email == email, User.status != "WITHDRAWN")
+        select(User).where(User.email == email, User.status != "WITHDRAWN").limit(1)
     )
 
 
 async def _latest_verification(
-    session: AsyncSession, email: str, purpose: VerificationPurpose
+    session: AsyncSession, email: str, purpose: VerificationPurpose, subject_key: str | None = None
 ) -> EmailVerification | None:
+    """가장 최근 코드. subject_key가 있으면 그 계정의 코드만 본다 (같은 이메일을 쓰는 다른 계정과 섞이지 않게)."""
+    who = (
+        EmailVerification.subject_key == subject_key
+        if subject_key
+        else (EmailVerification.email == email) & EmailVerification.subject_key.is_(None)
+    )
     return await session.scalar(
         select(EmailVerification)
         .where(
-            EmailVerification.email == email,
+            who,
             EmailVerification.purpose == purpose.value,
             EmailVerification.consumed_at.is_(None),
         )
@@ -60,11 +67,20 @@ async def _latest_verification(
 
 
 async def _issue_code(
-    session: AsyncSession, sender: EmailSender, email: str, purpose: VerificationPurpose, locale: str
-) -> None:
-    """6자리 코드를 만들어 저장하고 메일로 보낸다. 메일 발송에 실패하면 코드를 지워 바로 다시 요청할 수 있게 한다."""
+    session: AsyncSession,
+    sender: EmailSender,
+    email: str,
+    purpose: VerificationPurpose,
+    locale: str,
+    subject_key: str | None = None,
+    extra_variables: dict | None = None,
+) -> int:
+    """6자리 코드를 만들어 저장하고 메일로 보낸다. 메일 발송에 실패하면 코드를 지워 바로 다시 요청할 수 있게 한다.
+
+    유효 시간(분)을 돌려준다.
+    """
     now = _now()
-    latest = await _latest_verification(session, email, purpose)
+    latest = await _latest_verification(session, email, purpose, subject_key)
     cooldown = timedelta(seconds=settings.email_code_resend_cooldown_seconds)
     if latest and latest.created_at > now - cooldown:
         raise AppError(429, "rate_limit_exceeded", "잠시 후 다시 요청해 주세요.")
@@ -77,13 +93,15 @@ async def _issue_code(
     verification = EmailVerification(
         email=email,
         purpose=purpose.value,
+        subject_key=subject_key,
         code_hash=hash_code(code),
         expires_at=now + timedelta(seconds=ttl_seconds),
     )
     session.add(verification)
     await session.commit()
     template_id = email_templates.VERIFICATION_TEMPLATE_IDS[purpose.value]
-    variables = {"verification_code": code, "expiry_minutes": max(1, -(-ttl_seconds // 60))}
+    expiry_minutes = max(1, -(-ttl_seconds // 60))
+    variables = {"verification_code": code, "expiry_minutes": expiry_minutes, **(extra_variables or {})}
     mail = await email_template.render(session, template_id, locale, variables)
     try:
         if mail is None:  # 인증 메일은 항상 만들어지지만, 만약을 위해 실패로 처리한다.
@@ -93,6 +111,7 @@ async def _issue_code(
         await session.delete(verification)
         await session.commit()
         raise AppError(502, "email_send_failed", "인증 메일을 보내지 못했습니다. 잠시 후 다시 시도해 주세요.") from exc
+    return expiry_minutes
 
 
 async def send_verification_code(
@@ -121,12 +140,25 @@ async def send_withdraw_code(
     if normalize_email(email) != user.email:
         raise AppError(400, "email_mismatch", "본인 이메일로만 인증코드를 받을 수 있습니다.")
 
-    await _issue_code(session, sender, user.email, VerificationPurpose.WITHDRAW_REQUEST, locale)
+    await _issue_code(
+        session, sender, user.email, VerificationPurpose.WITHDRAW_REQUEST, locale, subject_key=user_subject(user)
+    )
+
+
+def user_subject(user: User) -> str:
+    return f"user:{user.id}"
 
 
 async def consume_withdraw_code(session: AsyncSession, user: User, code: str) -> None:
     """출금 신청 시 받은 이메일 코드를 확인하고 바로 사용 처리한다 (한 번만 쓸 수 있음). 커밋은 호출한 쪽에서 한다."""
-    verification = await _latest_verification(session, user.email, VerificationPurpose.WITHDRAW_REQUEST)
+    verification = await _latest_verification(
+        session, user.email, VerificationPurpose.WITHDRAW_REQUEST, user_subject(user)
+    )
+    await consume_code(session, verification, code)
+
+
+async def consume_code(session: AsyncSession, verification: EmailVerification | None, code: str) -> None:
+    """코드를 확인하고 사용 처리한다. 틀리면 시도 횟수를 올려 커밋하고 오류를 낸다. 맞으면 커밋은 호출한 쪽에서 한다."""
     if verification is None or verification.expires_at <= _now():
         raise AppError(400, "verification_code_expired", "인증코드가 없거나 만료되었습니다. 코드를 다시 받아 주세요.")
     if verification.attempts >= settings.email_code_max_attempts:
@@ -298,5 +330,7 @@ def to_user_out(
         grade=user.grade,
         total_referrals=total_referrals,
         total_assets=total_assets,
-        can_change_password=user.auth_provider == "LOCAL",
+        can_change_password=user.auth_provider in ("LOCAL", "PARTNER"),
+        is_partner_member=user.partner_member_id is not None,
+        partner_member_id=user.partner_member_id,
     )

@@ -51,6 +51,10 @@ class User(Base):
     locale: Mapped[str] = mapped_column(server_default="en")
 
     referral_code: Mapped[str] = mapped_column(String, unique=True)
+    # 제휴사(10Power·xnsoft) 회원 계정이면 그 Member ID. 일반 계정은 None.
+    partner_member_id: Mapped[str | None] = mapped_column(ForeignKey("core.partner_members.member_id"), unique=True)
+    # 탈퇴한 제휴 계정의 Member ID (연결은 풀어 같은 Member ID로 다시 활성화할 수 있게 한다).
+    withdrawn_partner_member_id: Mapped[str | None]
     # 추천인·수당 조직 상위는 core.member_relations (MemberRelation)에 있다.
 
     agreed_to_terms: Mapped[bool] = mapped_column(server_default="false")
@@ -70,6 +74,8 @@ class EmailVerification(Base):
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     email: Mapped[str]
     purpose: Mapped[str]
+    # 누구의 코드인지: partner:<member_id> / user:<user_id>. 회원가입 코드는 None.
+    subject_key: Mapped[str | None]
     code_hash: Mapped[str]
     attempts: Mapped[int] = mapped_column(Integer, server_default="0")
     expires_at: Mapped[datetime]

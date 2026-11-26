@@ -12,7 +12,7 @@ from app.errors import AppError
 from app.models import PasswordResetToken, User
 from app.security import hash_password, sha256_hex, verify_password
 from app.services import tokens
-from app.services import email_template
+from app.services import email_template, partner_account
 from app.services.email import EmailSender, EmailSendError
 from app.services.signup import normalize_email
 
@@ -65,12 +65,22 @@ async def request_reset(
 
     조용히 넘어간 이유는 서버 로그에만 남긴다 (발송 이력에는 보낸 메일만 남는다).
     """
-    normalized = normalize_email(email)
-    user = await session.scalar(select(User).where(User.email == normalized, User.status != "WITHDRAWN"))
-    if user is None:
-        logger.info("비밀번호 재설정 메일 미발송: 가입되지 않았거나 탈퇴한 이메일 (%s)", _mask(normalized))
-        return
-    if user.auth_provider != "LOCAL":
+    identifier = email.strip()
+    if partner_account.is_member_id(identifier):
+        # 제휴사 Member ID: 그 계정의 현재 이메일로 보낸다 (같은 이메일의 다른 계정과 섞이지 않게 계정 기준).
+        partner = await partner_account.find_partner(session, identifier)
+        user = await partner_account.account_of(session, partner) if partner else None
+        if user is None or user.status == "WITHDRAWN":
+            logger.info("비밀번호 재설정 메일 미발송: 활성화되지 않은 Member ID (%s)", identifier[:2] + "***")
+            return
+        normalized = user.email
+    else:
+        normalized = normalize_email(identifier)
+        user = await partner_account.find_standard_user(session, normalized)
+        if user is None:
+            logger.info("비밀번호 재설정 메일 미발송: 가입되지 않았거나 탈퇴한 이메일 (%s)", _mask(normalized))
+            return
+    if user.auth_provider not in ("LOCAL", "PARTNER"):
         logger.info("비밀번호 재설정 메일 미발송: %s 가입 계정 (%s)", user.auth_provider, _mask(normalized))
         return
 

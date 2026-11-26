@@ -13,6 +13,8 @@ class VerificationPurpose(str, Enum):
     SIGNUP = "SIGNUP"
     WITHDRAW_REQUEST = "WITHDRAW_REQUEST"
     PASSWORD_RESET = "PASSWORD_RESET"
+    PARTNER_ACTIVATION = "PARTNER_ACTIVATION"
+    EMAIL_CHANGE = "EMAIL_CHANGE"
 
 
 class EmailVerificationSendRequest(BaseModel):
@@ -94,10 +96,14 @@ class UserOut(BaseModel):
     grade: str = "NORMAL"
     total_referrals: int = 0
     can_change_password: bool | None = None
+    # 제휴사 회원 계정이면 true와 Member ID (Edit Profile에서 이메일을 바꿀 수 있다)
+    is_partner_member: bool = False
+    partner_member_id: str | None = None
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    # 이메일 또는 제휴사 Member ID. `@`가 있으면 이메일로 본다.
+    email: str = Field(min_length=1, max_length=254)
     password: str
     recaptcha_token: str | None = None
 
@@ -156,7 +162,8 @@ class PasswordChangeRequest(BaseModel):
 
 
 class PasswordForgotRequest(BaseModel):
-    email: EmailStr
+    # 이메일 또는 제휴사 Member ID
+    email: str = Field(min_length=1, max_length=254)
     recaptcha_token: str | None = None
 
 
@@ -297,3 +304,31 @@ class StatusHistoryPage(BaseModel):
     page: int
     size: int
     pages: int
+
+
+class PartnerActivationSendRequest(BaseModel):
+    member_id: str = Field(min_length=1, max_length=100)
+    recaptcha_token: str | None = None
+
+
+class PartnerActivationSendResponse(BaseModel):
+    member_id: str
+    masked_email: str
+    expiry_minutes: int
+
+
+class PartnerActivationCompleteRequest(BaseModel):
+    member_id: str = Field(min_length=1, max_length=100)
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+    password: str = Field(min_length=8, max_length=128)
+    agree_to_terms: bool = False
+    subscribe_newsletter: bool = False
+
+
+class EmailChangeSendRequest(BaseModel):
+    new_email: EmailStr
+
+
+class EmailChangeRequest(BaseModel):
+    new_email: EmailStr
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")

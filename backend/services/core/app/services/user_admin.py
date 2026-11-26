@@ -68,6 +68,10 @@ async def withdraw(session: AsyncSession, user: User, reason: str, changed_by: u
     user.is_2fa_enabled = False
     user.totp_secret_encrypted = None
     user.withdrawn_at = _now()
+    if user.partner_member_id:
+        # 같은 Member ID로 다시 활성화할 수 있게 연결을 풀고 기록만 남긴다.
+        user.withdrawn_partner_member_id = user.partner_member_id
+        user.partner_member_id = None
     await tokens.revoke_all_for_user(session, user.id)
     return old_email
 
@@ -217,7 +221,7 @@ async def create_user(session: AsyncSession, data: dict, admin: User) -> User:
     role = data.get("role") or "USER"
     if role == "ADMIN" and data["status"] != "ACTIVE":
         raise AppError(400, "cannot_block_admin", "관리자 계정은 활성 상태로만 만들 수 있습니다.")
-    exists = await session.scalar(select(User.id).where(User.email == email, User.status != "WITHDRAWN"))
+    exists = await session.scalar(select(User.id).where(User.email == email, User.status != "WITHDRAWN").limit(1))
     if exists:
         raise AppError(409, "email_already_exists", "이미 가입된 이메일입니다.")
     user = User(

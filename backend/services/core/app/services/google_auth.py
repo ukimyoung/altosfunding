@@ -15,13 +15,13 @@ from urllib.parse import urlencode, urlsplit
 
 import httpx
 import jwt
-from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.errors import AppError
 from app.models import User
+from app.services import partner_account
 from app.services.signup import _generate_unique, generate_uid, normalize_email
 
 logger = logging.getLogger(__name__)
@@ -168,7 +168,10 @@ async def find_or_create_user(
     Google이 인증한 이메일이므로 이메일 가입 회원도 같은 이메일이면 Google로 로그인할 수 있다.
     """
     email = normalize_email(profile.email)
-    user = await session.scalar(select(User).where(User.email == email, User.status != "WITHDRAWN"))
+    # 제휴 계정에는 Google 로그인을 묶지 않는다 (같은 이메일의 제휴 계정이 여러 개일 수 있다).
+    user = await partner_account.find_standard_user(session, email)
+    if user is None and await partner_account.has_partner_account_with_email(session, email):
+        raise AppError(409, "partner_use_member_id", "제휴사 회원은 Member ID로 로그인해 주세요.")
     if user is not None:
         if user.email_verified_at is None:
             user.email_verified_at = datetime.now(UTC)
@@ -196,7 +199,7 @@ async def find_or_create_user(
     except IntegrityError:
         # 같은 이메일로 동시에 가입한 경우: 먼저 만들어진 회원으로 로그인한다.
         await session.rollback()
-        user = await session.scalar(select(User).where(User.email == email, User.status != "WITHDRAWN"))
+        user = await partner_account.find_standard_user(session, email)
         if user is None:
             raise
         return user, False
