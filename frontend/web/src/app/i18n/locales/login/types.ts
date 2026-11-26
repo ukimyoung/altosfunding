@@ -52,6 +52,46 @@ export interface LoginTranslations {
   recaptchaNotReady: string;
   recaptchaFailed: string;
 
+  // Partner member (Member ID) login & activation
+  partnerUseMemberId: string;
+  partnerEmailRequired: string;
+  accountDeactivated: string;
+  partnerFirstTimePrompt: string;
+  partnerActivateLink: string;
+  paTitle: string;
+  paSubtitle: string;
+  paFromLogin: string;
+  paMemberIdLabel: string;
+  paMemberIdPlaceholder: string;
+  paSendCode: string;
+  paSendingCode: string;
+  paResendCode: string;
+  paCodeSentTo: string;
+  paRegisteredEmail: string;
+  paCodeLabel: string;
+  paCodePlaceholder: string;
+  paPasswordLabel: string;
+  paPasswordPlaceholder: string;
+  paPasswordConfirmPlaceholder: string;
+  paErrPasswordLength: string;
+  paErrPasswordMismatch: string;
+  paAgreeTermsPrefix: string;
+  paTermsLink: string;
+  paAgreeTermsConnector: string;
+  paPrivacyLink: string;
+  paAgreeTermsSuffix: string;
+  paNewsletter: string;
+  paSubmit: string;
+  paSubmitting: string;
+  paBackToLogin: string;
+  paErrNotFound: string;
+  paErrAlreadyActivated: string;
+  paErrInvalidCode: string;
+  paErrCodeExpired: string;
+  paErrTooManyAttempts: string;
+  paErrTerms: string;
+  paErrFailed: string;
+
   // 2FA login
   twoFactorBackToLogin: string;
   twoFactorTitle: string;

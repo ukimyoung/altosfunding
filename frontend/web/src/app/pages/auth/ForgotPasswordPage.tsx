@@ -34,11 +34,12 @@ export function ForgotPasswordPage() {
     e.preventDefault();
 
     if (!email.trim()) {
-      setError('Please enter your email address.');
+      setError('Please enter your email address or Member ID.');
       return;
     }
 
-    if (!isValidEmail(email)) {
+    // '@'가 없으면 제휴사 Member ID로 보고 형식 검사를 하지 않는다.
+    if (email.includes('@') && !isValidEmail(email)) {
       setError('Please enter a valid email address.');
       return;
     }
@@ -172,22 +173,24 @@ export function ForgotPasswordPage() {
 
           <h1 className="text-4xl text-white mb-3">Reset Your Password</h1>
           <p className="text-gray-400 text-sm leading-relaxed mb-8">
-            Enter your registered email address below, and we will send you a secure link to reset
-            your password.
+            Enter your registered email address or partner Member ID below, and we will send a
+            secure link to reset your password to your registered email.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             {/* Email input */}
             <div>
-              <label className="block text-sm text-gray-400 mb-1.5">Email Address</label>
+              <label className="block text-sm text-gray-400 mb-1.5">Email or Member ID</label>
               <input
-                type="email"
+                type="text"
+                autoCapitalize="none"
+                spellCheck={false}
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
                   if (error) setError('');
                 }}
-                placeholder="name@example.com"
+                placeholder="name@example.com or Member ID"
                 className={`w-full px-4 py-3 bg-[#1a1a24] border rounded-lg text-white placeholder-gray-500 focus:outline-none transition-colors ${
                   error
                     ? 'border-red-500 focus:border-red-500'

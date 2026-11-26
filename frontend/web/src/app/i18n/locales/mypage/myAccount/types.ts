@@ -160,4 +160,25 @@ export interface MyAccountTranslations {
   creating: string;
   requestFailed: string;
   profileNameRequired: string;
+
+  // Partner member: Member ID, email change
+  memberId: string;
+  emailChangeBtn: string;
+  emailChangeHint: string;
+  emailChangeNewPlaceholder: string;
+  emailChangeSendCode: string;
+  emailChangeResendCode: string;
+  emailChangeSending: string;
+  emailChangeCodeSent: string;
+  emailChangeCodePlaceholder: string;
+  emailChangeConfirm: string;
+  emailChangeConfirming: string;
+  emailChangeCancel: string;
+  emailChangeDone: string;
+  emailChangeErrInvalid: string;
+  emailChangeErrSame: string;
+  emailChangeErrCode: string;
+  emailChangeErrExpired: string;
+  emailChangeErrTooMany: string;
+  emailChangeFailed: string;
 }

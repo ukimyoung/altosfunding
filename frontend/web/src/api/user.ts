@@ -39,6 +39,10 @@ export interface MeResponse {
   is_email_enabled?: boolean;
   /** 회원 언어 (알림 메일 언어) */
   locale?: 'en' | 'ko';
+  /** 제휴사(10Power·xnsoft) 회원 계정이면 true. 이메일 변경은 제휴 회원만 가능. */
+  is_partner_member?: boolean;
+  /** 제휴사 Member ID (일반 계정은 null) */
+  partner_member_id?: string | null;
   [key: string]: unknown;
 }
 
@@ -180,5 +184,19 @@ export const updateWithdrawEmail = async (payload: UpdateWithdrawEmailRequest) =
 
 export const getLoginHistory = async () => {
   const response = await api.get<LoginHistoryResponse>('/v1/auth/login-history');
+  return response.data;
+};
+
+// 이메일 변경 (제휴사 회원만). 새 이메일로 인증코드를 받고, 코드를 확인하면 바뀐다.
+export const sendEmailChangeCode = async (newEmail: string) => {
+  const response = await api.post<{ ok?: boolean; expiry_minutes?: number }>(
+    '/v1/auth/email/change/send-code',
+    { new_email: newEmail },
+  );
+  return response.data;
+};
+
+export const changeEmail = async (payload: { new_email: string; code: string }) => {
+  const response = await api.post<MeResponse>('/v1/auth/email/change', payload);
   return response.data;
 };

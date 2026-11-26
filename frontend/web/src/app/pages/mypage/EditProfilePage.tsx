@@ -2,16 +2,22 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import axios from 'axios';
-import { useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   useMeQuery,
   useUpdateProfileMutation,
   useWithdrawAccountMutation,
 } from '@/app/queries/profile';
-import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
+import { getApiErrorCode, getApiErrorMessage } from '@altosfunding/shared/api/errors';
 import { Edit, User, Mail, Phone, MapPin, X, AlertCircle, CheckCircle } from 'lucide-react';
 import { Toast } from '../../components/shared/Toast';
-import { type MeResponse, type UpdateProfileRequest } from '@/api/user';
+import {
+  changeEmail,
+  sendEmailChangeCode,
+  type MeResponse,
+  type UpdateProfileRequest,
+} from '@/api/user';
+import { profileQueryKey } from '@/app/queries/profile';
 import { useLocale } from '@/app/i18n/LocaleContext';
 import { clearAccessToken } from '@altosfunding/shared/auth/tokenStore';
 import { getCountryCallingCode, parsePhoneNumber, type Country } from 'react-phone-number-input';
@@ -143,6 +149,201 @@ const getUpdateProfilePayload = (
 
   return payload;
 };
+
+type MyAccountText = ReturnType<typeof useLocale>['T']['myAccount'];
+
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+
+/**
+ * 제휴사 회원만: 새 이메일로 인증코드를 받아 확인하면 이메일이 바뀐다.
+ * 일반 회원은 이메일을 바꿀 수 없어 이 칸 대신 읽기 전용 칸을 보여 준다.
+ */
+function PartnerEmailField({
+  currentEmail,
+  text,
+  onChanged,
+  onError,
+}: {
+  currentEmail: string;
+  text: MyAccountText;
+  onChanged: (message: string) => void;
+  onError: (message: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [sentTo, setSentTo] = useState<{ email: string; minutes: number } | null>(null);
+  const [fieldError, setFieldError] = useState('');
+  const sendCode = useMutation({ mutationFn: sendEmailChangeCode });
+  const confirm = useMutation({ mutationFn: changeEmail });
+
+  const reset = () => {
+    setIsEditing(false);
+    setNewEmail('');
+    setCode('');
+    setSentTo(null);
+    setFieldError('');
+  };
+
+  const errorText = (error: unknown) => {
+    switch (getApiErrorCode(error)) {
+      case 'same_email':
+        return text.emailChangeErrSame;
+      case 'invalid_verification_code':
+        return text.emailChangeErrCode;
+      case 'verification_code_expired':
+        return text.emailChangeErrExpired;
+      case 'verification_too_many_attempts':
+        return text.emailChangeErrTooMany;
+      case 'rate_limit_exceeded':
+        return getApiErrorMessage(error, text.emailChangeFailed);
+      default:
+        return axios.isAxiosError(error) && error.response?.status === 422
+          ? text.emailChangeErrInvalid
+          : text.emailChangeFailed;
+    }
+  };
+
+  const handleSendCode = async () => {
+    const value = newEmail.trim();
+    if (!isValidEmail(value)) {
+      setFieldError(text.emailChangeErrInvalid);
+      return;
+    }
+    if (value.toLowerCase() === currentEmail.toLowerCase()) {
+      setFieldError(text.emailChangeErrSame);
+      return;
+    }
+    setFieldError('');
+    try {
+      const result = await sendCode.mutateAsync(value);
+      setSentTo({ email: value, minutes: result.expiry_minutes ?? 30 });
+      setCode('');
+    } catch (error) {
+      setFieldError(errorText(error));
+    }
+  };
+
+  const handleConfirm = async () => {
+    if (!sentTo || !/^\d{6}$/.test(code)) return;
+    setFieldError('');
+    try {
+      await confirm.mutateAsync({ new_email: sentTo.email, code });
+      await queryClient.invalidateQueries({ queryKey: profileQueryKey });
+      reset();
+      onChanged(text.emailChangeDone);
+    } catch (error) {
+      const message = errorText(error);
+      setFieldError(message);
+      if (message === text.emailChangeFailed) onError(message);
+    }
+  };
+
+  const inputClass =
+    'min-w-0 flex-1 bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#0052FF] transition-colors';
+  const buttonClass =
+    'flex-shrink-0 px-4 py-3 rounded-lg border border-[#0052FF]/60 text-[#4d8bff] text-sm hover:bg-[#0052FF]/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed';
+
+  return (
+    <div className="md:col-span-2">
+      <label className="block text-gray-400 text-sm mb-2 font-medium">{text.emailAddress}</label>
+      <div className="flex gap-2">
+        <input
+          type="email"
+          name="email"
+          value={currentEmail}
+          readOnly
+          className="min-w-0 flex-1 bg-[#16161f] border border-[#1a1a24] rounded-lg px-4 py-3 text-gray-400 text-sm cursor-not-allowed"
+        />
+        {!isEditing ? (
+          <button type="button" onClick={() => setIsEditing(true)} className={buttonClass}>
+            {text.emailChangeBtn}
+          </button>
+        ) : null}
+      </div>
+
+      {isEditing ? (
+        <div className="mt-3 space-y-3 rounded-lg border border-[#1a1a24] bg-[#12121a] p-4">
+          <p className="text-xs text-gray-500">{text.emailChangeHint}</p>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              autoComplete="email"
+              value={newEmail}
+              onChange={(e) => {
+                setNewEmail(e.target.value);
+                setSentTo(null);
+                setFieldError('');
+              }}
+              placeholder={text.emailChangeNewPlaceholder}
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={handleSendCode}
+              disabled={!newEmail.trim() || sendCode.isPending}
+              className={buttonClass}
+            >
+              {sendCode.isPending
+                ? text.emailChangeSending
+                : sentTo
+                  ? text.emailChangeResendCode
+                  : text.emailChangeSendCode}
+            </button>
+          </div>
+
+          {sentTo ? (
+            <>
+              <p className="text-xs text-green-400">
+                {text.emailChangeCodeSent
+                  .replace('{email}', sentTo.email)
+                  .replace('{minutes}', String(sentTo.minutes))}
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder={text.emailChangeCodePlaceholder}
+                  className={`${inputClass} tracking-[0.3em]`}
+                />
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  disabled={code.length !== 6 || confirm.isPending}
+                  className="flex-shrink-0 px-4 py-3 rounded-lg bg-[#0052FF] text-white text-sm hover:bg-[#0041CC] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {confirm.isPending ? text.emailChangeConfirming : text.emailChangeConfirm}
+                </button>
+              </div>
+            </>
+          ) : null}
+
+          {fieldError ? (
+            <p className="flex items-center gap-1.5 text-xs text-red-400">
+              <AlertCircle size={12} />
+              {fieldError}
+            </p>
+          ) : null}
+
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={reset}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            >
+              {text.emailChangeCancel}
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 type EditProfileModalProps = {
   isOpen: boolean;
@@ -423,23 +624,40 @@ export function EditProfileModal({ isOpen, onClose }: EditProfileModalProps) {
                         />
                       </div>
 
-                      {/* Email */}
-                      <div>
-                        <label className="block text-gray-400 text-sm mb-2 font-medium">
-                          {text.emailAddress}
-                        </label>
-                        <input
-                          type="email"
-                          name="email"
-                          value={formData.email}
-                          readOnly
-                          className="w-full bg-[#16161f] border border-[#1a1a24] rounded-lg px-4 py-3 text-gray-400 text-sm cursor-not-allowed"
-                          placeholder={text.emailPlaceholder}
+                      {/* Email: 제휴사 회원은 인증코드로 변경 가능, 일반 회원은 읽기 전용 */}
+                      {me?.is_partner_member ? (
+                        <PartnerEmailField
+                          currentEmail={me.email || ''}
+                          text={text}
+                          onChanged={(message) => {
+                            setToastType('success');
+                            setToastMessage(message);
+                            setShowToast(true);
+                          }}
+                          onError={(message) => {
+                            setToastType('error');
+                            setToastMessage(message);
+                            setShowToast(true);
+                          }}
                         />
-                      </div>
+                      ) : (
+                        <div>
+                          <label className="block text-gray-400 text-sm mb-2 font-medium">
+                            {text.emailAddress}
+                          </label>
+                          <input
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            readOnly
+                            className="w-full bg-[#16161f] border border-[#1a1a24] rounded-lg px-4 py-3 text-gray-400 text-sm cursor-not-allowed"
+                            placeholder={text.emailPlaceholder}
+                          />
+                        </div>
+                      )}
 
-                      {/* Phone: 국가코드 선택 + 숫자만 입력 */}
-                      <div>
+                      {/* Phone: 국가코드 선택 + 숫자만 입력 (제휴 회원은 이메일 칸이 한 줄을 써서 전화도 한 줄) */}
+                      <div className={me?.is_partner_member ? 'md:col-span-2' : undefined}>
                         <label className="block text-gray-400 text-sm mb-2 font-medium">
                           {text.phoneNumber}
                         </label>

@@ -14,7 +14,11 @@ import {
   navigateToGoogleAuth,
 } from '../../utils/auth/googleAuth';
 import { useGoogleReCaptcha } from 'react-google-recaptcha-v3';
-import { getApiErrorMessage } from '@altosfunding/shared/api/errors';
+import {
+  getApiErrorCode,
+  getApiErrorData,
+  getApiErrorMessage,
+} from '@altosfunding/shared/api/errors';
 import { useLocale } from '@/app/i18n/LocaleContext';
 
 type LoginLocationState = {
@@ -96,6 +100,36 @@ export function Login() {
       navigate('/my-page', { replace: true });
     } catch (error) {
       if (axios.isAxiosError(error)) {
+        const errorCode = getApiErrorCode(error);
+
+        // 제휴사 회원(Member ID) 로그인 분기
+        if (errorCode === 'partner_activation_required') {
+          const data = getApiErrorData<{ member_id?: string; masked_email?: string }>(error);
+          navigate('/partner-activation', {
+            state: {
+              fromLogin: true,
+              memberId: data?.member_id ?? formData.email.trim(),
+              maskedEmail: data?.masked_email ?? '',
+            },
+          });
+          return;
+        }
+
+        if (errorCode === 'partner_email_required') {
+          window.alert(text.partnerEmailRequired);
+          return;
+        }
+
+        if (errorCode === 'partner_use_member_id') {
+          setErrorMessage(text.partnerUseMemberId);
+          return;
+        }
+
+        if (errorCode === 'account_deactivated') {
+          setErrorMessage(text.accountDeactivated);
+          return;
+        }
+
         if (error.response?.status === 404) {
           setErrorMessage(text.noAccountFound);
           return;
@@ -342,9 +376,13 @@ export function Login() {
               <div className="flex-1 border-t border-[#2a2a3a]"></div>
             </div>
 
-            {/* Email */}
+            {/* Email or Member ID (제휴사 회원은 Member ID로 로그인) */}
             <input
-              type="email"
+              type="text"
+              name="username"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
               placeholder={text.placeholderEmail}
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -443,6 +481,17 @@ export function Login() {
               {text.noAccount}{' '}
               <Link to="/signup" className="text-[#FFB800] hover:text-[#FFC933] transition-colors">
                 {text.signUp}
+              </Link>
+            </p>
+
+            {/* 제휴사 회원 첫 이용 (계정 활성화) */}
+            <p className="text-center text-sm text-gray-400 -mt-2">
+              {text.partnerFirstTimePrompt}{' '}
+              <Link
+                to="/partner-activation"
+                className="text-[#FFB800] hover:text-[#FFC933] transition-colors"
+              >
+                {text.partnerActivateLink}
               </Link>
             </p>
           </form>
