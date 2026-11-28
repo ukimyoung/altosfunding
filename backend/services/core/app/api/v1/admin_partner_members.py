@@ -51,6 +51,8 @@ class PartnerMemberOut(BaseModel):
     membership_expires_on: date | None
     # 명세대로 expires_on으로 지금 판정 (만료일 당일까지 활성, KST)
     membership_active: bool
+    # 제휴사가 준 membership_active 값 그대로 (core.partner_members.membership_active, 백오피스 '멤버십 상태')
+    membership_active_partner: bool
     partner_updated_at: datetime
     last_synced_at: datetime
     # 연결된 Altos 계정 (활성화 전이면 null)
@@ -146,6 +148,7 @@ def _member_out(p: PartnerMember, user: User | None) -> PartnerMemberOut:
         joined_at=p.joined_at,
         membership_expires_on=p.membership_expires_on,
         membership_active=bool(p.membership_expires_on and p.membership_expires_on >= _today_kst()),
+        membership_active_partner=p.membership_active,
         partner_updated_at=p.partner_updated_at,
         last_synced_at=p.last_synced_at,
         user_id=user.id if user else None,
