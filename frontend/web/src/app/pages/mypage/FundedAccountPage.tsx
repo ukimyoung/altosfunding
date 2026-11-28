@@ -34,7 +34,11 @@ import {
   useFundedSummaryQuery,
 } from '@/app/queries/accounts';
 import { checkPayoutPositions } from '@/api/payouts';
-import { formatDateByBrowserTimeZone, formatDateTimeByBrowserTimeZone } from '@/app/utils/date';
+import {
+  formatBrowserGmtOffset,
+  formatDateByBrowserTimeZone,
+  formatDateTimeByBrowserTimeZone,
+} from '@/app/utils/date';
 import { ChallengeDetailModal } from '../../components/shared/ChallengeDetailModal';
 import { ActivePositionWarningModal } from '../../components/shared/ActivePositionWarningModal';
 import { DataTable, Column } from '../../components/shared/DataTable';
@@ -66,6 +70,7 @@ type FundedAccount = {
   startDate: string;
   // 펀디드 시작 일시 (계좌 start_at, 브라우저 시간대, YYYY-MM-DD HH:mm). 목록 'Start Date' 열에 표시.
   startDateTime: string;
+  rawStartDate?: string;
   endDate: string;
 };
 
@@ -450,6 +455,7 @@ export function FundedAccountPage() {
         banReason: item.reason ?? undefined,
         startDate: normalizeDateValue(item.start_date),
         startDateTime: (item.start_date && formatDateTimeByBrowserTimeZone(item.start_date).slice(0, 16)) || '-',
+        rawStartDate: item.start_date || undefined,
         endDate: normalizeDateValue(item.end_date),
       };
     });
@@ -757,17 +763,15 @@ export function FundedAccountPage() {
     {
       header: text.colStartDate,
       align: 'center',
-      // 날짜와 시:분을 두 줄로 나눠 표 너비를 늘리지 않는다 (1280px 이상 한 줄 헤더 유지).
-      accessor: (item) => {
-        const [date, time] = item.startDateTime.split(' ');
-
-        return (
-          <div className="font-mono leading-tight">
-            <p className="text-gray-300 text-sm">{date}</p>
-            {time ? <p className="text-gray-500 text-xs mt-0.5">{time}</p> : null}
-          </div>
-        );
-      },
+      // Challenge 목록 'CHALLENGE PERIOD'와 같은 형식: 시작 일시(브라우저 시간대) + 아래 줄에 GMT 오프셋 (예: GMT+9).
+      accessor: (item) => (
+        <div className="whitespace-nowrap">
+          <p className="text-white text-sm">{item.startDateTime}</p>
+          {item.rawStartDate && (
+            <p className="text-gray-500 text-xs mt-1">{formatBrowserGmtOffset(item.rawStartDate)}</p>
+          )}
+        </div>
+      ),
     },
     {
       header: text.colBalance,
@@ -817,7 +821,8 @@ export function FundedAccountPage() {
             className="flex items-center gap-1 min-[1440px]:gap-1.5 px-2 min-[1440px]:px-3 py-2 bg-[#0052FF] hover:bg-[#0052FF]/90 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-[#0052FF]/30 disabled:cursor-not-allowed disabled:bg-[#24243a] disabled:text-gray-500 disabled:hover:bg-[#24243a] disabled:hover:shadow-none"
             onClick={() => handleViewFundedAccountDetails(item)}
           >
-            <Eye size={16} />
+            {/* 1280~1439px에서는 표 너비를 위해 아이콘을 숨긴다 */}
+            <Eye size={16} className="hidden min-[1440px]:block" />
             {text.details}
           </button>
         </div>
@@ -840,7 +845,7 @@ export function FundedAccountPage() {
             {withdrawingAccounts.has(item.id) ? (
               <Clock size={16} className="animate-spin" />
             ) : (
-              <ArrowUpRight size={16} />
+              <ArrowUpRight size={16} className="hidden min-[1440px]:block" />
             )}
             {text.requestPayout}
           </button>
