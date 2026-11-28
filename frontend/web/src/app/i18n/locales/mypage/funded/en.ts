@@ -72,6 +72,7 @@ export const fundedEn: FundedTranslations = {
   fundedAccountHistorySubtitle: 'View and manage all your funded trading accounts',
 
   colAccountId: 'Account ID',
+  colAccountType: 'Account Type',
   colFundedCapital: 'Funded Capital',
   colBalance: 'Balance',
   colProfit: 'Profit',

@@ -71,6 +71,7 @@ export const fundedKo: FundedTranslations = {
   fundedAccountHistorySubtitle: '모든 펀딩 트레이딩 계좌를 조회하고 관리하세요',
 
   colAccountId: '계좌 ID',
+  colAccountType: '계좌 유형',
   colFundedCapital: '펀딩 자본금',
   colBalance: '잔고',
   colProfit: '손익',

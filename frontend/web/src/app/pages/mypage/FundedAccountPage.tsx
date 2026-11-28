@@ -55,6 +55,7 @@ type FundedAccount = {
   id: string;
   account_id: string;
   mt4Login: number;
+  accountType: string;
   funding: number;
   balance: number;
   profit: number;
@@ -433,6 +434,11 @@ export function FundedAccountPage() {
         id: item.account_id || String(item.mt4_login ?? index + 1),
         account_id: item.account_id,
         mt4Login: item.mt4_login ?? 0,
+        // 계좌 유형 = 원래 챌린지 상품 유형 (Core account_type). 없으면 상품명에서 접두어를 뺀 이름.
+        accountType:
+          item.account_type?.trim() ||
+          item.product_name?.trim().replace(/^(challenge|funded)\s+/i, '') ||
+          '-',
         funding: item.capital ?? 0,
         balance: item.balance ?? 0,
         profit: item.total_profit ?? 0,
@@ -728,6 +734,12 @@ export function FundedAccountPage() {
       header: text.colAccountId,
       accessor: (item) => (
         <p className="text-white font-mono text-sm font-medium">{item.mt4Login.toString()}</p>
+      ),
+    },
+    {
+      header: text.colAccountType,
+      accessor: (item) => (
+        <span className="text-[#00FF94] text-sm font-semibold">{item.accountType}</span>
       ),
     },
     {

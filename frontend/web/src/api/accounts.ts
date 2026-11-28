@@ -58,6 +58,8 @@ export interface AccountListItem {
   user_id: string;
   product_id: string;
   product_name?: string | null;
+  // 계좌 유형 (Starter·Professional·Elite·Prime). 펀디드 계좌는 원래 챌린지 상품 기준.
+  account_type?: string | null;
   status: AccountStatus | string;
   tier: AccountTier | string;
   type_code: string;

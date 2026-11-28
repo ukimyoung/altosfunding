@@ -111,6 +111,11 @@ def test_funded_list_filters(client, admin_headers, buyer, round_, fake_mt4):  #
         return sorted(a["mt4_login"] for a in res.json()["items"])
 
     assert len(logins()) == 2
+    listed = client.get(URL, headers=buyer, params={"tier": "FUNDED"}).json()["items"]
+    assert {a["mt4_login"]: a["account_type"] for a in listed}[starter_login] == "Starter"
+    assert sorted(a["account_type"] for a in listed) == ["Prime", "Starter"]
+    challenge = client.get(URL, headers=buyer, params={"tier": "CHALLENGE"}).json()["items"]
+    assert sorted(a["account_type"] for a in challenge) == ["Prime", "Starter"]
     assert logins(product_type="Starter") == [starter_login]
     assert len(logins(product_type="Prime")) == 1 and logins(product_type="Prime") != [starter_login]
     assert logins(product_type="Professional") == [] and logins(product_type="Elite") == []
