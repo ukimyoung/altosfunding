@@ -43,7 +43,7 @@ def _member(n: int) -> dict:
         "email": email,
         "phone": None if n % 5 == 0 else f"010{n:04d}{n:04d}",
         "sponsor_id": None if n == 1 else f"mock{(n - 1) // 3 + 1:03d}",
-        "status": status,
+        "account_status": status,
         "joined_at": (datetime(2025, 3, 2, 14, 0, tzinfo=KST) + timedelta(days=n * 7)).isoformat(),
         "membership": {
             "expires_on": expires_on.isoformat() if expires_on else None,
