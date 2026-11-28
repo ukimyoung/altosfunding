@@ -194,3 +194,23 @@ def test_create_demo_account(client, admin_headers, buyer, fake_mt4):  # noqa: F
     assert client.post(f"{URL}/30000001/unfreeze", headers=admin_headers).json()["status"] == "ACTIVE"
     _work()
     assert fake_mt4.accounts[30000001]["isReadOnly"] is False
+
+
+def test_member_list_account_counts(client, admin_headers, buyer, round_, fake_mt4):  # noqa: F811
+    """회원 목록·상세 '보유 계좌 수': 챌린지·펀디드·데모 (발급 실패 계좌 제외)."""
+    assert _join(client, buyer, round_["challenge_id"], quantity=3).status_code == 201
+    _work()
+    user_id = run_sql("select id from core.users where email = $1", BUYER)[0]["id"]
+    run_sql("update core.trading_accounts set tier = 'FUNDED' where mt4_login = $1", POOL_START)
+    run_sql("update core.trading_accounts set tier = 'DEMO' where mt4_login = $1", POOL_START + 1)
+
+    def counts():
+        items = client.get("/api/v1/admin/users", headers=admin_headers, params={"keyword": BUYER}).json()["items"]
+        detail = client.get(f"/api/v1/admin/users/{user_id}", headers=admin_headers).json()
+        keys = ("challenge_account_count", "funded_account_count", "demo_account_count", "live_account_count")
+        assert tuple(items[0][k] for k in keys) == tuple(detail[k] for k in keys)
+        return tuple(items[0][k] for k in keys)
+
+    assert counts() == (1, 1, 1, 0)
+    run_sql("update core.trading_accounts set provision_status = 'FAILED', status = 'CANCELLED' where tier = 'DEMO'")
+    assert counts() == (1, 1, 0, 0)

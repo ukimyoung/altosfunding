@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
-from app.models import MemberRelation, User, UserStatusHistory, Wallet
+from app.models import MemberRelation, TradingAccount, User, UserStatusHistory, Wallet
 from app.schemas.auth import UserOut
 from app.security import hash_password
 from app.services import member_relations, tokens
@@ -87,6 +87,37 @@ async def _total_assets(session: AsyncSession, user_id: uuid.UUID) -> float:
     return float(value or 0)
 
 
+async def account_counts(session: AsyncSession, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, dict[str, int]]:
+    """회원별 보유 계좌 수 {user_id: {CHALLENGE: n, FUNDED: n, DEMO: n, LIVE: n}}.
+
+    발급 실패로 환불된 계좌(provision_status=FAILED, status=CANCELLED)는 세지 않는다 (관리자 계좌 목록과 같은 기준).
+    대회가 끝난 계좌(CLOSED·FAILED 등)는 센다.
+    """
+    if not user_ids:
+        return {}
+    rows = await session.execute(
+        select(TradingAccount.user_id, TradingAccount.tier, func.count())
+        .where(
+            TradingAccount.user_id.in_(user_ids),
+            TradingAccount.status != "CANCELLED",
+            TradingAccount.provision_status != "FAILED",
+        )
+        .group_by(TradingAccount.user_id, TradingAccount.tier)
+    )
+    counts: dict[uuid.UUID, dict[str, int]] = {}
+    for user_id, tier, n in rows.all():
+        counts.setdefault(user_id, {})[tier] = n
+    return counts
+
+
+def _apply_counts(out: UserOut, counts: dict[str, int]) -> UserOut:
+    out.challenge_account_count = counts.get("CHALLENGE", 0)
+    out.funded_account_count = counts.get("FUNDED", 0)
+    out.demo_account_count = counts.get("DEMO", 0)
+    out.live_account_count = counts.get("LIVE", 0)
+    return out
+
+
 async def user_out(session: AsyncSession, user: User, *, for_admin: bool) -> UserOut:
     referrer_code = None
     sponsor_id = await member_relations.sponsor_id_of(session, user.id)
@@ -99,6 +130,7 @@ async def user_out(session: AsyncSession, user: User, *, for_admin: bool) -> Use
         total_referrals=total_referrals or 0,
         total_assets=await _total_assets(session, user.id),
     )
+    _apply_counts(out, (await account_counts(session, [user.id])).get(user.id, {}))
     if not for_admin:
         # 관리자 메모는 회원 본인에게 보여 주지 않는다.
         out.admin_note = None
@@ -157,9 +189,11 @@ async def list_users(
         .offset((page - 1) * size)
         .limit(size)
     )
+    result = rows.all()
+    counts = await account_counts(session, [u.id for u, *_ in result])
     items = [
-        to_user_out(u, referrer_code=code, total_referrals=n, total_assets=float(bal))
-        for u, code, n, bal in rows.all()
+        _apply_counts(to_user_out(u, referrer_code=code, total_referrals=n, total_assets=float(bal)), counts.get(u.id, {}))
+        for u, code, n, bal in result
     ]
     return items, total
 
