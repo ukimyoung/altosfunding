@@ -1,8 +1,8 @@
 import type { FundedTranslations } from './types';
 
 export const fundedKo: FundedTranslations = {
-  dashboardTitle: '펀딩 완료 계정 대시보드',
-  liveAccountStatus: '라이브 계정 상태',
+  dashboardTitle: '펀딩 완료 계좌 대시보드',
+  liveAccountStatus: '라이브 계좌 상태',
   fundedAmount: '펀딩 자금 규모',
   currentEquity: '현재 평가 잔고 (Equity)',
   totalPayoutsToDate: '총 누적 출금액',
@@ -26,7 +26,7 @@ export const fundedKo: FundedTranslations = {
   payoutApproved: '출금 승인 완료',
   payoutUnderReview: '출금 검토 중',
 
-  liveAccountRules: '라이브 계정 관리 규칙',
+  liveAccountRules: '라이브 계좌 관리 규칙',
   dailyLossHardStop: '일일 손실 강제 제한 (Hard Stop)',
   maxTotalDrawdownLimit: '총 최대 허용 낙폭 제한',
   currentDrawdownDistance: '최대 허용 낙폭까지 남은 금액',
@@ -41,8 +41,8 @@ export const fundedKo: FundedTranslations = {
   understood: '확인했습니다',
 
   searchAndFilter: '검색 및 필터',
-  accountIdLabel: '계정 ID',
-  searchPlaceholder: '계정 ID 검색...',
+  accountIdLabel: '계좌 ID',
+  searchPlaceholder: '계좌 ID 검색...',
   fundingTypeLabel: '펀딩 유형',
   startDateLabel: '시작일',
   endDateLabel: '종료일',
@@ -63,10 +63,10 @@ export const fundedKo: FundedTranslations = {
   statusClosed: '종료',
   statusBanned: '영구정지',
 
-  fundedAccountHistoryTitle: '펀딩 계정 내역 및 출금',
-  fundedAccountHistorySubtitle: '모든 펀딩 트레이딩 계정을 조회하고 관리하세요',
+  fundedAccountHistoryTitle: '펀딩 계좌 내역 및 출금',
+  fundedAccountHistorySubtitle: '모든 펀딩 트레이딩 계좌를 조회하고 관리하세요',
 
-  colAccountId: '계정 ID',
+  colAccountId: '계좌 ID',
   colFundedCapital: '펀딩 자본금',
   colBalance: '잔고',
   colProfit: '손익',
@@ -76,11 +76,11 @@ export const fundedKo: FundedTranslations = {
 
   details: '상세 보기',
   payoutUnderReviewBadge: '출금 검토 중',
-  emptyFundedAccounts: '펀딩 계정이 없습니다',
-  emptyFundedAccountsHint: '검색 필터를 조정하여 일치하는 계정을 확인해 보세요.',
-  noFundedAccountsMatching: '필터와 일치하는 펀딩 계정이 없습니다.',
-  summaryLabel: '펀딩 계정',
-  endOfFundedAccounts: '펀딩 계정 마지막 내역',
+  emptyFundedAccounts: '펀딩 계좌가 없습니다',
+  emptyFundedAccountsHint: '검색 필터를 조정하여 일치하는 계좌를 확인해 보세요.',
+  noFundedAccountsMatching: '필터와 일치하는 펀딩 계좌가 없습니다.',
+  summaryLabel: '펀딩 계좌',
+  endOfFundedAccounts: '펀딩 계좌 마지막 내역',
   banReason: '정지 사유',
   closeBanReasonTooltip: '정지 사유 툴팁 닫기',
 
@@ -154,15 +154,15 @@ export const fundedKo: FundedTranslations = {
   confirmTransfer: '이체 확인',
 
   breadcrumbDashboard: '대시보드',
-  breadcrumbFundedAccount: '펀딩 계정',
+  breadcrumbFundedAccount: '펀딩 계좌',
   breadcrumbRequestPayout: '출금 신청',
 
   requestPayoutTitle: '출금 신청하기',
-  requestPayoutSubtitle: '펀딩 계정 수익에 대한 출금을 신청하세요',
+  requestPayoutSubtitle: '펀딩 계좌 수익에 대한 출금을 신청하세요',
   back: '뒤로',
 
-  accountInformation: '계정 정보',
-  accountIdField: '계정 ID',
+  accountInformation: '계좌 정보',
+  accountIdField: '계좌 ID',
   creationDate: '생성일',
   totalBalance: '총 잔고',
   pendingPayoutField: '심사 중인 출금액',
