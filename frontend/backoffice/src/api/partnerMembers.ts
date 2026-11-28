@@ -25,7 +25,10 @@ export interface PartnerMember {
   user_uid: string | null;
   user_email: string | null;
   user_status: string | null;
+  /** 활성화 시각. 사전 가입만 하고 아직 활성화하지 않았으면 null */
   activated_at: string | null;
+  /** 백오피스 '회원사전가입'으로 계정을 만든 시각 */
+  pre_registered_at: string | null;
 }
 
 export interface PartnerMemberPage {
@@ -42,6 +45,8 @@ export interface PartnerMemberSummary {
   linked: number;
   membership_active: number;
   no_email: number;
+  /** linked 중 사전 가입만 하고 아직 활성화하지 않은 계정 */
+  pending: number;
 }
 
 export interface SyncRun {
@@ -92,6 +97,8 @@ export interface PartnerMemberParams {
   site?: PartnerSite;
   status?: PartnerStatus;
   linked?: boolean;
+  /** none=계정 없음, pending=사전 가입(활성화 전), activated=활성화 완료 */
+  account?: 'none' | 'pending' | 'activated';
   membership?: 'active' | 'expired' | 'none';
   page?: number;
   size?: number;
@@ -113,3 +120,16 @@ export const getSyncRuns = async (page: number, size = 20) =>
   (await api.get<SyncRunPage>(`${BASE}/sync-runs`, { params: { page, size } })).data;
 
 export const getSyncRun = async (id: number) => (await api.get<SyncRunDetail>(`${BASE}/sync-runs/${id}`)).data;
+
+export type PreRegisterSkipReason = 'already_exists' | 'no_email' | 'withdrawn' | 'not_found';
+
+export interface PreRegisterResult {
+  created: string[];
+  /** 만들었지만 제휴사에서 삭제(deleted)된 회원이라 비활성으로 둔 계정 */
+  created_inactive: string[];
+  skipped: { member_id: string; reason: PreRegisterSkipReason }[];
+}
+
+/** 회원사전가입: 고른 제휴 회원의 Altos 계정을 활성화 전 상태로 미리 만든다 (한 번에 최대 1,000명). */
+export const preRegisterPartnerMembers = async (memberIds: string[]) =>
+  (await api.post<PreRegisterResult>(`${BASE}/pre-register`, { member_ids: memberIds })).data;

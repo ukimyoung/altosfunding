@@ -150,6 +150,8 @@ export interface User {
   is_partner_member?: boolean;
   /** 제휴사 Member ID (일반 계정은 null) */
   partner_member_id?: string | null;
+  /** 사전 가입으로 만들어졌고 아직 활성화하지 않은 제휴 계정 */
+  is_partner_pending?: boolean;
 }
 
 export interface ListUsersParams {

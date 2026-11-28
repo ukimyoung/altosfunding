@@ -6,6 +6,7 @@
 - POST /admin/partner-members/sync       가져오기 실행 {mode: INCREMENTAL(지금 가져오기) | FULL(전체 다시 가져오기)}
 - GET  /admin/partner-members/sync-runs  가져오기 이력
 - GET  /admin/partner-members/sync-runs/{id}  회차 상세 (실패 항목 포함)
+- POST /admin/partner-members/pre-register  회원사전가입 (고른 회원의 계정을 활성화 전 상태로 미리 만든다)
 """
 
 import math
@@ -14,14 +15,14 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import and_, func, or_, select
 
 from app.config import settings
 from app.deps import AdminUser, Session
 from app.errors import AppError
 from app.models import PartnerMember, PartnerMemberSyncRun, User
-from app.services import partner_sync
+from app.services import partner_preregister, partner_sync
 
 router = APIRouter(prefix="/admin/partner-members", tags=["admin-partner-members"])
 
@@ -57,7 +58,9 @@ class PartnerMemberOut(BaseModel):
     user_uid: str | None = None
     user_email: str | None = None
     user_status: str | None = None
+    # 활성화 시각. 사전 가입만 하고 아직 활성화하지 않았으면 null (pre_registered_at만 있음)
     activated_at: datetime | None = None
+    pre_registered_at: datetime | None = None
 
 
 class PartnerMemberPage(BaseModel):
@@ -111,6 +114,22 @@ class SyncStatus(BaseModel):
     next_auto_at: datetime | None
 
 
+class PreRegisterRequest(BaseModel):
+    member_ids: list[str] = Field(min_length=1, max_length=partner_preregister.MAX_MEMBERS)
+
+
+class PreRegisterSkip(BaseModel):
+    member_id: str
+    # already_exists(이미 계정 있음) | no_email(이메일 없음) | withdrawn(탈퇴한 계정 있음) | not_found
+    reason: str
+
+
+class PreRegisterResponse(BaseModel):
+    created: list[str]
+    created_inactive: list[str]
+    skipped: list[PreRegisterSkip]
+
+
 class SyncRequest(BaseModel):
     mode: Literal["INCREMENTAL", "FULL"] = "INCREMENTAL"
 
@@ -133,7 +152,8 @@ def _member_out(p: PartnerMember, user: User | None) -> PartnerMemberOut:
         user_uid=user.uid if user else None,
         user_email=user.email if user else None,
         user_status=user.status if user else None,
-        activated_at=user.created_at if user else None,
+        activated_at=user.activated_at if user else None,
+        pre_registered_at=user.pre_registered_at if user else None,
     )
 
 
@@ -153,6 +173,7 @@ async def list_partner_members(
     site: str | None = None,
     status: str | None = None,
     linked: bool | None = None,
+    account: Literal["none", "pending", "activated"] | None = None,
     membership: Literal["active", "expired", "none"] | None = None,
     page: Page = 1,
     size: Size = 20,
@@ -185,6 +206,13 @@ async def list_partner_members(
         conditions.append(User.id.is_not(None))
     elif linked is False:
         conditions.append(User.id.is_(None))
+    # account: none=계정 없음, pending=사전 가입(활성화 전), activated=활성화 완료
+    if account == "none":
+        conditions.append(User.id.is_(None))
+    elif account == "pending":
+        conditions.append(and_(User.id.is_not(None), User.activated_at.is_(None)))
+    elif account == "activated":
+        conditions.append(User.activated_at.is_not(None))
 
     join = and_(User.partner_member_id == PartnerMember.member_id)
     total = (
@@ -219,6 +247,7 @@ async def partner_members_summary(admin: AdminUser, session: Session) -> dict:
                 func.count(User.id),
                 func.count().filter(PartnerMember.membership_expires_on >= today),
                 func.count().filter(PartnerMember.email.is_(None)),
+                func.count(User.id).filter(User.activated_at.is_(None)),
             )
             .select_from(PartnerMember)
             .outerjoin(User, User.partner_member_id == PartnerMember.member_id)
@@ -230,6 +259,8 @@ async def partner_members_summary(admin: AdminUser, session: Session) -> dict:
         "linked": row[5],
         "membership_active": row[6],
         "no_email": row[7],
+        # linked 중 사전 가입만 하고 아직 활성화하지 않은 계정
+        "pending": row[8],
     }
 
 
@@ -295,3 +326,18 @@ async def get_sync_run(run_id: int, admin: AdminUser, session: Session) -> SyncR
         raise AppError(404, "not_found", "sync run not found")
     emails = await _emails(session, {run.requested_by} if run.requested_by else set())
     return _run_out(run, emails.get(run.requested_by), detail=True)
+
+
+@router.post("/pre-register", response_model=PreRegisterResponse, summary="회원사전가입")
+async def pre_register(body: PreRegisterRequest, admin: AdminUser, session: Session) -> PreRegisterResponse:
+    """고른 제휴 회원의 Altos 계정을 미리 만든다 (비밀번호 없음, 활성화 전).
+
+    이미 계정이 있거나 이메일이 없거나 탈퇴한 계정이 있는 회원은 건너뛴다.
+    제휴사 status=deleted 회원은 만들고 비활성(INACTIVE)으로 둔다 (created_inactive).
+    """
+    result = await partner_preregister.pre_register(session, body.member_ids, admin.id)
+    return PreRegisterResponse(
+        created=result.created,
+        created_inactive=result.created_inactive,
+        skipped=[PreRegisterSkip(**s) for s in result.skipped],
+    )

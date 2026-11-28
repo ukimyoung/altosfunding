@@ -50,6 +50,11 @@ async def login(
             # 아직 Altos 계정이 없다: 비밀번호는 보지 않고 활성화 단계로 안내한다.
             partner_account.ensure_activatable(partner)
             raise partner_account.activation_required_error(partner)
+        if user.is_partner_pending:
+            # 사전 가입 계정(활성화 전, 비밀번호 없음): 계정이 없을 때와 같이 활성화 단계로 안내한다.
+            partner_account.ensure_pending_can_activate(user)
+            partner_account.ensure_activatable(partner)
+            raise partner_account.activation_required_error(partner)
     else:
         user = await partner_account.find_standard_user(session, identifier)
         if user is None:

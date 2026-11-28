@@ -30,7 +30,8 @@ async def change_password(
     new_password: str,
     current_refresh_token: str | None,
 ) -> None:
-    if user.auth_provider != "LOCAL" or not user.password_hash:
+    # 일반(LOCAL)·제휴(PARTNER) 계정만. Google 가입 계정과 비밀번호가 없는 계정은 바꿀 수 없다.
+    if user.auth_provider not in ("LOCAL", "PARTNER") or not user.password_hash:
         raise AppError(400, "oauth_account_password_change", "Google 가입 계정은 비밀번호를 변경할 수 없습니다.")
     if not verify_password(old_password, user.password_hash):
         raise AppError(409, "invalid_current_password", "현재 비밀번호가 올바르지 않습니다.")
@@ -70,7 +71,7 @@ async def request_reset(
         # 제휴사 Member ID: 그 계정의 현재 이메일로 보낸다 (같은 이메일의 다른 계정과 섞이지 않게 계정 기준).
         partner = await partner_account.find_partner(session, identifier)
         user = await partner_account.account_of(session, partner) if partner else None
-        if user is None or user.status == "WITHDRAWN":
+        if user is None or user.status == "WITHDRAWN" or user.is_partner_pending:
             logger.info("비밀번호 재설정 메일 미발송: 활성화되지 않은 Member ID (%s)", identifier[:2] + "***")
             return
         normalized = user.email

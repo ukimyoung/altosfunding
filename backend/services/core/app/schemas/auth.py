@@ -99,6 +99,8 @@ class UserOut(BaseModel):
     # 제휴사 회원 계정이면 true와 Member ID (Edit Profile에서 이메일을 바꿀 수 있다)
     is_partner_member: bool = False
     partner_member_id: str | None = None
+    # 사전 가입으로 만들어졌고 아직 활성화하지 않은 제휴 계정 (백오피스 '비활성' 라벨)
+    is_partner_pending: bool = False
 
 
 class LoginRequest(BaseModel):
