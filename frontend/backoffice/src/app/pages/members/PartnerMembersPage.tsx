@@ -17,9 +17,11 @@ import {
   getSyncRuns,
   getSyncState,
   preRegisterPartnerMembers,
+  resyncPartnerNetwork,
   startSync,
 } from '../../../api/partnerMembers';
 import type {
+  NetworkResult,
   PartnerMember,
   PartnerMemberParams,
   PreRegisterSkipReason,
@@ -36,6 +38,20 @@ const SKIP_LABEL: Record<PreRegisterSkipReason, string> = {
   no_email: '이메일 없음',
   withdrawn: '탈퇴한 계정 있음',
   not_found: '회원 없음',
+};
+const SPONSOR_SKIP_LABEL: Record<string, string> = {
+  sponsor_not_found: '제휴사 추천인 없음',
+  sponsor_no_account: '추천인 계정 없음',
+  relation_cycle: '순환 관계',
+  already_set: '이미 다른 추천인',
+};
+const networkSummary = (n: NetworkResult) => {
+  const skipped = Object.entries(n.sponsor_skipped).filter(([, v]) => v);
+  return [
+    `IB 등록 ${n.ib_created.toLocaleString()}명`,
+    `추천인 연결 ${n.sponsors_linked.toLocaleString()}명`,
+    ...(skipped.length ? [`미연결 ${skipped.map(([k, v]) => `${SPONSOR_SKIP_LABEL[k] ?? k} ${v}`).join(', ')}`] : []),
+  ].join(' · ');
 };
 // 사전 가입할 수 있는 회원: 아직 Altos 계정이 없고 이메일이 있는 회원
 const canPreRegister = (m: PartnerMember) => !m.user_id && Boolean(m.email);
@@ -161,12 +177,27 @@ export function PartnerMembersPage() {
         result.skipped.forEach((x) => counts.set(SKIP_LABEL[x.reason] ?? x.reason, (counts.get(SKIP_LABEL[x.reason] ?? x.reason) ?? 0) + 1));
         parts.push(`제외 ${result.skipped.length}명 (${[...counts].map(([k, v]) => `${k} ${v}`).join(', ')})`);
       }
+      parts.push(networkSummary(result.network));
       setToast({ message: parts.join(' · '), type: result.skipped.length ? 'warning' : 'success' });
       void queryClient.invalidateQueries({ queryKey: KEY });
     },
     onError: (error) => {
       setConfirmPre(false);
       setToast({ message: apiErrorMessage(error, '사전 가입을 실행하지 못했습니다.'), type: 'warning' });
+    },
+  });
+
+  const [confirmResync, setConfirmResync] = useState(false);
+  const resync = useMutation({
+    mutationFn: resyncPartnerNetwork,
+    onSuccess: (result) => {
+      setConfirmResync(false);
+      setToast({ message: `다시 맞추기 완료: ${networkSummary(result)}`, type: 'success' });
+      void queryClient.invalidateQueries({ queryKey: KEY });
+    },
+    onError: (error) => {
+      setConfirmResync(false);
+      setToast({ message: apiErrorMessage(error, 'IB 등록·추천인 연결을 실행하지 못했습니다.'), type: 'warning' });
     },
   });
 
@@ -323,6 +354,15 @@ export function PartnerMembersPage() {
                 선택 해제
               </button>
             )}
+            <button
+              type="button"
+              disabled={resync.isPending}
+              onClick={() => setConfirmResync(true)}
+              style={{ ...button(false, resync.isPending), marginLeft: 'auto' }}
+              title="계정이 있는 모든 제휴 회원을 IB(레벨 1)로 등록하고 제휴사 추천인을 연결합니다"
+            >
+              <RefreshCw size={14} /> IB 등록·추천인 연결 다시 맞추기
+            </button>
           </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
             <form
@@ -420,7 +460,18 @@ export function PartnerMembersPage() {
                     <td style={td}>{m.name || '-'}</td>
                     <td style={{ ...td, color: m.email ? t.text : '#DC2626' }}>{m.email ?? '없음'}</td>
                     <td style={{ ...td, ...mono, color: t.textSec }}>{m.phone ?? '-'}</td>
-                    <td style={{ ...td, ...mono, color: t.textSec }}>{m.sponsor_member_id ?? '-'}</td>
+                    <td style={{ ...td, ...mono, color: t.textSec }}>
+                      {m.sponsor_member_id ?? '-'}
+                      {m.sponsor_mismatch ? (
+                        // 계정의 Altos 추천인이 제휴사 추천인과 다르다 (자동으로 바꾸지 않는다)
+                        <span
+                          style={{ marginLeft: 6 }}
+                          title={`Altos 추천인: ${m.linked_sponsor_member_id ?? m.linked_sponsor_uid ?? '없음'}`}
+                        >
+                          {pill('#D97706', '다름')}
+                        </span>
+                      ) : null}
+                    </td>
                     <td style={td}>{pill(STATUS_COLOR[m.status], STATUS_LABEL[m.status])}</td>
                     {/* 제휴사 membership_active 값 그대로 */}
                     <td style={td}>{m.membership_active_partner ? pill('#16A34A', '활성') : pill('#6B7280', '비활성')}</td>
@@ -505,6 +556,27 @@ export function PartnerMembersPage() {
         </div>
       )}
 
+      {/* IB 등록·추천인 연결 다시 맞추기 확인 */}
+      {confirmResync && (
+        <div onClick={() => !resync.isPending && setConfirmResync(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 460, background: t.surface, borderRadius: 12, border: `1px solid ${t.border}`, padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 10 }}>
+              <RefreshCw size={16} color={t.accent} /> IB 등록·추천인 연결 다시 맞추기
+            </div>
+            <div style={{ fontSize: 13, color: t.textSec, lineHeight: 1.7, marginBottom: 20 }}>
+              Altos 계정이 있는 모든 제휴 회원을 IB(레벨 1)로 등록하고, 제휴사 추천인의 계정이 있으면 추천인·수당 조직 상위로 연결합니다.
+              <br />이미 IB인 회원의 레벨·상태와 이미 추천인이 있는 회원의 관계는 바꾸지 않습니다.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setConfirmResync(false)} style={button(false, false)}>취소</button>
+              <button type="button" disabled={resync.isPending} onClick={() => resync.mutate()} style={button(true, resync.isPending)}>
+                {resync.isPending ? '실행 중...' : '실행'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 회원사전가입 확인 */}
       {confirmPre && (
         <div onClick={() => !preRegister.isPending && setConfirmPre(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
@@ -516,6 +588,7 @@ export function PartnerMembersPage() {
               선택한 <b style={{ color: t.text }}>{selected.size.toLocaleString()}명</b>의 Altos 계정을 미리 만듭니다.
               <br />비밀번호가 없는 '활성화 전' 계정으로 만들어지며, 회원이 Member ID로 처음 로그인할 때 이메일 인증과 비밀번호 설정으로 활성화합니다.
               <br />환영 메일은 회원이 활성화할 때 보냅니다.
+              <br />만든 계정은 IB(레벨 1)로 등록하고, 제휴사 추천인의 계정이 있으면 추천인·수당 조직 상위로 연결합니다.
               {selectedDeleted > 0 && (
                 <><br /><span style={{ color: '#D97706' }}>제휴사에서 삭제된 회원 {selectedDeleted}명은 비활성 계정으로 만듭니다.</span></>
               )}

@@ -18,7 +18,7 @@ from app.errors import AppError
 from app.models import PartnerMember, User
 from app.schemas.auth import PartnerActivationCompleteRequest, VerificationPurpose
 from app.security import hash_password
-from app.services import signup
+from app.services import partner_network, signup
 from app.services.email import EmailSender
 
 DELETED = "deleted"
@@ -190,6 +190,8 @@ async def complete_activation(
         pending.subscribed_newsletter = body.subscribe_newsletter
         pending.locale = locale
         pending.activated_at = now
+        # 사전 가입 때 이미 했지만, 그 전에 만든 계정도 빠짐없이 IB·추천인이 맞춰지게 한 번 더 (이미 되어 있으면 그대로).
+        await partner_network.apply(session, pending, partner, None, partner_network.NetworkResult())
         await session.commit()
         await session.refresh(pending)
         return pending
@@ -213,6 +215,8 @@ async def complete_activation(
     session.add(user)
     try:
         await session.flush()
+        # 제휴 회원은 모두 IB: 레벨 1로 등록하고 제휴사 추천인을 연결한다 (사전 가입 계정은 사전 가입 때 이미 했다).
+        await partner_network.apply(session, user, partner, None, partner_network.NetworkResult())
         await session.commit()
     except IntegrityError as exc:
         await session.rollback()
