@@ -121,7 +121,8 @@ const mapUserToRow = (user: User): MemberRow => {
   const nation = user.country || '-';
   const challengeCount = user.challenge_account_count ?? 0;
   const fundedCount = user.funded_account_count ?? 0;
-  const liveCount = user.live_account_count ?? 0;
+  // 라이브 계좌는 표시하지 않는다 (2026-11-28 사용자 요청, Live 기능 제거 방향)
+  // const liveCount = user.live_account_count ?? 0;
   const demoCount = user.demo_account_count ?? 0;
 
   return {
@@ -134,7 +135,7 @@ const mapUserToRow = (user: User): MemberRow => {
     userType: String(user.grade).toUpperCase() === 'VIP' ? 'VIP' : 'Normal',
     nation,
     kyc: mapKycStatus(user.kyc_status),
-    accountCount: `챌린지 ${challengeCount} / 펀디드 ${fundedCount} / 라이브 ${liveCount} / 데모 ${demoCount}`,
+    accountCount: `챌린지 ${challengeCount} / 펀디드 ${fundedCount} / 데모 ${demoCount}`,
     totalAssets: formatMoney(user.total_assets),
     regDate: formatDateTime(user.created_at),
     lastLogin: formatDateTime(user.last_login_at),
