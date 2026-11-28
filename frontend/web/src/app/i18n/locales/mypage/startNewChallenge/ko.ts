@@ -2,7 +2,7 @@ import type { StartNewChallengeTranslations } from './types';
 
 export const startNewChallengeKo: StartNewChallengeTranslations = {
   pageTitle: '새로운 챌린지 시작하기',
-  accountSizeTitle: '계정 규모(사이즈) 선택',
+  accountSizeTitle: '계좌 규모(사이즈) 선택',
   accountSizeSubtitle: '회원님의 트레이딩 스타일에 맞는 펀딩 평가 단계를 선택하세요.',
 
   tierNames: { starter: '스타터', pro: '프로페셔널', elite: '엘리트', prime: '프라임' },
@@ -11,7 +11,7 @@ export const startNewChallengeKo: StartNewChallengeTranslations = {
   fundingCapital: '펀딩 자본',
   oneTimeFee: '일회성 수수료',
   evaluationPhase: '평가 단계',
-  fundedAccount: '펀딩 완료 계정',
+  fundedAccount: '펀딩 완료 계좌',
 
   challengeStage: '챌린지 단계',
   fundedStage: '펀딩 단계',
@@ -53,15 +53,15 @@ export const startNewChallengeKo: StartNewChallengeTranslations = {
   leverageText: '최대 1:100 레버리지 지원',
 
   quantityLabel: '수량',
-  account: '계정',
-  accounts: '계정',
+  account: '계좌',
+  accounts: '계좌',
 
   orderSummary: '주문 요약',
-  challengeAccountType: '챌린지 계정 유형',
+  challengeAccountType: '챌린지 계좌 유형',
   quantity: '수량',
   totalAmount: '총 금액',
   proceedToPayment: '결제 진행하기',
-  chooseChallengeAccountType: '챌린지 계정 유형을 선택하세요',
+  chooseChallengeAccountType: '챌린지 계좌 유형을 선택하세요',
   selected: '선택됨',
   fiveDays: '5일',
   requestFailed: '요청 실패',
@@ -104,7 +104,7 @@ export const startNewChallengeKo: StartNewChallengeTranslations = {
     '결제 금액은 총 자산 잔액에서 차감됩니다.',
     "결제 완료 후 환불은 불가능하며 결제 완료는 환불 불가에 '동의' 한것으로 간주됩니다.",
     '결제 완료 시 참가 확정이 됩니다.',
-    '결제 완료 후 챌린지의 계정 정보는 이메일로 발송됩니다.',
+    '결제 완료 후 챌린지의 계좌 정보는 이메일로 발송됩니다.',
   ],
   cancel: '취소',
   completePaymentBtn: '결제 완료',
