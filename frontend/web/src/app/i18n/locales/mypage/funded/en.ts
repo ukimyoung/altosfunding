@@ -208,4 +208,11 @@ export const fundedEn: FundedTranslations = {
   submitPayoutFailed: 'Failed to submit payout request.',
   loading: 'Loading',
   endOfPayoutHistory: 'End of payout history',
+  detailModal: {
+    accountDetail: 'Account Detail',
+    copyAccountNumber: 'Copy account number',
+    tradingCredentials: 'Trading Credentials',
+    accountNumber: 'Account Number',
+    accountStatus: 'Account Status',
+  },
 };

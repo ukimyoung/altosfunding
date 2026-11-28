@@ -34,6 +34,8 @@ interface ChallengeDetailModalProps {
   onClose: () => void;
   challengeDetail: ChallengeDetail;
   onTradeHistorySettled?: () => void;
+  /** 화면별로 바꿀 문구 (예: 펀딩 화면은 '계정' 문구 유지) */
+  textOverrides?: Partial<ChallengeText>;
 }
 
 const formatCredentialPassword = (password: string) => {
@@ -111,9 +113,10 @@ export function ChallengeDetailModal({
   onClose,
   challengeDetail,
   onTradeHistorySettled,
+  textOverrides,
 }: ChallengeDetailModalProps) {
   const { T } = useLocale();
-  const text = T.challenge;
+  const text = useMemo(() => ({ ...T.challenge, ...textOverrides }), [T.challenge, textOverrides]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const hasNotifiedTradeSettledRef = useRef(false);
   const {

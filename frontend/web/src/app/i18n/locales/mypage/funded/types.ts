@@ -221,4 +221,13 @@ export interface FundedTranslations {
   submitPayoutFailed: string;
   loading: string;
   endOfPayoutHistory: string;
+
+  // 공용 계좌 상세 팝업(ChallengeDetailModal)을 펀딩 화면에서 열 때 쓰는 문구
+  detailModal: {
+    accountDetail: string;
+    copyAccountNumber: string;
+    tradingCredentials: string;
+    accountNumber: string;
+    accountStatus: string;
+  };
 }

@@ -207,4 +207,11 @@ export const fundedKo: FundedTranslations = {
   submitPayoutFailed: '출금 신청 제출에 실패했습니다.',
   loading: '불러오는 중',
   endOfPayoutHistory: '출금 내역의 마지막입니다',
+  detailModal: {
+    accountDetail: '계정 상세 정보',
+    copyAccountNumber: '계정 번호 복사',
+    tradingCredentials: '트레이딩 계정 접속 정보',
+    accountNumber: '계정 번호',
+    accountStatus: '계정 상태',
+  },
 };

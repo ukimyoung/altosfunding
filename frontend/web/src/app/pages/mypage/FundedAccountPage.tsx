@@ -1193,6 +1193,7 @@ export function FundedAccountPage() {
           isOpen={showDetailModal}
           challengeDetail={selectedFundedAccount}
           onClose={handleCloseDetailModal}
+          textOverrides={text.detailModal}
           onTradeHistorySettled={() => {
             if (!selectedFundedAccountId) return;
             window.setTimeout(() => {
