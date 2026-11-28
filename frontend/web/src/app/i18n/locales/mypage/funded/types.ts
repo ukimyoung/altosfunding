@@ -47,6 +47,10 @@ export interface FundedTranslations {
   accountIdLabel: string;
   searchPlaceholder: string;
   fundingTypeLabel: string;
+  fundingTypeStarter: string;
+  fundingTypeProfessional: string;
+  fundingTypeElite: string;
+  fundingTypePrime: string;
   startDateLabel: string;
   endDateLabel: string;
   statusLabel: string;
