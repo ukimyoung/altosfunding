@@ -382,7 +382,7 @@ export function PartnerMembersPage() {
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1220 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1300 }}>
               <thead>
                 <tr>
                   <th style={{ ...th, width: 36, paddingRight: 0 }}>
@@ -396,7 +396,7 @@ export function PartnerMembersPage() {
                       style={{ cursor: pageEligible.length ? 'pointer' : 'not-allowed', accentColor: t.accent }}
                     />
                   </th>
-                  {['Member ID', '사이트', '이름', '이메일', '전화', '추천인 ID', '상태', '구독 만료일', '가입일 (GMT+9)', 'Altos 계정', '마지막 가져옴 (GMT+9)'].map((h) => (
+                  {['Member ID', '사이트', '이름', '이메일', '전화', '추천인 ID', '상태', '멤버십 상태', '구독 만료일', '가입일 (GMT+9)', 'Altos 계정', '마지막 가져옴 (GMT+9)'].map((h) => (
                     <th key={h} style={th}>{h}</th>
                   ))}
                 </tr>
@@ -422,6 +422,8 @@ export function PartnerMembersPage() {
                     <td style={{ ...td, ...mono, color: t.textSec }}>{m.phone ?? '-'}</td>
                     <td style={{ ...td, ...mono, color: t.textSec }}>{m.sponsor_member_id ?? '-'}</td>
                     <td style={td}>{pill(STATUS_COLOR[m.status], STATUS_LABEL[m.status])}</td>
+                    {/* 제휴사 membership_active 값 그대로 */}
+                    <td style={td}>{m.membership_active_partner ? pill('#16A34A', '활성') : pill('#6B7280', '비활성')}</td>
                     <td style={{ ...td, ...mono }}>
                       {m.membership_expires_on ? (
                         <span style={{ color: m.membership_active ? '#16A34A' : t.textHint }}>
@@ -453,7 +455,7 @@ export function PartnerMembersPage() {
                 ))}
                 {members.data && members.data.items.length === 0 && (
                   <tr>
-                    <td colSpan={12} style={{ ...td, textAlign: 'center', color: t.textHint, padding: 40 }}>
+                    <td colSpan={13} style={{ ...td, textAlign: 'center', color: t.textHint, padding: 40 }}>
                       {s?.total ? '조건에 맞는 회원이 없습니다.' : '아직 가져온 회원이 없습니다. 위의 가져오기 버튼을 눌러 주세요.'}
                     </td>
                   </tr>

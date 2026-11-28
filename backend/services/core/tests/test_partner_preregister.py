@@ -61,6 +61,8 @@ def test_pre_register_creates_pending_accounts(client, admin_headers, sent_email
     ).json()["items"]
     assert {m["member_id"] for m in pending} == {"ukim", "gone"}
     assert all(m["activated_at"] is None and m["pre_registered_at"] for m in pending)
+    # 멤버십 상태 = 제휴사 membership_active 값 그대로 (_partner 기본값 false)
+    assert all(m["membership_active_partner"] is False for m in pending)
     none = client.get("/api/v1/admin/partner-members", params={"account": "none"}, headers=admin_headers).json()
     assert [m["member_id"] for m in none["items"]] == ["noemail"]
     summary = client.get("/api/v1/admin/partner-members/summary", headers=admin_headers).json()

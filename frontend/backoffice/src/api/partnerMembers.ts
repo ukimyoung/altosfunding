@@ -19,6 +19,8 @@ export interface PartnerMember {
   joined_at: string;
   membership_expires_on: string | null;
   membership_active: boolean;
+  /** 제휴사가 준 membership_active 값 그대로 ('멤버십 상태' 열) */
+  membership_active_partner: boolean;
   partner_updated_at: string;
   last_synced_at: string;
   user_id: string | null;
