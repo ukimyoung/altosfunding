@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import Select, String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.errors import AppError
 from app.models import Challenge, ChallengeOrder, Product, TradingAccount, User
@@ -314,11 +315,19 @@ async def my_accounts(
         query = query.where(or_(TradingAccount.product_id == type_code, TradingAccount.type_code == type_code))
     if product_type and product_type.strip() and product_type.upper() != "ALL":
         # 계좌 유형 = 상품명에서 'Challenge '를 뺀 이름 (Starter·Professional·Elite·Prime, 대소문자 무시)
+        # 펀디드 계좌는 펀디드 상품 이름(예: 'Funded 100K')이 유형과 다를 수 있어
+        # 원래 챌린지 계좌의 상품·펀디드 상품의 연관 챌린지 상품 이름으로도 맞춘다.
         name = func.lower(func.trim(Product.name))
         wanted = product_type.strip().lower()
+        typed = select(Product.product_id).where(
+            or_(name == wanted, name == f"challenge {wanted}", name == f"funded {wanted}")
+        )
+        source = aliased(TradingAccount)
         query = query.where(
-            TradingAccount.product_id.in_(
-                select(Product.product_id).where(or_(name == wanted, name == f"challenge {wanted}"))
+            or_(
+                TradingAccount.product_id.in_(typed),
+                TradingAccount.product_id.in_(select(Product.product_id).where(Product.related_id.in_(typed))),
+                TradingAccount.source_account_id.in_(select(source.id).where(source.product_id.in_(typed))),
             )
         )
     digits = "".join(ch for ch in (mt4_login or "") if ch.isdigit())

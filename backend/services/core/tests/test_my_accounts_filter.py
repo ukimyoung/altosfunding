@@ -81,3 +81,42 @@ def test_challenge_list_filters(client, admin_headers, buyer, round_, fake_mt4):
     # 여러 조건을 함께
     assert logins(product_type="Prime", status="ACTIVE", start_date="20260310") == [login]
     assert logins(product_type="Starter", start_date="20260310", end_date="20260310") == []
+
+
+def test_funded_list_filters(client, admin_headers, buyer, round_, fake_mt4):  # noqa: F811
+    """My Page > Funded: 펀딩 유형(Starter·Professional·Elite·Prime)은 원래 챌린지 상품 기준."""
+    prime_id = _prime_round(client, admin_headers)
+    assert _join(client, buyer, round_["challenge_id"]).status_code == 201
+    assert _join(client, buyer, prime_id).status_code == 201
+    _work()
+    # 펀디드 상품 이름은 유형과 다르다 ('Funded 100K'). Starter 쪽은 연관 챌린지 상품도 지정하지 않는다.
+    funded = _product(client, admin_headers, name="Funded 100K", tier_type="FUNDED", capital=100000, price_usdt=0,
+                      mt4_login_pool_start=21000001, mt4_login_pool_end=21000009)
+    assert funded.status_code == 200, funded.text
+    fid = funded.json()["product_id"]
+    run_sql(
+        "insert into core.trading_accounts (user_id, product_id, tier, mt4_server, mt4_group, mt4_login, leverage,"
+        " capital, status, provision_status, start_at, source_account_id)"
+        " select user_id, $1, 'FUNDED', 'live', mt4_group, mt4_login + 20000000, leverage, capital,"
+        " case when product_id = $2 then 'ACTIVE' else 'PENDING' end, 'DONE',"
+        " case when product_id = $2 then timestamptz '2026-03-10 00:00:00+00' else timestamptz '2026-03-20 00:00:00+00' end,"
+        " id from core.trading_accounts where tier = 'CHALLENGE'",
+        fid, round_["product_id"],
+    )
+    starter_login = run_sql("select mt4_login from core.trading_accounts where tier = 'FUNDED' and status = 'ACTIVE'")[0]["mt4_login"]
+
+    def logins(**params):
+        res = client.get(URL, headers={**buyer, "X-Timezone": "Asia/Seoul"}, params={"tier": "FUNDED", **params})
+        assert res.status_code == 200, res.text
+        return sorted(a["mt4_login"] for a in res.json()["items"])
+
+    assert len(logins()) == 2
+    assert logins(product_type="Starter") == [starter_login]
+    assert len(logins(product_type="Prime")) == 1 and logins(product_type="Prime") != [starter_login]
+    assert logins(product_type="Professional") == [] and logins(product_type="Elite") == []
+    assert logins(mt4_login=str(starter_login)) == [starter_login] and len(logins(mt4_login="3000")) == 2
+    assert logins(status="ACTIVE") == [starter_login] and len(logins(status="PENDING")) == 1
+    assert logins(start_date="20260310", end_date="20260310") == [starter_login]
+    assert logins(start_date="20260311") == logins(product_type="Prime")
+    assert logins(product_type="Starter", status="ACTIVE", start_date="20260301", end_date="20260315") == [starter_login]
+    assert logins(product_type="Prime", status="ACTIVE") == []

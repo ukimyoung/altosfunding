@@ -114,14 +114,24 @@ type ChallengeDetail = {
   trades: Trade[];
 };
 
-type FundingTypeFilter = 'All' | '100K' | '300K' | '500K';
+// 펀딩 유형 = 원래 챌린지 상품명에서 'Challenge '를 뺀 이름. Core에 product_type으로 보낸다.
+// type FundingTypeFilter = 'All' | '100K' | '300K' | '500K';
+type FundingTypeFilter = 'All' | 'Starter' | 'Professional' | 'Elite' | 'Prime';
 type FundedStatusFilter = 'All' | FundedAccountStatus;
 
-const FUNDED_TYPE_FILTER_TO_CODE: Record<FundingTypeFilter, string | undefined> = {
-  All: undefined,
-  '100K': '100',
-  '300K': '300',
-  '500K': '500',
+// 예전에는 type_code('100'·'300'·'500')로 걸렀으나 Core 상품의 type_code는 비어 있을 수 있어 0건이 나왔다.
+// const FUNDED_TYPE_FILTER_TO_CODE: Record<FundingTypeFilter, string | undefined> = {
+//   All: undefined,
+//   '100K': '100',
+//   '300K': '300',
+//   '500K': '500',
+// };
+const FUNDING_TYPE_FILTERS = ['Starter', 'Professional', 'Elite', 'Prime'] as const;
+// 예전 주소(?type=100K 등)로 들어와도 같은 유형으로 맞춘다.
+const LEGACY_FUNDING_TYPE_QUERY: Record<string, FundingTypeFilter> = {
+  '100K': 'Starter',
+  '300K': 'Professional',
+  '500K': 'Elite',
 };
 
 const toApiDate = (value: string) => (value ? value.replace(/-/g, '') : undefined);
@@ -154,11 +164,13 @@ const parsePage = (value: string | null) => {
 };
 
 const parseFundingTypeFilter = (value: string | null): FundingTypeFilter => {
-  if (value === '100K' || value === '300K' || value === '500K') {
-    return value;
+  if (!value) {
+    return 'All';
   }
 
-  return 'All';
+  const matched = FUNDING_TYPE_FILTERS.find((type) => type.toLowerCase() === value.toLowerCase());
+
+  return matched ?? LEGACY_FUNDING_TYPE_QUERY[value.toUpperCase()] ?? 'All';
 };
 
 const parseFundedStatusFilter = (value: string | null): FundedStatusFilter => {
@@ -347,7 +359,7 @@ export function FundedAccountPage() {
       tier: 'FUNDED' as const,
       status:
         appliedFundedAccountStatusFilter === 'All' ? undefined : appliedFundedAccountStatusFilter,
-      type_code: FUNDED_TYPE_FILTER_TO_CODE[appliedFundingTypeFilter],
+      product_type: appliedFundingTypeFilter === 'All' ? undefined : appliedFundingTypeFilter,
       mt4_login: toMt4LoginParam(appliedSearchAccountId),
       start_date: toApiDate(appliedStartDate),
       end_date: toApiDate(appliedEndDate),
@@ -399,11 +411,18 @@ export function FundedAccountPage() {
       value: status,
     })),
   ];
+  const fundingTypeFilterLabels: Record<Exclude<FundingTypeFilter, 'All'>, string> = {
+    Starter: text.fundingTypeStarter,
+    Professional: text.fundingTypeProfessional,
+    Elite: text.fundingTypeElite,
+    Prime: text.fundingTypePrime,
+  };
   const fundingTypeFilterOptions = [
     { label: text.statusAll, value: 'All' as const },
-    { label: '100K', value: '100K' as const },
-    { label: '300K', value: '300K' as const },
-    { label: '500K', value: '500K' as const },
+    // { label: '100K', value: '100K' as const },
+    // { label: '300K', value: '300K' as const },
+    // { label: '500K', value: '500K' as const },
+    ...FUNDING_TYPE_FILTERS.map((type) => ({ label: fundingTypeFilterLabels[type], value: type })),
   ];
 
   const fundedAccounts = useMemo<FundedAccount[]>(() => {
