@@ -8,6 +8,7 @@
 - 제외: 이미 계정이 있는 회원, 이메일 없는 회원, 탈퇴한 계정이 있는 회원.
 - 제휴사 status=deleted 회원은 만들고 바로 INACTIVE로 둔다 (사유 PARTNER_DELETED → 제휴사에서 복구되면 가져오기가 되돌린다).
 - 환영 메일은 보내지 않는다 (활성화할 때 보낸다).
+- 만든 계정은 바로 IB(레벨 1)로 등록하고 제휴사 추천인을 연결한다 (partner_network, 2026-11-28 사용자 결정).
 """
 
 import uuid
@@ -18,7 +19,13 @@ from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import PartnerMember, User
-from app.services import partner_account, partner_sync, signup, user_admin
+from app.services import (
+    partner_account,
+    partner_network,
+    partner_sync,
+    signup,
+    user_admin,
+)
 
 MAX_MEMBERS = 1000
 
@@ -29,6 +36,7 @@ class PreRegisterResult:
     # 만들었지만 제휴사 status=deleted라 비활성으로 둔 회원
     created_inactive: list[str] = field(default_factory=list)
     skipped: list[dict] = field(default_factory=list)  # [{member_id, reason}]
+    network: partner_network.NetworkResult = field(default_factory=partner_network.NetworkResult)
 
 
 def _skip(result: PreRegisterResult, member_id: str, reason: str) -> None:
@@ -80,6 +88,7 @@ async def pre_register(session: AsyncSession, member_ids: list[str], admin_id: u
             result.created_inactive.append(partner.member_id)
         else:
             result.created.append(partner.member_id)
+        await partner_network.apply(session, user, partner, admin_id, result.network)
     await session.commit()
     return result
 

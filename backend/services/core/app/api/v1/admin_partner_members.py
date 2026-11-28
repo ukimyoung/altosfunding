@@ -6,7 +6,8 @@
 - POST /admin/partner-members/sync       가져오기 실행 {mode: INCREMENTAL(지금 가져오기) | FULL(전체 다시 가져오기)}
 - GET  /admin/partner-members/sync-runs  가져오기 이력
 - GET  /admin/partner-members/sync-runs/{id}  회차 상세 (실패 항목 포함)
-- POST /admin/partner-members/pre-register  회원사전가입 (고른 회원의 계정을 활성화 전 상태로 미리 만든다)
+- POST /admin/partner-members/pre-register  회원사전가입 (고른 회원의 계정을 활성화 전 상태로 미리 만들고 IB 등록·추천인 연결)
+- POST /admin/partner-members/network-resync  IB 등록·추천인 연결 다시 맞추기 (계정이 있는 모든 제휴 회원)
 """
 
 import math
@@ -21,8 +22,8 @@ from sqlalchemy import and_, func, or_, select
 from app.config import settings
 from app.deps import AdminUser, Session
 from app.errors import AppError
-from app.models import PartnerMember, PartnerMemberSyncRun, User
-from app.services import partner_preregister, partner_sync
+from app.models import MemberRelation, PartnerMember, PartnerMemberSyncRun, User
+from app.services import partner_network, partner_preregister, partner_sync
 
 router = APIRouter(prefix="/admin/partner-members", tags=["admin-partner-members"])
 
@@ -63,6 +64,11 @@ class PartnerMemberOut(BaseModel):
     # 활성화 시각. 사전 가입만 하고 아직 활성화하지 않았으면 null (pre_registered_at만 있음)
     activated_at: datetime | None = None
     pre_registered_at: datetime | None = None
+    # Altos 추천인(member_relations.sponsor_id)의 제휴사 Member ID. 추천인이 제휴 회원이 아니면 null
+    linked_sponsor_member_id: str | None = None
+    linked_sponsor_uid: str | None = None
+    # 계정이 있고, Altos 추천인이 제휴사 추천인(sponsor_member_id)과 다르면 true ('다름' 표시)
+    sponsor_mismatch: bool = False
 
 
 class PartnerMemberPage(BaseModel):
@@ -126,17 +132,36 @@ class PreRegisterSkip(BaseModel):
     reason: str
 
 
+class PreRegisterNetwork(BaseModel):
+    ib_created: int
+    sponsors_linked: int
+    sponsor_skipped: dict[str, int]
+
+
 class PreRegisterResponse(BaseModel):
     created: list[str]
     created_inactive: list[str]
     skipped: list[PreRegisterSkip]
+    # IB 등록·추천인 연결 결과
+    network: PreRegisterNetwork
 
 
 class SyncRequest(BaseModel):
     mode: Literal["INCREMENTAL", "FULL"] = "INCREMENTAL"
 
 
-def _member_out(p: PartnerMember, user: User | None) -> PartnerMemberOut:
+def _sponsor_mismatch(p: PartnerMember, user: User | None, sponsor: User | None) -> bool:
+    """계정이 있는데 Altos 추천인이 제휴사 추천인과 다르다 (한쪽만 있는 경우 포함)."""
+    if user is None:
+        return False
+    expected = (p.sponsor_member_id or "").strip().lower() or None
+    actual = (sponsor.partner_member_id or "").lower() if sponsor else None
+    if sponsor is not None and not actual:
+        return True  # 제휴 회원이 아닌 추천인
+    return expected != actual
+
+
+def _member_out(p: PartnerMember, user: User | None, sponsor: User | None = None) -> PartnerMemberOut:
     return PartnerMemberOut(
         member_id=p.member_id,
         site=p.site,
@@ -157,6 +182,9 @@ def _member_out(p: PartnerMember, user: User | None) -> PartnerMemberOut:
         user_status=user.status if user else None,
         activated_at=user.activated_at if user else None,
         pre_registered_at=user.pre_registered_at if user else None,
+        linked_sponsor_member_id=sponsor.partner_member_id if sponsor else None,
+        linked_sponsor_uid=sponsor.uid if sponsor else None,
+        sponsor_mismatch=_sponsor_mismatch(p, user, sponsor),
     )
 
 
@@ -166,6 +194,18 @@ def _run_out(run: PartnerMemberSyncRun, email: str | None = None, *, detail: boo
     if detail:
         return SyncRunDetail(**data, failures=run.failures or [])
     return SyncRunOut(**data)
+
+
+async def _sponsors(session, user_ids: list[uuid.UUID]) -> dict[uuid.UUID, User]:
+    """회원별 Altos 추천인(member_relations.sponsor_id) 계정."""
+    if not user_ids:
+        return {}
+    rows = await session.execute(
+        select(MemberRelation.member_id, User)
+        .join(User, User.id == MemberRelation.sponsor_id)
+        .where(MemberRelation.member_id.in_(user_ids))
+    )
+    return dict(rows.all())
 
 
 @router.get("", response_model=PartnerMemberPage, summary="제휴사 회원 목록")
@@ -232,7 +272,9 @@ async def list_partner_members(
         .offset((page - 1) * size)
         .limit(size)
     )
-    items = [_member_out(p, u) for p, u in rows.all()]
+    result = rows.all()
+    sponsors = await _sponsors(session, [u.id for _, u in result if u is not None])
+    items = [_member_out(p, u, sponsors.get(u.id) if u else None) for p, u in result]
     return PartnerMemberPage(items=items, total=total, page=page, size=size, pages=_pages(total, size))
 
 
@@ -343,4 +385,22 @@ async def pre_register(body: PreRegisterRequest, admin: AdminUser, session: Sess
         created=result.created,
         created_inactive=result.created_inactive,
         skipped=[PreRegisterSkip(**s) for s in result.skipped],
+        network=PreRegisterNetwork(**result.network.as_dict()),
     )
+
+
+class NetworkResultOut(BaseModel):
+    ib_created: int
+    sponsors_linked: int
+    # 연결하지 못한 사유별 건수: sponsor_not_found·sponsor_no_account·relation_cycle·already_set
+    sponsor_skipped: dict[str, int]
+
+
+@router.post("/network-resync", response_model=NetworkResultOut, summary="IB 등록·추천인 연결 다시 맞추기")
+async def network_resync(admin: AdminUser, session: Session) -> NetworkResultOut:
+    """계정이 있는 모든 제휴 회원을 IB(레벨 1)로 등록하고 제휴사 추천인을 연결한다.
+
+    이미 IB이거나 이미 추천인이 있는 회원은 바꾸지 않는다 (제휴사 추천인과 다르면 목록에 sponsor_mismatch로 보인다).
+    """
+    result = await partner_network.resync_all(session, admin.id)
+    return NetworkResultOut(**result.as_dict())

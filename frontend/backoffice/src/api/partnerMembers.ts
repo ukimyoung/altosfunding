@@ -31,6 +31,11 @@ export interface PartnerMember {
   activated_at: string | null;
   /** 백오피스 '회원사전가입'으로 계정을 만든 시각 */
   pre_registered_at: string | null;
+  /** Altos 추천인(member_relations)의 제휴사 Member ID·UID. 추천인이 없거나 제휴 회원이 아니면 null */
+  linked_sponsor_member_id: string | null;
+  linked_sponsor_uid: string | null;
+  /** 계정이 있고 Altos 추천인이 제휴사 추천인과 다르면 true */
+  sponsor_mismatch: boolean;
 }
 
 export interface PartnerMemberPage {
@@ -130,8 +135,22 @@ export interface PreRegisterResult {
   /** 만들었지만 제휴사에서 삭제(deleted)된 회원이라 비활성으로 둔 계정 */
   created_inactive: string[];
   skipped: { member_id: string; reason: PreRegisterSkipReason }[];
+  /** IB 등록·추천인 연결 결과 */
+  network: NetworkResult;
+}
+
+export type SponsorSkipReason = 'sponsor_not_found' | 'sponsor_no_account' | 'relation_cycle' | 'already_set';
+
+export interface NetworkResult {
+  ib_created: number;
+  sponsors_linked: number;
+  /** 추천인을 연결하지 못한 사유별 건수 */
+  sponsor_skipped: Partial<Record<SponsorSkipReason, number>>;
 }
 
 /** 회원사전가입: 고른 제휴 회원의 Altos 계정을 활성화 전 상태로 미리 만든다 (한 번에 최대 1,000명). */
 export const preRegisterPartnerMembers = async (memberIds: string[]) =>
   (await api.post<PreRegisterResult>(`${BASE}/pre-register`, { member_ids: memberIds })).data;
+
+/** IB 등록·추천인 연결 다시 맞추기: 계정이 있는 모든 제휴 회원 (이미 IB·이미 추천인이 있으면 그대로) */
+export const resyncPartnerNetwork = async () => (await api.post<NetworkResult>(`${BASE}/network-resync`)).data;
