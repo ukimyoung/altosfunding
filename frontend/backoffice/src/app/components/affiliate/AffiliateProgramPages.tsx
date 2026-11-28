@@ -5,7 +5,6 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   CircleDollarSign,
   FileSpreadsheet,
@@ -32,6 +31,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "./AffiliateAlertDialog";
+import {
+  TablePagination,
+  buildPaginationItems,
+  buildPaginationSummary,
+  getPaginationRange,
+} from "../shared/DataTable";
 import {
   addPartner,
   apiErrorMessage,
@@ -702,7 +707,7 @@ function RelocationConfirmModal({
 }
 
 export function IbPartnerManagementPage({ dark, onToast }: { dark: boolean; onToast: ToastHandler }) {
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 20;
   const t = tokens(dark);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<PartnerStatusFilter>("All");
@@ -732,7 +737,7 @@ export function IbPartnerManagementPage({ dark, onToast }: { dark: boolean; onTo
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
   const pagedPartners = partners;
-  const visiblePages = Array.from({ length: totalPages }, (_, index) => index + 1);
+  const partnerRange = getPaginationRange({ totalItems: total, currentPage: safePage, pageSize: PAGE_SIZE, currentPageItemCount: partners.length });
   const th: React.CSSProperties = { padding: "11px 13px", textAlign: "left", fontSize: 11, fontWeight: 700, color: t.textSec, whiteSpace: "nowrap", background: dark ? t.surface2 : "#F8FAFC", borderBottom: `1px solid ${dark ? t.border2 : "#E2E8F0"}` };
   const td: React.CSSProperties = { padding: "13px", color: t.text, fontSize: 12, borderBottom: `1px solid ${dark ? t.border : "#E2E8F0"}`, verticalAlign: "middle" };
   return (
@@ -801,46 +806,16 @@ export function IbPartnerManagementPage({ dark, onToast }: { dark: boolean; onTo
             </tbody>
           </table>
         </div>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: `1px solid ${t.border}` }}>
-          <span style={{ fontSize: 11, color: t.textHint, fontFamily: "'Noto Sans KR',sans-serif" }}>총 {total}명 · {safePage} / {totalPages} 페이지</span>
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <button
-              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
-              disabled={safePage === 1}
-              onMouseEnter={event => { if (safePage !== 1) event.currentTarget.style.background = t.surface3; }}
-              onMouseLeave={event => { event.currentTarget.style.background = t.surface2; }}
-              style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${t.border2}`, background: t.surface2, color: t.textSec, cursor: safePage === 1 ? "not-allowed" : "pointer", opacity: safePage === 1 ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-              aria-label="이전 페이지"
-            >
-              <ChevronLeft size={13} />
-            </button>
-            {visiblePages.map(page => {
-              const active = page === safePage;
-              return (
-                <button
-                  key={page}
-                  onClick={() => setCurrentPage(page)}
-                  onMouseEnter={event => { if (!active) event.currentTarget.style.background = t.surface3; }}
-                  onMouseLeave={event => { if (!active) event.currentTarget.style.background = t.surface2; }}
-                  style={{ width: 28, height: 28, borderRadius: 6, border: active ? "none" : `1px solid ${t.border2}`, background: active ? t.accent : t.surface2, color: active ? "#fff" : t.textSec, fontSize: 12, fontFamily: "'DM Sans',sans-serif", fontWeight: active ? 600 : 400, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-                  aria-current={active ? "page" : undefined}
-                >
-                  {page}
-                </button>
-              );
-            })}
-            <button
-              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
-              disabled={safePage === totalPages}
-              onMouseEnter={event => { if (safePage !== totalPages) event.currentTarget.style.background = t.surface3; }}
-              onMouseLeave={event => { event.currentTarget.style.background = t.surface2; }}
-              style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${t.border2}`, background: t.surface2, color: t.textSec, cursor: safePage === totalPages ? "not-allowed" : "pointer", opacity: safePage === totalPages ? 0.4 : 1, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
-              aria-label="다음 페이지"
-            >
-              <ChevronRight size={13} />
-            </button>
-          </div>
-        </div>
+        <TablePagination
+          summary={buildPaginationSummary({ totalItems: total, start: partnerRange.start, end: partnerRange.end, unit: "명" })}
+          containerStyle={{ padding: "12px 16px" }}
+          borderColor={t.border}
+          textColor={t.textHint}
+          activeBackground={t.accent}
+          inactiveBackground={t.surface2}
+          inactiveBorderColor={t.border2}
+          items={buildPaginationItems({ currentPage: safePage, totalPages, onPageChange: setCurrentPage })}
+        />
       </div>
       {drawer && <PartnerDrawer partner={drawer} t={t} onClose={() => setDrawer(null)} />}
       {adding && <AddPartnerModal t={t} onToast={onToast} onClose={() => setAdding(false)} onSave={() => { setAdding(false); setReloadKey(key => key + 1); onToast("신규 IB 파트너가 등록되었습니다.", "success"); }} />}
@@ -1453,7 +1428,7 @@ function toCommissionRow(item: CommissionItem) {
 
 export function AffiliateCommissionDetailPage({ dark, onToast }: { dark: boolean; onToast: ToastHandler }) {
   const t = tokens(dark);
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = 20;
   const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -1484,8 +1459,7 @@ export function AffiliateCommissionDetailPage({ dark, onToast }: { dark: boolean
   }, [filterParams, currentPage, query, onToast]);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const safePage = Math.min(currentPage, totalPages);
-  const firstRecord = total ? (safePage - 1) * PAGE_SIZE + 1 : 0;
-  const lastRecord = Math.min(safePage * PAGE_SIZE, total);
+  const commissionRange = getPaginationRange({ totalItems: total, currentPage: safePage, pageSize: PAGE_SIZE, currentPageItemCount: pagedRows.length });
 
   function resetFilters() {
     setQuery("");
@@ -1621,17 +1595,16 @@ export function AffiliateCommissionDetailPage({ dark, onToast }: { dark: boolean
           </table>
         </div>
 
-        <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px solid #E2E8F0", background: "#FFFFFF" }}>
-          <span style={{ fontSize: 11, color: "#64748B" }}>Showing {firstRecord} - {lastRecord} of {total} records</span>
-          <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-            <button onClick={() => setCurrentPage(page => Math.max(1, page - 1))} disabled={safePage === 1} style={{ height: 32, padding: "0 12px", borderRadius: 7, border: "1px solid #E2E8F0", background: "#FFFFFF", color: "#475569", fontSize: 11, cursor: safePage === 1 ? "not-allowed" : "pointer", opacity: safePage === 1 ? .4 : 1 }}>Previous</button>
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map(page => {
-              const active = safePage === page;
-              return <button key={page} onClick={() => setCurrentPage(page)} aria-current={active ? "page" : undefined} style={{ width: 32, height: 32, borderRadius: 7, border: `1px solid ${active ? "#7C6AF7" : "#E2E8F0"}`, background: active ? "#7C6AF7" : "#FFFFFF", color: active ? "#FFFFFF" : "#475569", fontSize: 11, fontWeight: active ? 700 : 500, cursor: "pointer" }}>{page}</button>;
-            })}
-            <button onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))} disabled={safePage === totalPages} style={{ height: 32, padding: "0 12px", borderRadius: 7, border: "1px solid #E2E8F0", background: "#FFFFFF", color: "#475569", fontSize: 11, cursor: safePage === totalPages ? "not-allowed" : "pointer", opacity: safePage === totalPages ? .4 : 1 }}>Next</button>
-          </div>
-        </div>
+        <TablePagination
+          summary={buildPaginationSummary({ totalItems: total, start: commissionRange.start, end: commissionRange.end, unit: "건" })}
+          containerStyle={{ padding: "12px 16px", background: "#FFFFFF" }}
+          borderColor="#E2E8F0"
+          textColor="#64748B"
+          activeBackground={t.accent}
+          inactiveBackground="#F8FAFC"
+          inactiveBorderColor="#E2E8F0"
+          items={buildPaginationItems({ currentPage: safePage, totalPages, onPageChange: setCurrentPage })}
+        />
       </div>
     </div>
   );
