@@ -85,6 +85,8 @@ export interface ListAccountsParams {
   tier: AccountTier;
   status?: AccountStatus;
   type_code?: string;
+  // 계좌 유형: 상품명에서 'Challenge '를 뺀 이름 (Starter·Professional·Elite·Prime)
+  product_type?: string;
   mt4_login?: number;
   account_id?: string;
   start_date?: string;

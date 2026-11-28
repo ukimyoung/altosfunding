@@ -121,13 +121,20 @@ async def my_accounts(
     session: Session,
     tier: str | None = None,
     status: str | None = None,
+    timezone: TimeZone = None,
     type_code: str | None = None,
-    mt4_login: int | None = None,
+    product_type: Annotated[
+        str | None, Query(description="계좌 유형: 상품명에서 'Challenge '를 뺀 이름 (Starter·Professional·Elite·Prime)")
+    ] = None,
+    mt4_login: Annotated[str | None, Query(description="MT4 번호 일부")] = None,
+    start_date: Annotated[str | None, Query(description="YYYYMMDD 또는 YYYY-MM-DD, 계좌 시작일 기준 (X-Timezone)")] = None,
+    end_date: Annotated[str | None, Query(description="YYYYMMDD 또는 YYYY-MM-DD, 계좌 시작일 기준 (X-Timezone)")] = None,
     page: Page = 1,
     size: Size = 20,
 ) -> AccountPage:
     items, total = await q.my_accounts(
-        session, user, tier=tier, status=status, type_code=type_code, mt4_login=mt4_login, page=page, size=size
+        session, user, tier=tier, status=status, type_code=type_code, mt4_login=mt4_login, page=page, size=size,
+        product_type=product_type, start_date=start_date, end_date=end_date, timezone=timezone,
     )
     return AccountPage(items=items, total=total, page=page, size=size, pages=q.pages(total, size))
 

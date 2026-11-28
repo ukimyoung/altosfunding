@@ -40,7 +40,8 @@ import { useSearchParams } from 'react-router';
 import { applyScopedSearchParams, createScopedSearchParams } from '../../utils/url/queryParams';
 import { useLocale } from '@/app/i18n/LocaleContext';
 
-type AccountTypeFilter = 'All' | '$100' | '$300' | '$500';
+// 계좌 유형 = 상품명에서 'Challenge '를 뺀 이름. Core에 product_type으로 보낸다.
+type AccountTypeFilter = 'All' | 'Starter' | 'Professional' | 'Elite' | 'Prime';
 type ChallengeStatusFilter = 'All' | ChallengeAccountStatus;
 
 type Challenge = {
@@ -83,11 +84,19 @@ type ChallengeDetail = {
   trades: Trade[];
 };
 
-const CHALLENGE_TYPE_FILTER_TO_CODE: Record<AccountTypeFilter, string | undefined> = {
-  All: undefined,
-  $100: '100',
-  $300: '300',
-  $500: '500',
+// 예전에는 type_code('100'·'300'·'500')로 걸렀으나 Core 상품의 type_code는 비어 있을 수 있어 0건이 나왔다.
+// const CHALLENGE_TYPE_FILTER_TO_CODE: Record<AccountTypeFilter, string | undefined> = {
+//   All: undefined,
+//   $100: '100',
+//   $300: '300',
+//   $500: '500',
+// };
+const ACCOUNT_TYPE_FILTERS = ['Starter', 'Professional', 'Elite', 'Prime'] as const;
+// 예전 주소(?type=$100 등)로 들어와도 같은 유형으로 맞춘다.
+const LEGACY_ACCOUNT_TYPE_QUERY: Record<string, AccountTypeFilter> = {
+  $100: 'Starter',
+  $300: 'Professional',
+  $500: 'Elite',
 };
 
 const toApiDate = (value: string) => (value ? value.replace(/-/g, '') : undefined);
@@ -127,11 +136,13 @@ const toMt4LoginParam = (value: string) => {
 };
 
 const parseChallengeAccountTypeFilter = (value: string | null): AccountTypeFilter => {
-  if (value === '$100' || value === '$300' || value === '$500') {
-    return value;
+  if (!value) {
+    return 'All';
   }
 
-  return 'All';
+  const matched = ACCOUNT_TYPE_FILTERS.find((type) => type.toLowerCase() === value.toLowerCase());
+
+  return matched ?? LEGACY_ACCOUNT_TYPE_QUERY[value] ?? 'All';
 };
 
 const formatChallengeAccountType = (
@@ -282,7 +293,7 @@ export function ChallengeAccountPage() {
     () => ({
       tier: 'CHALLENGE' as const,
       status: appliedStatusFilter === 'All' ? undefined : appliedStatusFilter,
-      type_code: CHALLENGE_TYPE_FILTER_TO_CODE[appliedAccountTypeFilter],
+      product_type: appliedAccountTypeFilter === 'All' ? undefined : appliedAccountTypeFilter,
       mt4_login: toMt4LoginParam(appliedSearchAccountId),
       start_date: toApiDate(appliedStartDate),
       end_date: toApiDate(appliedEndDate),
@@ -330,20 +341,27 @@ export function ChallengeAccountPage() {
     '300': text.accountTypeProfessional,
     '500': text.accountTypeElite,
   };
+  const accountTypeFilterLabels: Record<Exclude<AccountTypeFilter, 'All'>, string> = {
+    Starter: text.accountTypeStarter,
+    Professional: text.accountTypeProfessional,
+    Elite: text.accountTypeElite,
+    Prime: text.accountTypePrime,
+  };
   const accountTypeFilterOptions = [
     text.statusAll,
-    text.accountTypeStarter,
-    text.accountTypeProfessional,
-    text.accountTypeElite,
-  ] as const;
-  const accountTypeFilterValues: Record<string, AccountTypeFilter> = {
-    [text.accountTypeStarter]: '$100',
-    [text.accountTypeProfessional]: '$300',
-    [text.accountTypeElite]: '$500',
-  };
+    ...ACCOUNT_TYPE_FILTERS.map((type) => accountTypeFilterLabels[type]),
+  ];
+  const accountTypeFilterValues: Record<string, AccountTypeFilter> = Object.fromEntries(
+    ACCOUNT_TYPE_FILTERS.map((type) => [accountTypeFilterLabels[type], type]),
+  );
+  // 'In Progress'·'Inactive'는 Core가 계좌에 쓰지 않아 항상 0건이라 필터 목록에서 숨긴다 (사용자 요청).
+  const HIDDEN_STATUS_FILTERS: readonly ChallengeAccountStatus[] = [
+    'IN_PROGRESS', // 진행 중
+    'INACTIVE', // 비활성
+  ];
   const statusFilterOptions = [
     { label: text.statusAll, value: 'All' as const },
-    ...CHALLENGE_ACCOUNT_STATUSES.map((status) => ({
+    ...CHALLENGE_ACCOUNT_STATUSES.filter((status) => !HIDDEN_STATUS_FILTERS.includes(status)).map((status) => ({
       label: getChallengeStatusLabel(status),
       value: status,
     })),
@@ -849,7 +867,7 @@ export function ChallengeAccountPage() {
                   value={
                     accountTypeFilter === 'All'
                       ? text.statusAll
-                      : accountTypeLabels[accountTypeFilter.replace(/^\$/, '')]
+                      : accountTypeFilterLabels[accountTypeFilter]
                   }
                   isOpen={showAccountTypeDropdown}
                   onToggle={() => {

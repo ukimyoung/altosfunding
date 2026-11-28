@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors import AppError
@@ -300,18 +300,40 @@ async def _account_rows(session: AsyncSession, query: Select) -> list[tuple[Trad
 
 async def my_accounts(
     session: AsyncSession, user: User, *, tier: str | None, status: str | None, type_code: str | None,
-    mt4_login: int | None, page: int, size: int,
+    mt4_login: str | None, page: int, size: int, product_type: str | None = None,
+    start_date: str | None = None, end_date: str | None = None, timezone: str | None = None,
 ) -> tuple[list[dict], int]:
     # 발급 실패(환불) 계좌는 목록에서 뺀다 (주문 내역에서 볼 수 있다).
     query = select(TradingAccount).where(TradingAccount.user_id == user.id, TradingAccount.provision_status != "FAILED")
     if tier:
         query = query.where(TradingAccount.tier == tier.upper())
-    if status:
+    if status and status.upper() != "ALL":
         query = query.where(TradingAccount.status == status.upper())
-    if type_code:
-        query = query.where(TradingAccount.type_code == type_code)
-    if mt4_login is not None:
-        query = query.where(TradingAccount.mt4_login == mt4_login)
+    if type_code and type_code.strip() and type_code.upper() != "ALL":
+        # 상품코드(4자리) 또는 상품의 type_code (관리자 목록과 같음)
+        query = query.where(or_(TradingAccount.product_id == type_code, TradingAccount.type_code == type_code))
+    if product_type and product_type.strip() and product_type.upper() != "ALL":
+        # 계좌 유형 = 상품명에서 'Challenge '를 뺀 이름 (Starter·Professional·Elite·Prime, 대소문자 무시)
+        name = func.lower(func.trim(Product.name))
+        wanted = product_type.strip().lower()
+        query = query.where(
+            TradingAccount.product_id.in_(
+                select(Product.product_id).where(or_(name == wanted, name == f"challenge {wanted}"))
+            )
+        )
+    digits = "".join(ch for ch in (mt4_login or "") if ch.isdigit())
+    if digits:
+        # MT4 번호 일부로 검색 (기존 서버와 같음)
+        query = query.where(cast(TradingAccount.mt4_login, String).like(f"%{digits}%"))
+    # 기간: 계좌 시작일(없으면 생성일) 기준, X-Timezone 날짜 (기존 서버와 같음)
+    tz = zone(timezone)
+    criteria = func.coalesce(TradingAccount.start_at, TradingAccount.created_at)
+    start = _local_day_bounds(start_date, tz)
+    end = _local_day_bounds(end_date, tz)
+    if start:
+        query = query.where(criteria >= start)
+    if end:
+        query = query.where(criteria < end + timedelta(days=1))
     total = await session.scalar(select(func.count()).select_from(query.subquery())) or 0
     rows = await _account_rows(
         session, query.order_by(TradingAccount.created_at.desc(), TradingAccount.id).offset((page - 1) * size).limit(size)
