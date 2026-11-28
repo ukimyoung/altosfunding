@@ -64,6 +64,8 @@ type FundedAccount = {
   statusLabel: string;
   banReason?: string;
   startDate: string;
+  // 펀디드 시작일 (계좌 start_at, 브라우저 시간대 날짜). 목록 'Start Day' 열에 표시.
+  startDay: string;
   endDate: string;
 };
 
@@ -447,6 +449,7 @@ export function FundedAccountPage() {
         statusLabel: getFundedStatusLabel(toFundedStatus(item.status)),
         banReason: item.reason ?? undefined,
         startDate: normalizeDateValue(item.start_date),
+        startDay: (item.start_date && formatDateByBrowserTimeZone(item.start_date)) || '-',
         endDate: normalizeDateValue(item.end_date),
       };
     });
@@ -752,6 +755,11 @@ export function FundedAccountPage() {
       ),
     },
     {
+      header: text.colStartDay,
+      align: 'center',
+      accessor: (item) => <p className="text-gray-300 text-sm font-mono">{item.startDay}</p>,
+    },
+    {
       header: text.colBalance,
       align: 'right',
       accessor: (item) => (
@@ -796,7 +804,7 @@ export function FundedAccountPage() {
         <div className="flex justify-center">
           <button
             disabled={item.mt4Login <= 0}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#0052FF] hover:bg-[#0052FF]/90 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-[#0052FF]/30 disabled:cursor-not-allowed disabled:bg-[#24243a] disabled:text-gray-500 disabled:hover:bg-[#24243a] disabled:hover:shadow-none"
+            className="flex items-center gap-1 min-[1440px]:gap-1.5 px-2 min-[1440px]:px-3 py-2 bg-[#0052FF] hover:bg-[#0052FF]/90 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-[#0052FF]/30 disabled:cursor-not-allowed disabled:bg-[#24243a] disabled:text-gray-500 disabled:hover:bg-[#24243a] disabled:hover:shadow-none"
             onClick={() => handleViewFundedAccountDetails(item)}
           >
             <Eye size={16} />
@@ -811,7 +819,7 @@ export function FundedAccountPage() {
       accessor: (item) => (
         <div className="flex justify-center">
           <button
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1 min-[1440px]:gap-1.5 px-2 min-[1440px]:px-3 py-2 rounded-lg text-sm font-medium transition-all ${
               isPayoutDisabled(item)
                 ? 'bg-gray-600/30 text-gray-500 cursor-not-allowed'
                 : 'bg-[#00FF94] hover:bg-[#00FF94]/90 text-[#0f0f17] hover:shadow-lg hover:shadow-[#00FF94]/30'
@@ -1109,8 +1117,8 @@ export function FundedAccountPage() {
             data={displayData}
             columns={fundedAccountColumns}
             // 열이 8개라 1440px에서 헤더·버튼 글자가 두 줄로 내려가지 않도록 좌우 여백을 줄이고 줄바꿈을 막는다.
-            desktopHeaderCellClassName="px-3 py-4 text-xs font-medium uppercase tracking-wide text-gray-400 whitespace-nowrap"
-            desktopCellClassName="px-3 py-5 whitespace-nowrap"
+            desktopHeaderCellClassName="px-2 min-[1440px]:px-3 py-4 text-xs font-medium uppercase tracking-normal min-[1440px]:tracking-wide text-gray-400 whitespace-nowrap"
+            desktopCellClassName="px-2 min-[1440px]:px-3 py-5 whitespace-nowrap"
             keyExtractor={(item) => item.id}
             currentPage={currentPage}
             totalPages={totalPages}
