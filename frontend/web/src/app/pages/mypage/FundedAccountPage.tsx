@@ -34,7 +34,7 @@ import {
   useFundedSummaryQuery,
 } from '@/app/queries/accounts';
 import { checkPayoutPositions } from '@/api/payouts';
-import { formatDateByBrowserTimeZone } from '@/app/utils/date';
+import { formatDateByBrowserTimeZone, formatDateTimeByBrowserTimeZone } from '@/app/utils/date';
 import { ChallengeDetailModal } from '../../components/shared/ChallengeDetailModal';
 import { ActivePositionWarningModal } from '../../components/shared/ActivePositionWarningModal';
 import { DataTable, Column } from '../../components/shared/DataTable';
@@ -64,8 +64,8 @@ type FundedAccount = {
   statusLabel: string;
   banReason?: string;
   startDate: string;
-  // 펀디드 시작일 (계좌 start_at, 브라우저 시간대 날짜). 목록 'Start Day' 열에 표시.
-  startDay: string;
+  // 펀디드 시작 일시 (계좌 start_at, 브라우저 시간대, YYYY-MM-DD HH:mm). 목록 'Start Date' 열에 표시.
+  startDateTime: string;
   endDate: string;
 };
 
@@ -449,7 +449,7 @@ export function FundedAccountPage() {
         statusLabel: getFundedStatusLabel(toFundedStatus(item.status)),
         banReason: item.reason ?? undefined,
         startDate: normalizeDateValue(item.start_date),
-        startDay: (item.start_date && formatDateByBrowserTimeZone(item.start_date)) || '-',
+        startDateTime: (item.start_date && formatDateTimeByBrowserTimeZone(item.start_date).slice(0, 16)) || '-',
         endDate: normalizeDateValue(item.end_date),
       };
     });
@@ -755,9 +755,19 @@ export function FundedAccountPage() {
       ),
     },
     {
-      header: text.colStartDay,
+      header: text.colStartDate,
       align: 'center',
-      accessor: (item) => <p className="text-gray-300 text-sm font-mono">{item.startDay}</p>,
+      // 날짜와 시:분을 두 줄로 나눠 표 너비를 늘리지 않는다 (1280px 이상 한 줄 헤더 유지).
+      accessor: (item) => {
+        const [date, time] = item.startDateTime.split(' ');
+
+        return (
+          <div className="font-mono leading-tight">
+            <p className="text-gray-300 text-sm">{date}</p>
+            {time ? <p className="text-gray-500 text-xs mt-0.5">{time}</p> : null}
+          </div>
+        );
+      },
     },
     {
       header: text.colBalance,
