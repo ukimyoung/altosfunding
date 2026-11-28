@@ -7,10 +7,10 @@
   성공한 회차가 없으면 since 없이 전체를 받는다.
 - 회차(core.partner_member_sync_runs)는 Core가 QUEUED로 만들고 작업 큐에 넣으면 Worker가 실행한다.
   한 번에 한 회차만 있다. 페이지마다 커밋하고 last_cursor를 남겨, Worker가 중간에 멈추면 그 다음 페이지부터 이어 받는다.
-- 항목 검사: member_id 없음·'@' 포함, site·status가 정해진 값 밖, 날짜 형식 오류는 그 항목만 실패로 남긴다.
+- 항목 검사: member_id 없음·'@' 포함, site·account_status가 정해진 값 밖, 날짜 형식 오류는 그 항목만 실패로 남긴다.
 - 같은 회원은 member_id(대소문자 무시)로 덮어쓴다. 제휴사 updated_at이 같으면 '변화 없음'.
 - 활성화된 뒤에는 제휴사 이메일·이름·전화가 바뀌어도 Altos 계정 값은 바꾸지 않는다 (partner_members에만 저장).
-- status=deleted: 연결된 Altos 계정을 INACTIVE로 (사유 PARTNER_DELETED, 로그인 세션 폐기).
+- account_status=deleted: 연결된 Altos 계정을 INACTIVE로 (사유 PARTNER_DELETED, 로그인 세션 폐기).
   다시 deleted가 아니게 되면 PARTNER_DELETED로 막힌 계정만 ACTIVE로 되돌린다 (관리자가 막은 계정은 그대로).
 - 오류: 400·401·403은 설정 문제라 바로 FAILED. 429는 잠시 기다려 다시. 500·네트워크 오류는 FAILED로 두고
   다음 주기에 같은 since로 다시 받는다 (기준은 항상 마지막 성공 회차의 as_of).
@@ -222,9 +222,10 @@ def parse_item(raw: object) -> _Item:
     site = _text(raw.get("site"))
     if site not in SITES:
         raise ValueError(f"알 수 없는 site: {site}")
-    status = _text(raw.get("status"))
+    # 제휴사 응답의 회원 상태 항목 이름은 account_status (2026-11-28 명세 변경, 이전 이름 status)
+    status = _text(raw.get("account_status"))
     if status not in STATUSES:
-        raise ValueError(f"알 수 없는 status: {status}")
+        raise ValueError(f"알 수 없는 account_status: {status}")
     email = _text(raw.get("email"))
     membership = raw.get("membership") if isinstance(raw.get("membership"), dict) else {}
     expires = _text(membership.get("expires_on"))

@@ -38,7 +38,7 @@ def _item(member_id, status="active", updated="2026-12-10T09:05:42+09:00", **ext
         "email": " Shared@Example.com ",
         "phone": "01012345678",
         "sponsor_id": None,
-        "status": status,
+        "account_status": status,
         "joined_at": "2025-03-02T14:20:11+09:00",
         "membership": {"expires_on": "2026-12-31", "active": True},
         "updated_at": updated,
@@ -136,6 +136,8 @@ def test_items_are_validated_and_upserted(client, admin_headers, fake_api):  # n
                 _item("", status="active"),
                 _item("odd", status="banned"),
                 _item("baddate", joined_at="yesterday"),
+                # 예전 항목 이름 status만 있으면 실패 (2026-11-28부터 account_status)
+                {k: v for k, v in _item("oldkey").items() if k != "account_status"} | {"status": "active"},
             ],
             next_cursor="1",
         ),
@@ -143,8 +145,8 @@ def test_items_are_validated_and_upserted(client, admin_headers, fake_api):  # n
     ]
     run = _sync(client, admin_headers, "FULL")
     assert run["status"] == "SUCCEEDED", run
-    assert (run["fetched"], run["inserted"], run["updated"], run["failed"]) == (7, 2, 1, 4)
-    assert {f["member_id"] for f in run["failures"]} == {"bad@id", "", "odd", "baddate"}
+    assert (run["fetched"], run["inserted"], run["updated"], run["failed"]) == (8, 2, 1, 5)
+    assert {f["member_id"] for f in run["failures"]} == {"bad@id", "", "odd", "baddate", "oldkey"}
     rows = run_sql("select member_id, email, phone, last_sync_run_id from core.partner_members order by 1")
     assert [(r["member_id"], r["email"], r["phone"]) for r in rows] == [
         ("ukim", "shared@example.com", None),
