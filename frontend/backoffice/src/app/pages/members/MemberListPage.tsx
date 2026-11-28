@@ -39,6 +39,7 @@ type MemberRow = {
   email: string;
   uid: string;
   partnerMemberId: string | null;
+  partnerPending: boolean;
   userType: 'VIP' | 'Normal';
   nation: string;
   kyc: string;
@@ -129,6 +130,7 @@ const mapUserToRow = (user: User): MemberRow => {
     email: user.email,
     uid: user.uid || '-',
     partnerMemberId: user.partner_member_id ?? null,
+    partnerPending: Boolean(user.is_partner_pending),
     userType: String(user.grade).toUpperCase() === 'VIP' ? 'VIP' : 'Normal',
     nation,
     kyc: mapKycStatus(user.kyc_status),
@@ -532,11 +534,10 @@ export function MemberListPage() {
                   UID : {m.uid}
                 </span>
                 {m.partnerMemberId ? (
+                  <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
                   <span
                     title="제휴사 회원 (Member ID로 로그인)"
                     style={{
-                      alignSelf: 'flex-start',
-                      marginTop: 2,
                       padding: '1px 6px',
                       borderRadius: 999,
                       fontSize: 10,
@@ -548,6 +549,24 @@ export function MemberListPage() {
                     }}
                   >
                     제휴 · {m.partnerMemberId}
+                  </span>
+                  {m.partnerPending ? (
+                    // 사전 가입만 하고 회원이 아직 계정 활성화(첫 로그인)를 하지 않은 계정
+                    <span
+                      title="사전 가입 계정 · 회원이 아직 계정을 활성화하지 않았습니다"
+                      style={{
+                        padding: '1px 6px',
+                        borderRadius: 999,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        background: 'rgba(107,114,128,0.14)',
+                        color: '#6B7280',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      비활성
+                    </span>
+                  ) : null}
                   </span>
                 ) : null}
               </div>

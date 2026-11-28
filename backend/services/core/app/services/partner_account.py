@@ -3,6 +3,7 @@
 - 로그인 입력값에 `@`가 있으면 이메일(일반 계정), 없으면 제휴사 Member ID로 본다.
 - 제휴 회원은 member_id 하나마다 Altos 계정이 따로 있다. 같은 이메일을 쓰는 다른 계정에 연결하지 않는다.
 - Altos 계정은 회원이 처음 로그인할 때, 제휴사 등록 이메일로 받은 코드를 확인하고 비밀번호를 정하면 만든다.
+  관리자가 '회원사전가입'으로 미리 만든 계정(활성화 전, 비밀번호 없음)이 있으면 새로 만들지 않고 그 계정을 채운다.
 - 제휴사 status·구독 여부로 로그인을 막지 않는다. 단 deleted(제휴사에서 삭제)는 활성화하지 않는다.
 """
 
@@ -49,6 +50,9 @@ def partner_phone(phone: str | None) -> str | None:
     digits = re.sub(r"[\s\-()]", "", value)
     if re.fullmatch(r"0\d{8,10}", digits):
         return f"+82{digits[1:]}"
+    # 국가번호 뒤에 0을 그대로 붙인 형식 (82-010 2456 2800, +82-010-...) → +821024562800
+    if re.fullmatch(r"\+?820\d{8,10}", digits):
+        return f"+82{digits.lstrip('+')[3:]}"
     return value
 
 
@@ -112,21 +116,34 @@ def activation_required_error(partner: PartnerMember) -> AppError:
     )
 
 
-async def _activatable_partner(session: AsyncSession, member_id: str) -> PartnerMember:
+def ensure_pending_can_activate(user: User) -> None:
+    """사전 가입 계정(활성화 전)이 활성화할 수 있는지 본다. 막힌 계정(비활성·정지)은 활성화하지 않는다."""
+    if user.status != "ACTIVE":
+        raise AppError(409, "account_deactivated", "Account is deactivated")
+
+
+async def _activatable_partner(
+    session: AsyncSession, member_id: str, *, lock: bool = False
+) -> tuple[PartnerMember, User | None]:
+    """활성화할 제휴 회원과, 있으면 사전 가입 계정(활성화 전)을 돌려준다."""
     partner = await find_partner(session, member_id)
     if partner is None:
         raise AppError(404, "not_found", "user not found")
-    if await account_of(session, partner) is not None:
+    stmt = select(User).where(User.partner_member_id == partner.member_id)
+    user = await session.scalar(stmt.with_for_update() if lock else stmt)
+    if user is not None and not user.is_partner_pending:
         raise AppError(409, "partner_already_activated", "이미 활성화된 계정입니다. 로그인해 주세요.")
+    if user is not None:
+        ensure_pending_can_activate(user)
     ensure_activatable(partner)
-    return partner
+    return partner, user
 
 
 async def send_activation_code(
     session: AsyncSession, sender: EmailSender, member_id: str, locale: str
 ) -> tuple[PartnerMember, int]:
     """제휴사 등록 이메일로 활성화 코드를 보낸다. (회원, 유효 시간(분))을 돌려준다."""
-    partner = await _activatable_partner(session, member_id)
+    partner, _ = await _activatable_partner(session, member_id)
     assert partner.email
     expiry = await signup._issue_code(
         session,
@@ -154,7 +171,7 @@ async def complete_activation(
     await session.execute(
         text("select pg_advisory_xact_lock(hashtext(:key))"), {"key": partner_subject(partner.member_id)}
     )
-    partner = await _activatable_partner(session, partner.member_id)
+    partner, pending = await _activatable_partner(session, partner.member_id, lock=True)
     assert partner.email
 
     verification = await signup._latest_verification(
@@ -162,6 +179,20 @@ async def complete_activation(
     )
     await signup.consume_code(session, verification, body.code)
     assert verification is not None
+
+    now = _now()
+    if pending is not None:
+        # 사전 가입 계정: 새로 만들지 않고 회원이 정한 값으로 채운다.
+        pending.email = verification.email
+        pending.password_hash = hash_password(body.password)
+        pending.email_verified_at = now
+        pending.agreed_to_terms = True
+        pending.subscribed_newsletter = body.subscribe_newsletter
+        pending.locale = locale
+        pending.activated_at = now
+        await session.commit()
+        await session.refresh(pending)
+        return pending
 
     user = User(
         uid=await signup.generate_uid(session),
@@ -172,7 +203,8 @@ async def complete_activation(
         partner_member_id=partner.member_id,
         first_name=signup._clean(partner.name),
         phone=partner_phone(partner.phone),
-        email_verified_at=_now(),
+        email_verified_at=now,
+        activated_at=now,
         referral_code=await signup._generate_unique(session, User.referral_code, 8),
         agreed_to_terms=True,
         subscribed_newsletter=body.subscribe_newsletter,

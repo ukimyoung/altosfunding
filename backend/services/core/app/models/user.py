@@ -55,6 +55,11 @@ class User(Base):
     partner_member_id: Mapped[str | None] = mapped_column(ForeignKey("core.partner_members.member_id"), unique=True)
     # 탈퇴한 제휴 계정의 Member ID (연결은 풀어 같은 Member ID로 다시 활성화할 수 있게 한다).
     withdrawn_partner_member_id: Mapped[str | None]
+    # 제휴 계정 활성화 시각. 사전 가입으로 만든 뒤 아직 활성화하지 않은 제휴 계정은 None (비밀번호 없음).
+    activated_at: Mapped[datetime | None]
+    # 백오피스 '회원사전가입'으로 만든 계정이면 그 시각과 실행한 관리자
+    pre_registered_at: Mapped[datetime | None]
+    pre_registered_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("core.users.id"))
     # 추천인·수당 조직 상위는 core.member_relations (MemberRelation)에 있다.
 
     agreed_to_terms: Mapped[bool] = mapped_column(server_default="false")
@@ -66,6 +71,11 @@ class User(Base):
     withdrawn_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    @property
+    def is_partner_pending(self) -> bool:
+        """사전 가입으로 만들어졌고 아직 활성화하지 않은 제휴 계정."""
+        return self.auth_provider == "PARTNER" and self.activated_at is None
 
 
 class EmailVerification(Base):

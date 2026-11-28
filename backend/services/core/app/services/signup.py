@@ -333,4 +333,5 @@ def to_user_out(
         can_change_password=user.auth_provider in ("LOCAL", "PARTNER"),
         is_partner_member=user.partner_member_id is not None,
         partner_member_id=user.partner_member_id,
+        is_partner_pending=user.is_partner_pending,
     )

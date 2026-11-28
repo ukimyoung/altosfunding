@@ -1,10 +1,11 @@
 // 트레이더 관리 > 제휴사 회원 — 제휴사(10Power·xnsoft)에서 가져온 회원 목록과 가져오기 실행·이력.
 // Core: /api/v1/admin/partner-members (목록·요약·가져오기 상태·실행·이력)
 // 가져오기는 Worker가 작업 큐에서 실행한다. 실행 중에는 3초마다 상태를 다시 읽는다.
+// 회원사전가입: Member ID 앞 체크박스로 고른 회원만 Altos 계정을 활성화 전 상태로 미리 만든다 (자동 실행 없음).
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, CloudDownload, History, RefreshCw, Search, Users, X } from 'lucide-react';
+import { AlertTriangle, CloudDownload, History, RefreshCw, Search, UserPlus, Users, X } from 'lucide-react';
 import { useAppShell } from '../../layouts/AppShell';
 import { Toast } from '../../components/shared/Toast';
 import { getMemberDetailRoute } from '../../config/navigation';
@@ -15,17 +16,29 @@ import {
   getSyncRun,
   getSyncRuns,
   getSyncState,
+  preRegisterPartnerMembers,
   startSync,
 } from '../../../api/partnerMembers';
 import type {
+  PartnerMember,
   PartnerMemberParams,
+  PreRegisterSkipReason,
   PartnerSite,
   PartnerStatus,
   SyncMode,
   SyncRun,
 } from '../../../api/partnerMembers';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZES = [20, 50, 100] as const;
+const PRE_REGISTER_MAX = 1000;
+const SKIP_LABEL: Record<PreRegisterSkipReason, string> = {
+  already_exists: '이미 계정 있음',
+  no_email: '이메일 없음',
+  withdrawn: '탈퇴한 계정 있음',
+  not_found: '회원 없음',
+};
+// 사전 가입할 수 있는 회원: 아직 Altos 계정이 없고 이메일이 있는 회원
+const canPreRegister = (m: PartnerMember) => !m.user_id && Boolean(m.email);
 const KEY = ['partner-members'] as const;
 
 const STATUS_LABEL: Record<PartnerStatus, string> = {
@@ -52,6 +65,10 @@ export function PartnerMembersPage() {
   const [keywordInput, setKeywordInput] = useState('');
   const [filters, setFilters] = useState<PartnerMemberParams>({});
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZES[0]);
+  // 회원사전가입 대상 (페이지를 넘겨도 유지). member_id → 제휴사 삭제 회원 여부
+  const [selected, setSelected] = useState<Map<string, boolean>>(new Map());
+  const [confirmPre, setConfirmPre] = useState(false);
   const [runsPage, setRunsPage] = useState(1);
   const [confirmFull, setConfirmFull] = useState(false);
   const [detailRunId, setDetailRunId] = useState<number | null>(null);
@@ -101,8 +118,8 @@ export function PartnerMembersPage() {
 
   const summary = useQuery({ queryKey: [...KEY, 'summary'], queryFn: getPartnerMemberSummary });
   const members = useQuery({
-    queryKey: [...KEY, 'list', filters, page],
-    queryFn: () => getPartnerMembers({ ...filters, page, size: PAGE_SIZE }),
+    queryKey: [...KEY, 'list', filters, page, pageSize],
+    queryFn: () => getPartnerMembers({ ...filters, page, size: pageSize }),
     placeholderData: keepPreviousData,
   });
   const runs = useQuery({
@@ -130,6 +147,46 @@ export function PartnerMembersPage() {
       setToast({ message: apiErrorMessage(error, '가져오기를 시작하지 못했습니다.'), type: 'warning' });
     },
   });
+
+  const preRegister = useMutation({
+    mutationFn: preRegisterPartnerMembers,
+    onSuccess: (result) => {
+      setConfirmPre(false);
+      setSelected(new Map());
+      const made = result.created.length + result.created_inactive.length;
+      const parts = [`${made.toLocaleString()}명 사전 가입 완료`];
+      if (result.created_inactive.length) parts.push(`제휴사 삭제 회원 ${result.created_inactive.length}명은 비활성으로 생성`);
+      if (result.skipped.length) {
+        const counts = new Map<string, number>();
+        result.skipped.forEach((x) => counts.set(SKIP_LABEL[x.reason] ?? x.reason, (counts.get(SKIP_LABEL[x.reason] ?? x.reason) ?? 0) + 1));
+        parts.push(`제외 ${result.skipped.length}명 (${[...counts].map(([k, v]) => `${k} ${v}`).join(', ')})`);
+      }
+      setToast({ message: parts.join(' · '), type: result.skipped.length ? 'warning' : 'success' });
+      void queryClient.invalidateQueries({ queryKey: KEY });
+    },
+    onError: (error) => {
+      setConfirmPre(false);
+      setToast({ message: apiErrorMessage(error, '사전 가입을 실행하지 못했습니다.'), type: 'warning' });
+    },
+  });
+
+  const toggle = (m: PartnerMember) =>
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (next.has(m.member_id)) next.delete(m.member_id);
+      else next.set(m.member_id, m.status === 'deleted');
+      return next;
+    });
+  const pageEligible = (members.data?.items ?? []).filter(canPreRegister);
+  const allPageSelected = pageEligible.length > 0 && pageEligible.every((m) => selected.has(m.member_id));
+  const togglePage = () =>
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (allPageSelected) pageEligible.forEach((m) => next.delete(m.member_id));
+      else pageEligible.forEach((m) => next.set(m.member_id, m.status === 'deleted'));
+      return next;
+    });
+  const selectedDeleted = [...selected.values()].filter(Boolean).length;
 
   const setFilter = (patch: PartnerMemberParams) => {
     setFilters((prev) => ({ ...prev, ...patch }));
@@ -209,10 +266,11 @@ export function PartnerMembersPage() {
       </div>
 
       {/* 요약 */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
         {[
           { label: '전체 회원', value: s?.total },
-          { label: '계정 활성화', value: s?.linked },
+          { label: '계정 활성화', value: s ? s.linked - s.pending : undefined },
+          { label: '사전 가입 (활성화 전)', value: s?.pending },
           { label: '구독 활성', value: s?.membership_active },
           { label: '정지·삭제', value: s ? s.status.suspended + s.status.deleted : undefined },
           { label: '이메일 없음', value: s?.no_email },
@@ -247,6 +305,25 @@ export function PartnerMembersPage() {
 
       {tab === 'members' ? (
         <div style={card}>
+          {/* 회원사전가입 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              disabled={selected.size === 0 || preRegister.isPending}
+              onClick={() => setConfirmPre(true)}
+              style={button(true, selected.size === 0 || preRegister.isPending)}
+            >
+              <UserPlus size={14} /> 회원사전가입
+            </button>
+            <span style={{ fontSize: 12, color: selected.size ? t.text : t.textHint }}>
+              {selected.size ? `${selected.size.toLocaleString()}명 선택됨` : '사전 가입할 회원을 Member ID 앞 체크박스로 선택하세요. (계정이 없고 이메일이 있는 회원만 선택할 수 있습니다)'}
+            </span>
+            {selected.size > 0 && (
+              <button type="button" onClick={() => setSelected(new Map())} style={{ border: 'none', background: 'none', color: t.accent, fontSize: 12, cursor: 'pointer', padding: 0 }}>
+                선택 해제
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
             <form
               onSubmit={(e) => {
@@ -275,13 +352,14 @@ export function PartnerMembersPage() {
               ))}
             </select>
             <select
-              value={filters.linked === undefined ? '' : String(filters.linked)}
-              onChange={(e) => setFilter({ linked: e.target.value === '' ? undefined : e.target.value === 'true' })}
+              value={filters.account ?? ''}
+              onChange={(e) => setFilter({ account: (e.target.value || undefined) as PartnerMemberParams['account'] })}
               style={select}
             >
               <option value="">Altos 계정 전체</option>
-              <option value="true">활성화됨</option>
-              <option value="false">활성화 전</option>
+              <option value="none">계정 없음</option>
+              <option value="pending">사전 가입 (활성화 전)</option>
+              <option value="activated">활성화됨</option>
             </select>
             <select value={filters.membership ?? ''} onChange={(e) => setFilter({ membership: (e.target.value || undefined) as PartnerMemberParams['membership'] })} style={select}>
               <option value="">구독 전체</option>
@@ -289,12 +367,35 @@ export function PartnerMembersPage() {
               <option value="expired">구독 만료</option>
               <option value="none">구독 이력 없음</option>
             </select>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              style={select}
+            >
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>{n}개씩</option>
+              ))}
+            </select>
           </div>
 
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1180 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1220 }}>
               <thead>
                 <tr>
+                  <th style={{ ...th, width: 36, paddingRight: 0 }}>
+                    <input
+                      type="checkbox"
+                      aria-label="이 페이지에서 사전 가입할 수 있는 회원 모두 선택"
+                      title="이 페이지에서 사전 가입할 수 있는 회원 모두 선택"
+                      checked={allPageSelected}
+                      disabled={pageEligible.length === 0}
+                      onChange={togglePage}
+                      style={{ cursor: pageEligible.length ? 'pointer' : 'not-allowed', accentColor: t.accent }}
+                    />
+                  </th>
                   {['Member ID', '사이트', '이름', '이메일', '전화', '추천인 ID', '상태', '구독 만료일', '가입일 (GMT+9)', 'Altos 계정', '마지막 가져옴 (GMT+9)'].map((h) => (
                     <th key={h} style={th}>{h}</th>
                   ))}
@@ -302,7 +403,18 @@ export function PartnerMembersPage() {
               </thead>
               <tbody>
                 {(members.data?.items ?? []).map((m) => (
-                  <tr key={m.member_id}>
+                  <tr key={m.member_id} style={{ background: selected.has(m.member_id) ? t.accentBg : undefined }}>
+                    <td style={{ ...td, width: 36, paddingRight: 0 }}>
+                      <input
+                        type="checkbox"
+                        aria-label={`${m.member_id} 선택`}
+                        title={m.user_id ? '이미 Altos 계정이 있습니다' : m.email ? '' : '이메일이 없어 사전 가입할 수 없습니다'}
+                        checked={selected.has(m.member_id)}
+                        disabled={!canPreRegister(m)}
+                        onChange={() => toggle(m)}
+                        style={{ cursor: canPreRegister(m) ? 'pointer' : 'not-allowed', accentColor: t.accent }}
+                      />
+                    </td>
                     <td style={{ ...td, ...mono, fontWeight: 600 }}>{m.member_id}</td>
                     <td style={{ ...td, color: t.textSec }}>{m.site}</td>
                     <td style={td}>{m.name || '-'}</td>
@@ -331,8 +443,9 @@ export function PartnerMembersPage() {
                           {m.user_uid}
                         </button>
                       ) : (
-                        <span style={{ color: t.textHint }}>활성화 전</span>
+                        <span style={{ color: t.textHint }}>없음</span>
                       )}
+                      {m.user_id && !m.activated_at ? <span style={{ marginLeft: 6 }}>{pill('#6B7280', '사전 가입 · 활성화 전')}</span> : null}
                       {m.user_status && m.user_status !== 'ACTIVE' ? <span style={{ marginLeft: 6 }}>{pill('#DC2626', m.user_status)}</span> : null}
                     </td>
                     <td style={{ ...td, color: t.textSec }}>{formatKst(m.last_synced_at)}</td>
@@ -340,7 +453,7 @@ export function PartnerMembersPage() {
                 ))}
                 {members.data && members.data.items.length === 0 && (
                   <tr>
-                    <td colSpan={11} style={{ ...td, textAlign: 'center', color: t.textHint, padding: 40 }}>
+                    <td colSpan={12} style={{ ...td, textAlign: 'center', color: t.textHint, padding: 40 }}>
                       {s?.total ? '조건에 맞는 회원이 없습니다.' : '아직 가져온 회원이 없습니다. 위의 가져오기 버튼을 눌러 주세요.'}
                     </td>
                   </tr>
@@ -387,6 +500,39 @@ export function PartnerMembersPage() {
             </table>
           </div>
           {runs.data && runs.data.pages > 1 && pager(runsPage, runs.data.pages, setRunsPage)}
+        </div>
+      )}
+
+      {/* 회원사전가입 확인 */}
+      {confirmPre && (
+        <div onClick={() => !preRegister.isPending && setConfirmPre(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 460, background: t.surface, borderRadius: 12, border: `1px solid ${t.border}`, padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 600, color: t.text, marginBottom: 10 }}>
+              <UserPlus size={16} color={t.accent} /> 회원사전가입
+            </div>
+            <div style={{ fontSize: 13, color: t.textSec, lineHeight: 1.7, marginBottom: 20 }}>
+              선택한 <b style={{ color: t.text }}>{selected.size.toLocaleString()}명</b>의 Altos 계정을 미리 만듭니다.
+              <br />비밀번호가 없는 '활성화 전' 계정으로 만들어지며, 회원이 Member ID로 처음 로그인할 때 이메일 인증과 비밀번호 설정으로 활성화합니다.
+              <br />환영 메일은 회원이 활성화할 때 보냅니다.
+              {selectedDeleted > 0 && (
+                <><br /><span style={{ color: '#D97706' }}>제휴사에서 삭제된 회원 {selectedDeleted}명은 비활성 계정으로 만듭니다.</span></>
+              )}
+              {selected.size > PRE_REGISTER_MAX && (
+                <><br /><span style={{ color: '#DC2626' }}>한 번에 {PRE_REGISTER_MAX.toLocaleString()}명까지 실행할 수 있습니다. 선택을 줄여 주세요.</span></>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button type="button" onClick={() => setConfirmPre(false)} style={button(false, false)}>취소</button>
+              <button
+                type="button"
+                disabled={preRegister.isPending || selected.size > PRE_REGISTER_MAX}
+                onClick={() => preRegister.mutate([...selected.keys()])}
+                style={button(true, preRegister.isPending || selected.size > PRE_REGISTER_MAX)}
+              >
+                {preRegister.isPending ? '실행 중...' : '사전 가입 실행'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
