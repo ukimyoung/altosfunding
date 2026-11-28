@@ -64,6 +64,8 @@ class AccountListItem(BaseModel):
     user_id: str
     product_id: str
     product_name: str | None = None
+    # 계좌 유형 (Starter·Professional·Elite·Prime). 펀디드 계좌는 원래 챌린지 상품 기준. 회원 목록에서만 채운다.
+    account_type: str | None = None
     status: str
     provision_status: str
     tier: str

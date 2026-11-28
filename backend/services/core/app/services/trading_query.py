@@ -347,7 +347,50 @@ async def my_accounts(
     rows = await _account_rows(
         session, query.order_by(TradingAccount.created_at.desc(), TradingAccount.id).offset((page - 1) * size).limit(size)
     )
-    return [account_out(a, p, c, user) for a, p, c in rows], total
+    items = [account_out(a, p, c, user) for a, p, c in rows]
+    types = await _account_types(session, rows)
+    for item, (a, _p, _c) in zip(items, rows, strict=True):
+        item["account_type"] = types.get(a.id)
+    return items, total
+
+
+def _type_name(name: str | None) -> str | None:
+    """상품명에서 공통 접두어('Challenge '·'Funded ')를 뺀 유형 이름 (Challenge Starter → Starter)."""
+    if not name or not name.strip():
+        return None
+    words = name.strip().split(None, 1)
+    if len(words) == 2 and words[0].lower() in ("challenge", "funded"):
+        return words[1].strip()
+    return name.strip()
+
+
+async def _account_types(
+    session: AsyncSession, rows: list[tuple[TradingAccount, Product, Challenge | None]]
+) -> dict[uuid.UUID, str | None]:
+    """계좌 유형 (Starter·Professional·Elite·Prime).
+    펀디드 계좌는 상품명이 'Funded 100K'처럼 유형과 다를 수 있어 원래 챌린지 계좌의 상품 →
+    펀디드 상품의 연관 챌린지 상품 → 자기 상품 순으로 정한다 (필터 product_type과 같은 기준)."""
+    source_ids = {a.source_account_id for a, _p, _c in rows if a.source_account_id}
+    related_ids = {p.related_id for _a, p, _c in rows if p is not None and p.related_id}
+    source_names: dict[uuid.UUID, str] = {}
+    if source_ids:
+        found = await session.execute(
+            select(TradingAccount.id, Product.name)
+            .join(Product, Product.product_id == TradingAccount.product_id)
+            .where(TradingAccount.id.in_(source_ids))
+        )
+        source_names = dict(found.tuples().all())
+    related_names: dict[str, str] = {}
+    if related_ids:
+        found = await session.execute(select(Product.product_id, Product.name).where(Product.product_id.in_(related_ids)))
+        related_names = dict(found.tuples().all())
+    out: dict[uuid.UUID, str | None] = {}
+    for a, p, _c in rows:
+        name = source_names.get(a.source_account_id) if a.source_account_id else None
+        if not name and p is not None and p.related_id:
+            name = related_names.get(p.related_id)
+        out[a.id] = _type_name(name or (p.name if p is not None else None))
+    return out
 
 
 async def my_account(session: AsyncSession, user: User, account_id: uuid.UUID) -> dict:
