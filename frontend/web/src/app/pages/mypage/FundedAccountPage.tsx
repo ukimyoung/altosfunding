@@ -796,7 +796,7 @@ export function FundedAccountPage() {
         <div className="flex justify-center">
           <button
             disabled={item.mt4Login <= 0}
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#0052FF] hover:bg-[#0052FF]/90 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-[#0052FF]/30 disabled:cursor-not-allowed disabled:bg-[#24243a] disabled:text-gray-500 disabled:hover:bg-[#24243a] disabled:hover:shadow-none"
+            className="flex items-center gap-1.5 px-3 py-2 bg-[#0052FF] hover:bg-[#0052FF]/90 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-[#0052FF]/30 disabled:cursor-not-allowed disabled:bg-[#24243a] disabled:text-gray-500 disabled:hover:bg-[#24243a] disabled:hover:shadow-none"
             onClick={() => handleViewFundedAccountDetails(item)}
           >
             <Eye size={16} />
@@ -811,7 +811,7 @@ export function FundedAccountPage() {
       accessor: (item) => (
         <div className="flex justify-center">
           <button
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
               isPayoutDisabled(item)
                 ? 'bg-gray-600/30 text-gray-500 cursor-not-allowed'
                 : 'bg-[#00FF94] hover:bg-[#00FF94]/90 text-[#0f0f17] hover:shadow-lg hover:shadow-[#00FF94]/30'
@@ -1108,6 +1108,9 @@ export function FundedAccountPage() {
           <DataTable
             data={displayData}
             columns={fundedAccountColumns}
+            // 열이 8개라 1440px에서 헤더·버튼 글자가 두 줄로 내려가지 않도록 좌우 여백을 줄이고 줄바꿈을 막는다.
+            desktopHeaderCellClassName="px-3 py-4 text-xs font-medium uppercase tracking-wide text-gray-400 whitespace-nowrap"
+            desktopCellClassName="px-3 py-5 whitespace-nowrap"
             keyExtractor={(item) => item.id}
             currentPage={currentPage}
             totalPages={totalPages}
@@ -1135,6 +1138,9 @@ export function FundedAccountPage() {
                   <div>
                     <p className="text-white font-mono text-sm mb-1">
                       {account.mt4Login.toString()}
+                      <span className="ml-2 font-sans text-xs font-semibold text-[#00FF94]">
+                        {account.accountType}
+                      </span>
                     </p>
                     <p className="text-[#0052FF] text-xs font-semibold">
                       ${account.funding.toLocaleString('en-US')} {text.fundedCapitalMobile}
