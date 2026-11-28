@@ -354,9 +354,14 @@ export function ChallengeAccountPage() {
   const accountTypeFilterValues: Record<string, AccountTypeFilter> = Object.fromEntries(
     ACCOUNT_TYPE_FILTERS.map((type) => [accountTypeFilterLabels[type], type]),
   );
+  // 'In Progress'·'Inactive'는 Core가 계좌에 쓰지 않아 항상 0건이라 필터 목록에서 숨긴다 (사용자 요청).
+  const HIDDEN_STATUS_FILTERS: readonly ChallengeAccountStatus[] = [
+    'IN_PROGRESS', // 진행 중
+    'INACTIVE', // 비활성
+  ];
   const statusFilterOptions = [
     { label: text.statusAll, value: 'All' as const },
-    ...CHALLENGE_ACCOUNT_STATUSES.map((status) => ({
+    ...CHALLENGE_ACCOUNT_STATUSES.filter((status) => !HIDDEN_STATUS_FILTERS.includes(status)).map((status) => ({
       label: getChallengeStatusLabel(status),
       value: status,
     })),
