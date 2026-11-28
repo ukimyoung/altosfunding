@@ -8,6 +8,12 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { AlertTriangle, CloudDownload, History, RefreshCw, Search, UserPlus, Users, X } from 'lucide-react';
 import { useAppShell } from '../../layouts/AppShell';
 import { Toast } from '../../components/shared/Toast';
+import {
+  TablePagination,
+  buildPaginationItems,
+  buildPaginationSummary,
+  getPaginationRange,
+} from '../../components/shared/DataTable';
 import { getMemberDetailRoute } from '../../config/navigation';
 import { apiErrorMessage, formatKst } from '../../../api/affiliate';
 import {
@@ -247,13 +253,35 @@ export function PartnerMembersPage() {
   const last = state?.last_succeeded;
   const s = summary.data;
 
-  const pager = (current: number, pages: number, onChange: (p: number) => void) => (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6, marginTop: 14 }}>
-      <button type="button" disabled={current <= 1} onClick={() => onChange(current - 1)} style={button(false, current <= 1)}>이전</button>
-      <span style={{ fontSize: 12, color: t.textSec, padding: '0 8px' }}>{current} / {Math.max(pages, 1)}</span>
-      <button type="button" disabled={current >= pages} onClick={() => onChange(current + 1)} style={button(false, current >= pages)}>다음</button>
-    </div>
-  );
+  // 회원 목록과 같은 공용 페이지 이동 ('총 N명 중 a - b명 표시' + < 1 … 8 9 10 … 136 >)
+  const pager = (
+    data: { total: number; page: number; size: number; pages: number; items: unknown[] } | undefined,
+    current: number,
+    onChange: (p: number) => void,
+    unit: string,
+  ) => {
+    const total = data?.total ?? 0;
+    const pages = Math.max(1, data?.pages ?? 1);
+    const safe = Math.min(Math.max(1, current), pages);
+    const range = getPaginationRange({
+      totalItems: total,
+      currentPage: safe,
+      pageSize: data?.size ?? pageSize,
+      currentPageItemCount: data?.items.length ?? 0,
+    });
+    return (
+      <TablePagination
+        summary={buildPaginationSummary({ totalItems: total, start: range.start, end: range.end, unit })}
+        containerStyle={{ padding: '12px 4px 0', marginTop: 4 }}
+        borderColor={t.border}
+        textColor={t.textHint}
+        activeBackground={t.accent}
+        inactiveBackground={t.surface2}
+        inactiveBorderColor={t.border2}
+        items={buildPaginationItems({ currentPage: safe, totalPages: pages, onPageChange: onChange })}
+      />
+    );
+  };
 
   return (
     <div style={{ padding: 32, background: t.pageBg, minHeight: 'calc(100vh - 52px)' }}>
@@ -514,8 +542,7 @@ export function PartnerMembersPage() {
               </tbody>
             </table>
           </div>
-          <div style={{ fontSize: 12, color: t.textHint, marginTop: 10 }}>총 {members.data?.total.toLocaleString() ?? 0}명</div>
-          {members.data && members.data.pages > 1 && pager(page, members.data.pages, setPage)}
+          {pager(members.data, page, setPage, '명')}
         </div>
       ) : (
         <div style={card}>
@@ -552,7 +579,7 @@ export function PartnerMembersPage() {
               </tbody>
             </table>
           </div>
-          {runs.data && runs.data.pages > 1 && pager(runsPage, runs.data.pages, setRunsPage)}
+          {pager(runs.data, runsPage, setRunsPage, '건')}
         </div>
       )}
 
