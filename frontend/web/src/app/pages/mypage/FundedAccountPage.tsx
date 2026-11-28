@@ -34,7 +34,11 @@ import {
   useFundedSummaryQuery,
 } from '@/app/queries/accounts';
 import { checkPayoutPositions } from '@/api/payouts';
-import { formatDateByBrowserTimeZone } from '@/app/utils/date';
+import {
+  formatBrowserGmtOffset,
+  formatDateByBrowserTimeZone,
+  formatDateTimeByBrowserTimeZone,
+} from '@/app/utils/date';
 import { ChallengeDetailModal } from '../../components/shared/ChallengeDetailModal';
 import { ActivePositionWarningModal } from '../../components/shared/ActivePositionWarningModal';
 import { DataTable, Column } from '../../components/shared/DataTable';
@@ -64,6 +68,9 @@ type FundedAccount = {
   statusLabel: string;
   banReason?: string;
   startDate: string;
+  // 펀디드 시작 일시 (계좌 start_at, 브라우저 시간대, YYYY-MM-DD HH:mm). 목록 'Start Date' 열에 표시.
+  startDateTime: string;
+  rawStartDate?: string;
   endDate: string;
 };
 
@@ -447,6 +454,8 @@ export function FundedAccountPage() {
         statusLabel: getFundedStatusLabel(toFundedStatus(item.status)),
         banReason: item.reason ?? undefined,
         startDate: normalizeDateValue(item.start_date),
+        startDateTime: (item.start_date && formatDateTimeByBrowserTimeZone(item.start_date).slice(0, 16)) || '-',
+        rawStartDate: item.start_date || undefined,
         endDate: normalizeDateValue(item.end_date),
       };
     });
@@ -752,6 +761,19 @@ export function FundedAccountPage() {
       ),
     },
     {
+      header: text.colStartDate,
+      align: 'center',
+      // Challenge 목록 'CHALLENGE PERIOD'와 같은 형식: 시작 일시(브라우저 시간대) + 아래 줄에 GMT 오프셋 (예: GMT+9).
+      accessor: (item) => (
+        <div className="whitespace-nowrap">
+          <p className="text-white text-sm">{item.startDateTime}</p>
+          {item.rawStartDate && (
+            <p className="text-gray-500 text-xs mt-1">{formatBrowserGmtOffset(item.rawStartDate)}</p>
+          )}
+        </div>
+      ),
+    },
+    {
       header: text.colBalance,
       align: 'right',
       accessor: (item) => (
@@ -796,10 +818,11 @@ export function FundedAccountPage() {
         <div className="flex justify-center">
           <button
             disabled={item.mt4Login <= 0}
-            className="flex items-center gap-1.5 px-3 py-2 bg-[#0052FF] hover:bg-[#0052FF]/90 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-[#0052FF]/30 disabled:cursor-not-allowed disabled:bg-[#24243a] disabled:text-gray-500 disabled:hover:bg-[#24243a] disabled:hover:shadow-none"
+            className="flex items-center gap-1 min-[1440px]:gap-1.5 px-2 min-[1440px]:px-3 py-2 bg-[#0052FF] hover:bg-[#0052FF]/90 text-white rounded-lg text-sm font-medium transition-all hover:shadow-lg hover:shadow-[#0052FF]/30 disabled:cursor-not-allowed disabled:bg-[#24243a] disabled:text-gray-500 disabled:hover:bg-[#24243a] disabled:hover:shadow-none"
             onClick={() => handleViewFundedAccountDetails(item)}
           >
-            <Eye size={16} />
+            {/* 1280~1439px에서는 표 너비를 위해 아이콘을 숨긴다 */}
+            <Eye size={16} className="hidden min-[1440px]:block" />
             {text.details}
           </button>
         </div>
@@ -811,7 +834,7 @@ export function FundedAccountPage() {
       accessor: (item) => (
         <div className="flex justify-center">
           <button
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1 min-[1440px]:gap-1.5 px-2 min-[1440px]:px-3 py-2 rounded-lg text-sm font-medium transition-all ${
               isPayoutDisabled(item)
                 ? 'bg-gray-600/30 text-gray-500 cursor-not-allowed'
                 : 'bg-[#00FF94] hover:bg-[#00FF94]/90 text-[#0f0f17] hover:shadow-lg hover:shadow-[#00FF94]/30'
@@ -822,7 +845,7 @@ export function FundedAccountPage() {
             {withdrawingAccounts.has(item.id) ? (
               <Clock size={16} className="animate-spin" />
             ) : (
-              <ArrowUpRight size={16} />
+              <ArrowUpRight size={16} className="hidden min-[1440px]:block" />
             )}
             {text.requestPayout}
           </button>
@@ -1109,8 +1132,8 @@ export function FundedAccountPage() {
             data={displayData}
             columns={fundedAccountColumns}
             // 열이 8개라 1440px에서 헤더·버튼 글자가 두 줄로 내려가지 않도록 좌우 여백을 줄이고 줄바꿈을 막는다.
-            desktopHeaderCellClassName="px-3 py-4 text-xs font-medium uppercase tracking-wide text-gray-400 whitespace-nowrap"
-            desktopCellClassName="px-3 py-5 whitespace-nowrap"
+            desktopHeaderCellClassName="px-2 min-[1440px]:px-3 py-4 text-xs font-medium uppercase tracking-normal min-[1440px]:tracking-wide text-gray-400 whitespace-nowrap"
+            desktopCellClassName="px-2 min-[1440px]:px-3 py-5 whitespace-nowrap"
             keyExtractor={(item) => item.id}
             currentPage={currentPage}
             totalPages={totalPages}

@@ -73,6 +73,7 @@ export const fundedKo: FundedTranslations = {
   colAccountId: '계좌 ID',
   colAccountType: '계좌 유형',
   colFundedCapital: '펀딩 자본금',
+  colStartDate: '시작일',
   colBalance: '잔고',
   colProfit: '손익',
   colStatus: '상태',

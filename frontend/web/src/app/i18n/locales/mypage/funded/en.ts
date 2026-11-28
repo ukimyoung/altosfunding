@@ -74,6 +74,7 @@ export const fundedEn: FundedTranslations = {
   colAccountId: 'Account ID',
   colAccountType: 'Account Type',
   colFundedCapital: 'Funded Capital',
+  colStartDate: 'Start Date',
   colBalance: 'Balance',
   colProfit: 'Profit',
   colStatus: 'Status',

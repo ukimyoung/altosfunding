@@ -79,6 +79,7 @@ export interface FundedTranslations {
   colAccountId: string;
   colAccountType: string;
   colFundedCapital: string;
+  colStartDate: string;
   colBalance: string;
   colProfit: string;
   colStatus: string;
